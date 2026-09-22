@@ -1,0 +1,51 @@
+/* Gamepad and keyboard, straight from evdev.
+ *
+ * Every /dev/input/event* that reports keys is opened and polled together,
+ * so the built-in pad, a paired controller and a USB keyboard all work
+ * without knowing which is which.
+ *
+ * The poll blocks with no timeout while nothing is held, which is where the
+ * idle cost of this program goes to zero. A timeout is only used to drive
+ * key repeat for a held direction.
+ */
+#ifndef PL_INPUT_H
+#define PL_INPUT_H
+
+enum action {
+	ACT_NONE = 0,
+	ACT_UP,
+	ACT_DOWN,
+	ACT_LEFT,
+	ACT_RIGHT,
+	ACT_CONFIRM,
+	ACT_BACK,
+	ACT_MENU,     /* the settings key            */
+	ACT_PALETTE,  /* cycles the colour ramp, for choosing one */
+	ACT_TICK,     /* the idle timeout expired; nothing was pressed */
+	ACT_QUIT,     /* only bound to a keyboard escape hatch */
+};
+
+#define INPUT_MAX_DEV 24
+
+struct input {
+	int fd[INPUT_MAX_DEV];
+	int n;
+	enum action held;      /* direction currently held, for repeat */
+	int repeats;           /* how many repeats have fired          */
+};
+
+int  input_open(struct input *in);
+void input_close(struct input *in);
+
+/* Blocks until something happens and returns one action.
+ *
+ * idle_ms bounds the wait so the caller can refresh a clock; ACT_TICK says
+ * that is why it returned. A negative idle_ms blocks forever. Key repeat
+ * shortens the wait on its own when a direction is held, so passing a long
+ * idle_ms does not make the pad feel sluggish.
+ *
+ * ACT_NONE means it woke for something that is not a binding, which the
+ * caller can ignore and call again. */
+enum action input_wait(struct input *in, int idle_ms);
+
+#endif

@@ -1,0 +1,13 @@
+# Build environment for portarelauncher.
+#
+# Debian bookworm is glibc 2.36 and the device is 2.41, so a binary built
+# here runs there - glibc is forward compatible, not backward. Native arm64,
+# so this is a compile rather than a cross-compile.
+FROM docker.io/library/debian:bookworm-slim
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        gcc libc6-dev make pkg-config libdrm-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src

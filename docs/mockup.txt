@@ -1,0 +1,96 @@
+    SYSTEMS
+    .....................................................  <- 53 columns
+     PortareOS                            23:59  BAT 87% |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+      SYSTEMS                                  12 found  |
+                                                         |
+      ▸ GameCube                                     24  |
+        Nintendo 64                                   9  |
+        PlayStation                                 112  |
+        PlayStation 2                                 2  |
+        PlayStation Portable                         31  |
+        SNES                                        204  |
+        Mega Drive                                   88  |
+        Game Boy Advance                            140  |
+        Dreamcast                                     6  |
+        Arcade                                       47  |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A SELECT   Y SETTINGS                       ↑↓ MOVE |
+                                                         |
+                                                         |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    GAMES
+    .....................................................  <- 53 columns
+     PortareOS  ›  PlayStation                 112 games |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+        Tekken 2                                         |
+      ▸ Tekken 3                                         |
+        Tomb Raider                                      |
+        Tony Hawk's Pro Skater 2                         |
+        Vagrant Story                                    |
+        Wipeout XL                                       |
+        Xenogears                                        |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+        swanstation                            8 of 112  |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A LAUNCH   B BACK                           ↑↓ MOVE |
+                                                         |
+                                                         |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    SETTINGS (stub)
+    .....................................................  <- 53 columns
+     PortareOS  ›  Settings                              |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+      ▸ Wi-Fi                                Hofmann-5G  |
+        Bluetooth                                   off  |
+        Brightness                                  70%  |
+        USB gadget mode                             off  |
+                                                         |
+     ─────────────────────────────────────────────────── |
+                                                         |
+        Everything here is a stub in the first cut.      |
+        The list renders and moves, nothing applies yet. |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A CHANGE   B BACK                           ↑↓ MOVE |
+                                                         |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    LAUNCHING
+    .....................................................  <- 53 columns
+     PortareOS                            23:59  BAT 87% |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+               Tekken 3 (USA)                            |
+                                                         |
+               swanstation                               |
+                                                         |
+               handing over the display…                 |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
