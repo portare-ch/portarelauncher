@@ -40,6 +40,11 @@ void kms_close(struct kms *k);
  * DRM master, because it will have set its own. */
 int  kms_present(struct kms *k);
 
+/* Blanks by disabling the CRTC, which powers the panel down rather than
+ * drawing black on it - on an OLED the difference is the backlight-equivalent
+ * rather than a dark picture. */
+int  kms_blank(struct kms *k);
+
 int  kms_drop_master(struct kms *k);
 int  kms_set_master(struct kms *k);
 

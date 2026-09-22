@@ -66,11 +66,15 @@ static const char *const settings_labels[N_SETTINGS] = {
 };
 
 static volatile sig_atomic_t stop_requested;
+static volatile sig_atomic_t blank_requested;   /* -1 off, 1 on, 0 nothing */
 
 static void on_signal(int sig)
 {
-	(void)sig;
-	stop_requested = 1;
+	switch (sig) {
+	case SIGUSR1: blank_requested = -1; break;
+	case SIGUSR2: blank_requested = 1;  break;
+	default:      stop_requested = 1;   break;
+	}
 }
 
 static unsigned list_rows(const struct ui *u)
@@ -400,6 +404,11 @@ int main(void)
 
 	signal(SIGINT, on_signal);
 	signal(SIGTERM, on_signal);
+	/* The panel is ours, so blanking it is ours too. power-handler used to
+	 * ask sway; with no compositor there is nobody else holding DRM
+	 * master who could. */
+	signal(SIGUSR1, on_signal);
+	signal(SIGUSR2, on_signal);
 
 	if (catalog_load(&u.cat, ES_SYSTEMS, SETTINGS) < 0)
 		return 1;
@@ -450,6 +459,21 @@ int main(void)
 		/* Sleep until the minute turns over, or until a button is
 		 * pressed. Nothing else wakes this program. */
 		enum action a = input_wait(&u.in, status_ms_to_next_minute());
+
+		if (blank_requested) {
+			int on = blank_requested > 0;
+			blank_requested = 0;
+			if (on) {
+				kms_present(&u.kms);
+				term_invalidate(&u.term);
+				status_read(&u.st);
+				redraw(&u);
+			} else {
+				kms_blank(&u.kms);
+			}
+			continue;
+		}
+
 		if (a == ACT_NONE)
 			continue;
 		on_action(&u, a);

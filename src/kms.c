@@ -163,6 +163,15 @@ int kms_present(struct kms *k)
 	return 0;
 }
 
+int kms_blank(struct kms *k)
+{
+	if (drmModeSetCrtc(k->fd, k->crtc_id, 0, 0, 0, NULL, 0, NULL) < 0) {
+		fprintf(stderr, "blank: %s\n", strerror(errno));
+		return -1;
+	}
+	return 0;
+}
+
 int kms_drop_master(struct kms *k)
 {
 	if (drmDropMaster(k->fd) < 0) {
