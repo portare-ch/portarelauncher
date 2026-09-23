@@ -55,6 +55,7 @@
       ▸ Bluetooth                            WH-1000XM4  |
         USB gadget mode                         network  |
         Button style                            Retroid  |
+        Colour                                     grey  |
                                                          |
      ─────────────────────────────────────────────────── |
                                                          |
@@ -67,7 +68,6 @@
                                                          |
      ─────────────────────────────────────────────────── |
      A CHANGE   B BACK                           ↑↓ MOVE |
-                                                         |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     BLUETOOTH
@@ -92,6 +92,102 @@
      ─────────────────────────────────────────────────── |
      A DISCONNECT   B BACK   Y SCAN                      |
                                                          |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    KEYBOARD - letters
+    .....................................................  <- 53 columns
+     Settings  ›  Wi-Fi VOL 50%  BRI 70%  BAT 87%  23:59 |
+     ═══════════════════════════════════════════════════ |
+      NETWORK  FRITZ!Box 7520 JI                         |
+      PASSWORD                       4 / 63  at least 8  |
+      ┌───────────────────────────────────────────────┐  |
+      │ hunt_                                         │  |
+      └───────────────────────────────────────────────┘  |
+                                                         |
+       1    2    3    4    5    6    7    8    9    0    |
+       q    w  [ e ]  r    t    y    u    i    o    p    |
+       a    s    d    f    g    h    j    k    l    -    |
+       z    x    c    v    b    n    m    _    .    @    |
+       SHIFT      #+=         SPACE      DEL    DONE     |
+                                                         |
+        SELECT shows or hides the password               |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     B TYPE  A DELETE  Y SPACE  X SHIFT  START JOIN      |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    KEYBOARD - shift, PS button style
+    .....................................................  <- 53 columns
+     Settings  ›  Wi-Fi VOL 50%  BRI 70%  BAT 87%  23:59 |
+     ═══════════════════════════════════════════════════ |
+      NETWORK  FRITZ!Box 7520 JI                         |
+      PASSWORD                                  11 / 63  |
+      ┌───────────────────────────────────────────────┐  |
+      │ hunter2Hunt_                                  │  |
+      └───────────────────────────────────────────────┘  |
+                                                         |
+       1    2    3    4    5    6    7    8    9    0    |
+       Q    W    E    R    T    Y    U    I    O    P    |
+       A    S    D    F    G    H  [ J ]  K    L    -    |
+       Z    X    C    V    B    N    M    _    .    @    |
+       SHIFT      #+=         SPACE      DEL    DONE     |
+                                                         |
+        SELECT shows or hides the password               |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     X TYPE  ○ DELETE  ■ SPACE  ▲ SHIFT  START JOIN      |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    KEYBOARD - symbols, password hidden, DONE selected
+    .....................................................  <- 53 columns
+     Settings  ›  Wi-Fi VOL 50%  BRI 70%  BAT 87%  23:59 |
+     ═══════════════════════════════════════════════════ |
+      NETWORK  FRITZ!Box 7520 JI                         |
+      PASSWORD                                  14 / 63  |
+      ┌───────────────────────────────────────────────┐  |
+      │ ••••••••••••••_                               │  |
+      └───────────────────────────────────────────────┘  |
+                                                         |
+       1    2    3    4    5    6    7    8    9    0    |
+       !    "    #    $    %    &    '    (    )    *    |
+       +    ,    /    :    ;    <    =    >    ?    [    |
+       \    ]    ^    `    {    |    }    ~              |
+       SHIFT      abc         SPACE      DEL [  DONE  ]  |
+                                                         |
+        SELECT shows or hides the password               |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     B TYPE  A DELETE  Y SPACE  X SHIFT  START JOIN      |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    KEYBOARD - join failed
+    .....................................................  <- 53 columns
+     Settings  ›  Wi-Fi VOL 50%  BRI 70%  BAT 87%  23:59 |
+     ═══════════════════════════════════════════════════ |
+      NETWORK  FRITZ!Box 7520 JI                         |
+      PASSWORD                                  14 / 63  |
+      ┌───────────────────────────────────────────────┐  |
+      │ hunter2Hunter!_                               │  |
+      └───────────────────────────────────────────────┘  |
+                                                         |
+       1    2    3    4    5    6    7    8    9    0    |
+       q    w  [ e ]  r    t    y    u    i    o    p    |
+       a    s    d    f    g    h    j    k    l    -    |
+       z    x    c    v    b    n    m    _    .    @    |
+       SHIFT      #+=         SPACE      DEL    DONE     |
+                                                         |
+        Wrong password, or the network refused it.       |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     B TYPE  A DELETE  Y SPACE  X SHIFT  START JOIN      |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     LAUNCHING

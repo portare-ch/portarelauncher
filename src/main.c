@@ -9,6 +9,8 @@
 #include "kms.h"
 #include "net.h"
 #include "osd.h"
+#include "osk.h"
+#include "proc.h"
 #include "settings.h"
 #include "status.h"
 #include "term.h"
@@ -29,7 +31,8 @@
 #define LIST_TOP    5
 #define LIST_MARGIN 3          /* rows kept below the list for the footer  */
 
-enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI, SCR_BT };
+enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI, SCR_BT,
+              SCR_KEYBOARD };
 
 struct ui {
 	struct term term;
@@ -47,6 +50,13 @@ struct ui {
 	struct bt_list bt;
 	int bt_on, bt_auto;
 	int bt_sel, bt_top;
+
+	struct osk osk;
+	char join_ssid[80];
+	/* One line of news for the screen that is up, kept until the next
+	 * press. Drawn by the screen itself, because anything drawn beside
+	 * the screen is gone in the redraw that follows every action. */
+	char note[64];
 	char usb[24];
 	char usb_opts[8][24];
 	int n_usb;
@@ -61,6 +71,7 @@ struct ui {
 /* Which face button confirms. Stored in system.cfg like everything else,
  * so it survives a restart and is visible to the rest of the system. */
 #define KEY_BUTTONS "launcher.buttons"
+#define KEY_PALETTE "launcher.palette"
 
 /* Sony's marks approximated out of CP437, which is all the VGA font has.
  * Close enough to be recognised, and not the real symbols. */
@@ -68,13 +79,15 @@ struct ui {
 #define G_TRIANGLE  0x1E   /* /\  */
 #define G_SQUARE    0xFE   /* []  */
 
-enum { SET_WIFI = 0, SET_BLUETOOTH, SET_USB, SET_BUTTONS, N_SETTINGS };
+enum { SET_WIFI = 0, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_COLOUR,
+       N_SETTINGS };
 
 static const char *const settings_labels[N_SETTINGS] = {
 	"Wi-Fi",
 	"Bluetooth",
 	"USB gadget mode",
 	"Button style",
+	"Colour",
 };
 
 static volatile sig_atomic_t stop_requested;
@@ -193,8 +206,6 @@ static void draw_systems(struct ui *u)
 	struct face f = face_of(u->retroid);
 	snprintf(buf, sizeof(buf), "%c SELECT   %c SETTINGS", f.bottom, f.left);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
-	snprintf(buf, sizeof(buf), "%c COLOUR %s", f.top, u->pal_name);
-	term_puts_right(t, t->cols - 1, t->rows - 1, buf, ATTR_DIM);
 }
 
 static void draw_games(struct ui *u)
@@ -222,8 +233,6 @@ static void draw_games(struct ui *u)
 	struct face f = face_of(u->retroid);
 	snprintf(buf, sizeof(buf), "%c LAUNCH   %c BACK", f.bottom, f.right);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
-	snprintf(buf, sizeof(buf), "%c COLOUR %s", f.top, u->pal_name);
-	term_puts_right(t, t->cols - 1, t->rows - 1, buf, ATTR_DIM);
 }
 
 /* A diamond of the four face buttons, because the argument is about where
@@ -279,6 +288,9 @@ static void draw_settings(struct ui *u)
 		case SET_BUTTONS:
 			value = u->retroid ? "Retroid" : "PS";
 			break;
+		case SET_COLOUR:
+			value = u->pal_name;
+			break;
 		}
 		draw_row(u, (unsigned)(3 + i), i == u->set_sel,
 		         settings_labels[i], value);
@@ -302,6 +314,14 @@ static void draw_settings(struct ui *u)
 		}
 		break;
 	}
+	case SET_COLOUR:
+		/* The ramp itself, in the colour being chosen: a name says
+		 * nothing about how it reads on this panel. */
+		term_puts(t, 4, y + 2, "the selected row", ATTR_BRIGHT);
+		term_puts(t, 4, y + 3, "body text", ATTR_TEXT);
+		term_puts(t, 4, y + 4, "counts and hints", ATTR_MID);
+		term_puts(t, 4, y + 5, "rules and separators", ATTR_DIM);
+		break;
 	case SET_BLUETOOTH:
 		term_puts(t, 4, y + 2, "Headphones, controllers. Open to", ATTR_DIM);
 		term_puts(t, 4, y + 3, "scan, connect, set auto-connect.", ATTR_DIM);
@@ -360,6 +380,9 @@ static void draw_wifi(struct ui *u)
 		draw_row(u, (unsigned)(LIST_TOP + i), u->wifi_top + i == u->wifi_sel,
 		         e->name, buf);
 	}
+
+	if (u->note[0])
+		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
 
 	struct face f = face_of(u->retroid);
 	snprintf(buf, sizeof(buf), "%c CONNECT   %c BACK   %c RESCAN",
@@ -428,6 +451,40 @@ static void draw_bt(struct ui *u)
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
+/* The password for a network that has never been joined. The layout is in
+ * docs/mockup.txt; the keyboard itself is osk.c. What this adds is the
+ * frame, the count, and the one line that says what went wrong. */
+static void draw_keyboard(struct ui *u)
+{
+	struct term *t = &u->term;
+	char buf[80];
+
+	draw_frame(u, "Settings  >  Wi-Fi");
+	term_puts(t, 2, 2, "NETWORK", ATTR_MID);
+	term_puts(t, 11, 2, u->join_ssid, ATTR_TEXT);
+
+	term_puts(t, 2, 3, "PASSWORD", ATTR_MID);
+	if (u->osk.len < u->osk.min_len)
+		snprintf(buf, sizeof(buf), "%d / %d  at least %d", u->osk.len,
+		         OSK_MAX, u->osk.min_len);
+	else
+		snprintf(buf, sizeof(buf), "%d / %d", u->osk.len, OSK_MAX);
+	term_puts_right(t, t->cols - 2, 3, buf, ATTR_MID);
+
+	unsigned y = osk_draw(&u->osk, t, 4);
+	if (u->note[0])
+		term_puts(t, 4, y + 1, u->note, ATTR_BRIGHT);
+	else
+		term_puts(t, 4, y + 1, "SELECT shows or hides the password", ATTR_DIM);
+
+	/* Built from the pad's own printing, like every other hint line, so
+	 * it names the buttons the user is actually holding. */
+	struct face f = face_of(u->retroid);
+	snprintf(buf, sizeof(buf), "%c TYPE  %c DELETE  %c SPACE  %c SHIFT  START JOIN",
+	         f.bottom, f.right, f.left, f.top);
+	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
+}
+
 static void redraw(struct ui *u)
 {
 	switch (u->screen) {
@@ -436,6 +493,7 @@ static void redraw(struct ui *u)
 	case SCR_SETTINGS: draw_settings(u); break;
 	case SCR_WIFI:     draw_wifi(u);     break;
 	case SCR_BT:       draw_bt(u);       break;
+	case SCR_KEYBOARD: draw_keyboard(u); break;
 	}
 	term_flush(&u->term);
 }
@@ -525,6 +583,44 @@ static void launch(struct ui *u, const struct psystem *s, const struct game *g)
 	term_invalidate(&u->term);   /* the emulator owned the panel; assume nothing */
 }
 
+/* Joins the network the keyboard is for, or says why not. On success the
+ * password is scrubbed from memory and the Wi-Fi list comes back showing it
+ * connected; on failure the keyboard stays up with the text intact, because
+ * the likeliest fix is one wrong character. */
+static void join(struct ui *u, const char *password)
+{
+	char busy[96];
+	snprintf(busy, sizeof(busy), "joining %s...", u->join_ssid);
+	draw_busy(u, busy);
+
+	int rc = net_join(u->join_ssid, password);
+
+	switch (rc) {
+	case 0:
+		memset(u->osk.text, 0, sizeof(u->osk.text));
+		u->osk.len = 0;
+		net_scan(&u->nets, 0);
+		u->wifi_sel = u->wifi_top = 0;
+		u->screen = SCR_WIFI;
+		return;
+	case 4:
+		str_copy(u->note, sizeof(u->note),
+		         "Wrong password, or the network refused it.");
+		break;
+	case 10:
+		str_copy(u->note, sizeof(u->note), "The network is out of range now.");
+		break;
+	case 3:
+	case PROC_TIMEOUT:
+		str_copy(u->note, sizeof(u->note),
+		         "No answer from the network. Try closer to it.");
+		break;
+	default:
+		snprintf(u->note, sizeof(u->note), "Could not join (nmcli error %d).", rc);
+		break;
+	}
+}
+
 static void on_action(struct ui *u, enum action a)
 {
 	const struct psystem *s = &u->cat.sys[u->sys_sel];
@@ -543,11 +639,11 @@ static void on_action(struct ui *u, enum action a)
 		return;
 	}
 
-	if (a == ACT_PALETTE) {
-		u->pal_name = term_set_palette(&u->term,
-		                               term_palette(&u->term) + 1);
-		return;
-	}
+	/* Only the keyboard tells START from the settings button. */
+	if (a == ACT_START && u->screen != SCR_KEYBOARD)
+		a = ACT_MENU;
+
+	u->note[0] = '\0';
 
 	switch (u->screen) {
 	case SCR_SYSTEMS:
@@ -604,6 +700,15 @@ static void on_action(struct ui *u, enum action a)
 			usb_mode(u->usb, sizeof(u->usb));
 		}
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
+		         u->set_sel == SET_COLOUR) {
+			int n = term_palette_count();
+			int cur = term_palette(&u->term);
+			int next = (a == ACT_LEFT) ? (cur + n - 1) % n : (cur + 1) % n;
+			u->pal_name = term_set_palette(&u->term, next);
+			term_invalidate(&u->term);   /* every cell changes colour */
+			settings_set(SETTINGS, KEY_PALETTE, u->pal_name);
+		}
+		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
 		         u->set_sel == SET_BUTTONS) {
 			u->retroid = !u->retroid;
 			/* Written straight away rather than on exit: this program
@@ -627,10 +732,17 @@ static void on_action(struct ui *u, enum action a)
 		}
 		else if (a == ACT_CONFIRM && u->wifi_sel < u->nets.n) {
 			const struct net_entry *e = &u->nets.e[u->wifi_sel];
-			if (!e->saved) {
-				/* No password, nowhere to type one. Say which, rather
-				 * than fail silently against a network we cannot join. */
-				draw_busy(u, "no saved password for this network");
+			int min = net_min_password(e->security);
+			if (!e->saved && min < 0) {
+				str_copy(u->note, sizeof(u->note),
+				         "Needs a username too - not supported yet.");
+			} else if (!e->saved) {
+				str_copy(u->join_ssid, sizeof(u->join_ssid), e->name);
+				osk_init(&u->osk, min);
+				if (min == 0)
+					join(u, "");   /* open: nothing to type */
+				else
+					u->screen = SCR_KEYBOARD;
 			} else {
 				draw_busy(u, "connecting...");
 				net_connect(e->name);
@@ -639,6 +751,21 @@ static void on_action(struct ui *u, enum action a)
 		}
 		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
 		else if (a == ACT_QUIT) u->running = 0;
+		break;
+
+	case SCR_KEYBOARD:
+		switch (osk_action(&u->osk, a)) {
+		case OSK_DONE:
+			join(u, u->osk.text);
+			break;
+		case OSK_CANCEL:
+			u->screen = SCR_WIFI;
+			break;
+		case OSK_NONE:
+			if (a == ACT_QUIT)
+				u->running = 0;
+			break;
+		}
 		break;
 
 	case SCR_BT: {
@@ -739,9 +866,23 @@ int main(void)
 	        u.kms.mode.hdisplay, u.kms.mode.vdisplay,
 	        u.term.cols, u.term.rows, u.cat.n);
 
-	/* Grey by default. Amber was tried first and read as yellow on this
-	 * panel; X cycles the rest. */
+	/* Grey unless Settings chose otherwise. Amber was tried first and read
+	 * as yellow on this panel. Stored by name rather than by index, so
+	 * reordering the palettes cannot quietly change anyone's choice. */
 	u.pal_name = term_set_palette(&u.term, 0);
+	char pal[32];
+	if (settings_get(SETTINGS, KEY_PALETTE, pal, sizeof(pal))) {
+		int found = 0;
+		for (int i = 0; i < term_palette_count() && !found; i++) {
+			const char *name = term_set_palette(&u.term, i);
+			if (strcmp(name, pal) == 0) {
+				u.pal_name = name;
+				found = 1;
+			}
+		}
+		if (!found)   /* a name from a build that had other palettes */
+			u.pal_name = term_set_palette(&u.term, 0);
+	}
 
 	/* Default to the layout printed on this device rather than to the
 	 * positional convention, which would put confirm on the button
