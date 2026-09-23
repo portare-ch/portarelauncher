@@ -14,8 +14,9 @@
  *
  * The limit worth stating: that attempt is one shot at the moment you ask
  * for it. Nothing here polls, because a connect to a device that is not
- * there blocks for ten seconds or more and this program has one thread and
- * owns the panel.
+ * there does not fail - measured on the device, it never returns at all -
+ * and this program has one thread and owns the panel. Every call goes
+ * through proc_run_for's ceiling for the same reason.
  */
 #ifndef PL_BT_H
 #define PL_BT_H
