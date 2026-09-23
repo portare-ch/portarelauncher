@@ -852,15 +852,19 @@ int main(void)
 		return 1;
 	}
 
-	if (osd_open(&u.osd) == 0)
-		input_set_aux(&u.in, u.osd.fd);
-
 	if (input_open(&u.in) < 0) {
 		term_free(&u.term);
 		kms_close(&u.kms);
 		catalog_free(&u.cat);
 		return 1;
 	}
+
+	/* After input_open, never before: it starts by clearing the whole
+	 * struct, aux_fd included. The other way round registered the pipe and
+	 * then forgot it, so input_sense's notifications piled up unread and
+	 * the header only caught up on the minute tick. */
+	if (osd_open(&u.osd) == 0)
+		input_set_aux(&u.in, u.osd.fd);
 
 	fprintf(stderr, "portarelauncher: %ux%u, %ux%u grid, %d systems\n",
 	        u.kms.mode.hdisplay, u.kms.mode.vdisplay,
