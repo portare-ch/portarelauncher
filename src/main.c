@@ -12,6 +12,7 @@
 #include "osinfo.h"
 #include "osk.h"
 #include "proc.h"
+#include "quit.h"
 #include "settings.h"
 #include "status.h"
 #include "term.h"
@@ -20,11 +21,14 @@
 #include "update.h"
 
 #include <errno.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/syscall.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #define CARD        "/dev/dri/card0"
@@ -983,7 +987,111 @@ static void draw_launching(struct ui *u, const char *what, const char *detail)
 /* Gives the panel to argv and takes it back when argv exits: drop DRM
  * master, run, wait, take it again and repaint everything. The same for
  * an emulator and for a tool, because both are a program that wants the
- * whole display and then gives it back. */
+ * whole display and then gives it back.
+ *
+ * While it runs, Home + START is the way out of it, whatever it is - see
+ * quit.h. The child gets a process group of its own so its descendants can
+ * be found; the wait is on a pidfd, so the launcher sleeps until the child
+ * exits or one of the two buttons changes, and on nothing else. */
+#define QUIT_GRACE_MS 1500    /* for a program that quits on the combo itself */
+#define QUIT_TERM_MS  5000    /* between SIGTERM and SIGKILL                  */
+
+static long long now_ms(void)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+static int open_pidfd(pid_t pid)
+{
+#ifdef SYS_pidfd_open
+	return (int)syscall(SYS_pidfd_open, pid, 0);
+#else
+	(void)pid;
+	return -1;
+#endif
+}
+
+static void wait_or_quit(struct ui *u, pid_t pid)
+{
+	enum { RUNNING, GRACE, TERMED, KILLED } stage = RUNNING;
+	long long deadline = 0;
+	struct quit_combo q;
+	quit_reset(&q);
+
+	int pidfd = open_pidfd(pid);
+	input_quit_only(&u->in, 1);
+
+	for (;;) {
+		int status;
+		pid_t r = waitpid(pid, &status, WNOHANG);
+		if (r == pid || (r < 0 && errno != EINTR))
+			break;
+
+		struct pollfd pfd[INPUT_MAX_DEV + 2];
+		int ndev = input_fill_poll(&u->in, pfd);
+		int n = ndev;
+		if (pidfd >= 0)
+			pfd[n++] = (struct pollfd){ .fd = pidfd, .events = POLLIN };
+
+		/* Without a pidfd there is nothing to wake on when the child
+		 * exits, so look every half second instead. */
+		int timeout = pidfd >= 0 ? -1 : 500;
+		if (stage != RUNNING) {
+			long long left = deadline - now_ms();
+			int l = left > 0 ? (int)left : 0;
+			if (timeout < 0 || l < timeout)
+				timeout = l;
+		}
+
+		if (poll(pfd, (nfds_t)n, timeout) < 0 && errno != EINTR)
+			break;
+
+		/* InputPlumber restarting mid-game replaces the pad: follow it,
+		 * or the combo is read from a device that no longer exists. The
+		 * slots move with the reopen, so start the combo afresh. */
+		if (input_refresh(&u->in, pfd, ndev)) {
+			quit_reset(&q);
+			continue;
+		}
+
+		if (stage == RUNNING && input_quit_read(&u->in, &q)) {
+			stage = GRACE;
+			deadline = now_ms() + QUIT_GRACE_MS;
+			fprintf(stderr, "quit combo: waiting for %d to leave\n", (int)pid);
+			continue;
+		}
+		if (stage != RUNNING)
+			input_quit_read(&u->in, &q);   /* keep the queues empty */
+
+		if (stage != RUNNING && now_ms() >= deadline) {
+			if (stage == GRACE) {
+				/* The emulator, not runemu.sh: its cleanup after the
+				 * emulator returns has to run. */
+				int k = quit_signal_group(pid, pid, SIGTERM);
+				fprintf(stderr, "quit combo: SIGTERM to %d process(es)\n", k);
+				stage = TERMED;
+				deadline = now_ms() + QUIT_TERM_MS;
+			} else if (stage == TERMED) {
+				int k = quit_signal_group(pid, pid, SIGKILL);
+				fprintf(stderr, "quit combo: SIGKILL to %d process(es)\n", k);
+				stage = KILLED;
+				deadline = now_ms() + QUIT_TERM_MS;
+			} else {
+				/* Even the cleanup is stuck. The panel matters more. */
+				fprintf(stderr, "quit combo: killing the whole group\n");
+				kill(-pid, SIGKILL);
+				deadline = now_ms() + QUIT_TERM_MS;
+			}
+		}
+	}
+
+	input_quit_only(&u->in, 0);
+	if (pidfd >= 0)
+		close(pidfd);
+}
+
 static void hand_over(struct ui *u, char *const argv[], const char *cwd)
 {
 	if (kms_drop_master(&u->kms) < 0)
@@ -991,6 +1099,7 @@ static void hand_over(struct ui *u, char *const argv[], const char *cwd)
 
 	pid_t pid = fork();
 	if (pid == 0) {
+		setpgid(0, 0);
 		if (cwd && chdir(cwd) < 0)
 			_exit(127);
 		execv(argv[0], argv);
@@ -1000,9 +1109,8 @@ static void hand_over(struct ui *u, char *const argv[], const char *cwd)
 	if (pid < 0) {
 		fprintf(stderr, "fork: %s\n", strerror(errno));
 	} else {
-		int status = 0;
-		while (waitpid(pid, &status, 0) < 0 && errno == EINTR)
-			;
+		setpgid(pid, pid);        /* both sides, so neither can race */
+		wait_or_quit(u, pid);
 	}
 
 	kms_set_master(&u->kms);

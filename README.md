@@ -93,6 +93,14 @@ else.
 | top | — | shift: once for a letter, twice to lock |
 | START | settings | join |
 | SELECT | — | show or hide the password |
+| Home + START | quit the running game, film or tool | — |
+
+Home + START is the way out of everything the launcher starts, whatever
+its own controls are. The launcher watches for it while the game has the
+panel - asking the kernel for those two buttons only, so play does not wake
+it - gives the program 1.5 s to leave on its own, as RetroArch does, then
+sends it SIGTERM, then SIGKILL. Never to runemu.sh itself: its cleanup after
+the emulator, fan and GPU and CPU settings, has to run.
 
 The colour ramp is chosen in Settings, where each choice is previewed as
 the four levels it uses.

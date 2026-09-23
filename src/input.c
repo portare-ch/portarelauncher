@@ -1,4 +1,5 @@
 #include "input.h"
+#include "quit.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -8,6 +9,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/inotify.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
@@ -32,15 +34,14 @@ static int has_keys(int fd)
 	return 0;
 }
 
-int input_open(struct input *in)
+/* Every event device that reports keys, opened fresh. */
+static void open_devices(struct input *in)
 {
-	memset(in, 0, sizeof(*in));
-	in->aux_fd = -1;
-
+	in->n = 0;
 	DIR *d = opendir("/dev/input");
 	if (!d) {
 		fprintf(stderr, "opendir /dev/input: %s\n", strerror(errno));
-		return -1;
+		return;
 	}
 
 	struct dirent *e;
@@ -61,11 +62,72 @@ int input_open(struct input *in)
 	}
 	closedir(d);
 
+	if (in->quit_only)
+		input_quit_only(in, 1);
+}
+
+static void close_devices(struct input *in)
+{
+	for (int i = 0; i < in->n; i++)
+		close(in->fd[i]);
+	in->n = 0;
+}
+
+int input_open(struct input *in)
+{
+	memset(in, 0, sizeof(*in));
+	in->aux_fd = -1;
+
+	in->notify_fd = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
+	if (in->notify_fd >= 0 &&
+	    inotify_add_watch(in->notify_fd, "/dev/input", IN_CREATE | IN_DELETE) < 0) {
+		close(in->notify_fd);
+		in->notify_fd = -1;
+	}
+
+	open_devices(in);
 	if (in->n == 0) {
 		fprintf(stderr, "no usable input devices\n");
 		return -1;
 	}
 	return 0;
+}
+
+int input_fill_poll(struct input *in, struct pollfd *pfd)
+{
+	int n = 0;
+	for (int i = 0; i < in->n; i++)
+		pfd[n++] = (struct pollfd){ .fd = in->fd[i], .events = POLLIN };
+	if (in->notify_fd >= 0)
+		pfd[n++] = (struct pollfd){ .fd = in->notify_fd, .events = POLLIN };
+	return n;
+}
+
+int input_refresh(struct input *in, const struct pollfd *pfd, int n)
+{
+	int changed = 0;
+	for (int i = 0; i < n; i++) {
+		if (pfd[i].fd == in->notify_fd && (pfd[i].revents & POLLIN)) {
+			/* Only that something changed matters, not what. */
+			char buf[4096];
+			while (read(in->notify_fd, buf, sizeof(buf)) > 0)
+				;
+			changed = 1;
+		} else if (pfd[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+			/* A device that has gone. Polling it again returns at
+			 * once, forever: that was the launcher at 100% of a core
+			 * after every game. */
+			changed = 1;
+		}
+	}
+	if (!changed)
+		return 0;
+
+	close_devices(in);
+	open_devices(in);
+	in->held = ACT_NONE;
+	in->repeats = 0;
+	return 1;
 }
 
 void input_set_aux(struct input *in, int fd)
@@ -85,9 +147,10 @@ void input_drain(struct input *in)
 
 void input_close(struct input *in)
 {
-	for (int i = 0; i < in->n; i++)
-		close(in->fd[i]);
-	in->n = 0;
+	close_devices(in);
+	if (in->notify_fd >= 0)
+		close(in->notify_fd);
+	in->notify_fd = -1;
 }
 
 static enum action from_key(unsigned code)
@@ -158,13 +221,9 @@ static enum action from_abs(unsigned code, int value)
 
 enum action input_wait(struct input *in, int idle_ms)
 {
-	struct pollfd pfd[INPUT_MAX_DEV + 1];
-	for (int i = 0; i < in->n; i++) {
-		pfd[i].fd = in->fd[i];
-		pfd[i].events = POLLIN;
-		pfd[i].revents = 0;
-	}
-	int nfd = in->n;
+	struct pollfd pfd[INPUT_MAX_DEV + 2];
+	int ndev = input_fill_poll(in, pfd);
+	int nfd = ndev;
 	if (in->aux_fd >= 0) {
 		pfd[nfd].fd = in->aux_fd;
 		pfd[nfd].events = POLLIN;
@@ -194,6 +253,9 @@ enum action input_wait(struct input *in, int idle_ms)
 
 	if (in->aux_fd >= 0 && (pfd[nfd - 1].revents & POLLIN))
 		return ACT_AUX;
+
+	if (input_refresh(in, pfd, ndev))
+		return ACT_NONE;
 
 	enum action out = ACT_NONE;
 	for (int i = 0; i < in->n; i++) {
@@ -238,4 +300,53 @@ enum action input_wait(struct input *in, int idle_ms)
 		}
 	}
 	return out;
+}
+
+_Static_assert(QUIT_BTN_MODE == BTN_MODE && QUIT_BTN_START == BTN_START &&
+               QUIT_EV_KEY == EV_KEY, "quit.h spells out linux/input.h's codes");
+_Static_assert(QUIT_MAX_DEV >= INPUT_MAX_DEV, "one combo slot per device");
+
+static void set_bit(unsigned char *bits, unsigned n)
+{
+	bits[n / 8] |= (unsigned char)(1u << (n % 8));
+}
+
+void input_quit_only(struct input *in, int on)
+{
+	in->quit_only = on;
+#ifdef EVIOCSMASK
+	/* Two masks per device: which event types, then which key codes. Not
+	 * even EV_SYN in the narrow one - a SYN_REPORT follows every stick
+	 * report, and waking for those is exactly what this avoids. */
+	unsigned char types[EV_CNT / 8 + 1], keys[KEY_CNT / 8 + 1];
+	memset(types, on ? 0 : 0xff, sizeof(types));
+	memset(keys, on ? 0 : 0xff, sizeof(keys));
+	if (on) {
+		set_bit(types, EV_KEY);
+		set_bit(keys, BTN_MODE);
+		set_bit(keys, BTN_START);
+	}
+	struct input_mask tm = { .type = EV_SYN, .codes_size = sizeof(types),
+	                         .codes_ptr = (unsigned long)types };
+	struct input_mask km = { .type = EV_KEY, .codes_size = sizeof(keys),
+	                         .codes_ptr = (unsigned long)keys };
+	for (int i = 0; i < in->n; i++) {
+		ioctl(in->fd[i], EVIOCSMASK, &tm);
+		ioctl(in->fd[i], EVIOCSMASK, &km);
+	}
+#else
+	(void)in;
+	(void)on;
+#endif
+}
+
+int input_quit_read(struct input *in, struct quit_combo *q)
+{
+	int hit = 0;
+	struct input_event ev;
+	for (int i = 0; i < in->n; i++)
+		while (read(in->fd[i], &ev, sizeof(ev)) == (ssize_t)sizeof(ev))
+			if (quit_feed(q, i, ev.type, ev.code, ev.value))
+				hit = 1;
+	return hit;
 }
