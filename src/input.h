@@ -46,6 +46,14 @@ int  input_open(struct input *in);
 void input_set_aux(struct input *in, int fd);
 void input_close(struct input *in);
 
+/* Throws away everything the devices buffered while something else had the
+ * panel. The launcher's descriptors stay open while an emulator or a tool
+ * runs, and the kernel queues every press on them meanwhile - including
+ * the combo that quit the thing, which would otherwise arrive the moment
+ * the launcher is back: START+SELECT out of the gamepad tester, replayed,
+ * opens Settings. */
+void input_drain(struct input *in);
+
 /* Blocks until something happens and returns one action.
  *
  * idle_ms bounds the wait so the caller can refresh a clock; ACT_TICK says

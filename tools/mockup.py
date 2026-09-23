@@ -155,6 +155,21 @@ kb_syms  = kb_screen("FRITZ!Box 7520 JI", "hunter2Hunter!", SYMS, bottom_sel="DO
 joining = kb_screen("FRITZ!Box 7520 JI", "hunter2Hunter!", LOWER, sel=(1, 2),
                     note="Wrong password, or the network refused it.")
 
+# Tools: whatever scripts are in the modules folder, named and described
+# from its gamelist.xml. The description gets fixed room under the list,
+# because it is where a tool says how to get back out of it.
+TOOLS = ["File Manager", "PortMaster", "Remove ._ Files",
+         "Start RetroArch (64-bit)", "Test Gamepad"]
+tools = [row(" Tools", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, "",
+         row("  TOOLS", "5 found  "), ""]
+tools += [item(n == "Test Gamepad", n) for n in TOOLS]
+tools += [""] * (ROWS - 2 - 4 - 1 - len(tools))
+tools += [THIN,
+          "    A simple SDL GUI gamepad tester to help",
+          "    validate gamepad inputs. To exit, hold L1 and",
+          "    press START + SELECT.", ""]
+tools += [THIN, " B RUN   A BACK"]
+
 launching = [row(" PortareOS", "23:59  BAT 87% "), RULE] + [""] * 4
 launching += ["           Tekken 3 (USA)", "",
               "           swanstation", "",
@@ -168,6 +183,7 @@ if __name__ == "__main__":
                  ("KEYBOARD - shift, PS button style", kb_upper),
                  ("KEYBOARD - symbols, password hidden, DONE selected", kb_syms),
                  ("KEYBOARD - join failed", joining),
+                 ("TOOLS", tools),
                  ("LAUNCHING", launching)):
         print(screen(t, s))
         print()

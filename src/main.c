@@ -14,6 +14,7 @@
 #include "settings.h"
 #include "status.h"
 #include "term.h"
+#include "tools.h"
 
 #include <errno.h>
 #include <signal.h>
@@ -32,7 +33,7 @@
 #define LIST_MARGIN 3          /* rows kept below the list for the footer  */
 
 enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI, SCR_BT,
-              SCR_KEYBOARD };
+              SCR_KEYBOARD, SCR_TOOLS };
 
 struct ui {
 	struct term term;
@@ -53,6 +54,9 @@ struct ui {
 
 	struct osk osk;
 	char join_ssid[80];
+
+	struct tools tools;
+	int tool_sel, tool_top;
 	/* One line of news for the screen that is up, kept until the next
 	 * press. Drawn by the screen itself, because anything drawn beside
 	 * the screen is gone in the redraw that follows every action. */
@@ -131,7 +135,6 @@ static void draw_frame(struct ui *u, const char *crumb)
 	char right[64];
 
 	term_clear(t);
-	term_puts(t, 1, 0, crumb, ATTR_TEXT);
 
 	/* Retro machines did not pop up overlays; they showed the state on the
 	 * panel and left it there. Volume and brightness sit beside the
@@ -146,6 +149,19 @@ static void draw_frame(struct ui *u, const char *crumb)
 		              u->st.charging ? "CHG" : "BAT", u->st.capacity);
 	snprintf(right + n, sizeof(right) - n, "%s", u->st.clock);
 	term_puts_right(t, t->cols - 1, 0, right, ATTR_MID);
+
+	/* The status is 32 columns at typical values and 35 with everything
+	 * at 100%, which reaches back past "Settings  >  Bluetooth". It is the
+	 * part that changes and has to stay legible, so the crumb yields: cut
+	 * to end two columns short of it. */
+	int room = (int)t->cols - 1 - (int)strlen(right) - 2 - 1;
+	char c[64];
+	if (room > (int)sizeof(c) - 1)
+		room = (int)sizeof(c) - 1;
+	if (room > 0) {
+		snprintf(c, (size_t)room + 1, "%s", crumb);
+		term_puts(t, 1, 0, c, ATTR_TEXT);
+	}
 
 	term_hline(t, 1, G_HLINE_D, ATTR_DIM);
 	term_hline(t, t->rows - 2, G_HLINE, ATTR_DIM);
@@ -182,6 +198,19 @@ static void draw_row(struct ui *u, unsigned y, int selected,
 		term_puts_right(t, t->cols - 2, y, right, selected ? ATTR_BRIGHT : ATTR_MID);
 }
 
+/* The systems, then Tools as one more row - where EmulationStation kept it,
+ * and where anyone coming from it will look. Only there when the folder
+ * has something in it. */
+static int system_rows(const struct ui *u)
+{
+	return u->cat.n + (u->tools.n > 0);
+}
+
+static int on_tools_row(const struct ui *u)
+{
+	return u->tools.n > 0 && u->sys_sel == u->cat.n;
+}
+
 static void draw_systems(struct ui *u)
 {
 	struct term *t = &u->term;
@@ -193,13 +222,20 @@ static void draw_systems(struct ui *u)
 	term_puts(t, 2, 3, "SYSTEMS", ATTR_MID);
 	term_puts_right(t, t->cols - 2, 3, buf, ATTR_MID);
 
+	int rows = system_rows(u);
 	int visible = (int)list_rows(u);
-	scroll_to(u->sys_sel, &u->sys_top, u->cat.n, visible);
+	scroll_to(u->sys_sel, &u->sys_top, rows, visible);
 
-	for (int i = 0; i < visible && u->sys_top + i < u->cat.n; i++) {
-		const struct psystem *s = &u->cat.sys[u->sys_top + i];
+	for (int i = 0; i < visible && u->sys_top + i < rows; i++) {
+		int idx = u->sys_top + i;
+		if (idx == u->cat.n) {
+			snprintf(buf, sizeof(buf), "%d", u->tools.n);
+			draw_row(u, (unsigned)(LIST_TOP + i), idx == u->sys_sel, "Tools", buf);
+			continue;
+		}
+		const struct psystem *s = &u->cat.sys[idx];
 		snprintf(buf, sizeof(buf), "%d", s->ngames);
-		draw_row(u, (unsigned)(LIST_TOP + i), u->sys_top + i == u->sys_sel,
+		draw_row(u, (unsigned)(LIST_TOP + i), idx == u->sys_sel,
 		         s->fullname[0] ? s->fullname : s->name, buf);
 	}
 
@@ -451,6 +487,67 @@ static void draw_bt(struct ui *u)
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
+/* Writes text into a box of `width` columns and up to `lines` rows,
+ * breaking at spaces. Returns the rows used. */
+static unsigned wrap_puts(struct term *t, unsigned x, unsigned y, unsigned width,
+                          unsigned lines, const char *text, int attr)
+{
+	unsigned row = 0;
+	char buf[128];
+	while (*text && row < lines) {
+		while (*text == ' ')
+			text++;
+		size_t len = strlen(text);
+		size_t take = len < width ? len : width;
+		if (take < len) {
+			size_t sp = take;
+			while (sp > 0 && text[sp] != ' ')
+				sp--;
+			if (sp > 0)
+				take = sp;             /* else one long word: hard break */
+		}
+		if (take >= sizeof(buf))
+			take = sizeof(buf) - 1;
+		memcpy(buf, text, take);
+		buf[take] = '\0';
+		term_puts(t, x, y + row++, buf, attr);
+		text += take;
+	}
+	return row;
+}
+
+#define TOOLS_DESC_LINES 4
+
+static void draw_tools(struct ui *u)
+{
+	struct term *t = &u->term;
+	char buf[64];
+
+	draw_frame(u, "Tools");
+	snprintf(buf, sizeof(buf), "%d found", u->tools.n);
+	term_puts(t, 2, 3, "TOOLS", ATTR_MID);
+	term_puts_right(t, t->cols - 2, 3, buf, ATTR_MID);
+
+	/* The description is what says how to get back out of a tool, so it
+	 * gets fixed room below the list rather than whatever is left. */
+	unsigned desc_y = t->rows - 2 - TOOLS_DESC_LINES;
+	int visible = (int)(desc_y - 1 - LIST_TOP);
+	scroll_to(u->tool_sel, &u->tool_top, u->tools.n, visible);
+
+	for (int i = 0; i < visible && u->tool_top + i < u->tools.n; i++)
+		draw_row(u, (unsigned)(LIST_TOP + i), u->tool_top + i == u->tool_sel,
+		         u->tools.t[u->tool_top + i].name, NULL);
+
+	term_hline(t, desc_y - 1, G_HLINE, ATTR_DIM);
+	if (u->tool_sel < u->tools.n)
+		wrap_puts(t, 4, desc_y, t->cols - 8, TOOLS_DESC_LINES,
+		          u->tools.t[u->tool_sel].desc, ATTR_TEXT);
+
+	struct face f = face_of(u->retroid);
+	snprintf(buf, sizeof(buf), "%c RUN   %c BACK", f.bottom, f.right);
+	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
+}
+
 /* The password for a network that has never been joined. The layout is in
  * docs/mockup.txt; the keyboard itself is osk.c. What this adds is the
  * frame, the count, and the one line that says what went wrong. */
@@ -494,6 +591,7 @@ static void redraw(struct ui *u)
 	case SCR_WIFI:     draw_wifi(u);     break;
 	case SCR_BT:       draw_bt(u);       break;
 	case SCR_KEYBOARD: draw_keyboard(u); break;
+	case SCR_TOOLS:    draw_tools(u);    break;
 	}
 	term_flush(&u->term);
 }
@@ -506,16 +604,46 @@ static void draw_busy(struct ui *u, const char *what)
 	term_flush(t);
 }
 
-static void draw_launching(struct ui *u, const struct psystem *s,
-                           const struct game *g)
+static void draw_launching(struct ui *u, const char *what, const char *detail)
 {
 	struct term *t = &u->term;
 
 	draw_frame(u, "PortareOS");
-	term_puts(t, 6, 6, g->name, ATTR_BRIGHT);
-	term_puts(t, 6, 8, s->core[0] ? s->core : s->emulator, ATTR_MID);
+	term_puts(t, 6, 6, what, ATTR_BRIGHT);
+	term_puts(t, 6, 8, detail, ATTR_MID);
 	term_puts(t, 6, 10, "handing over the display...", ATTR_DIM);
 	term_flush(t);
+}
+
+/* Gives the panel to argv and takes it back when argv exits: drop DRM
+ * master, run, wait, take it again and repaint everything. The same for
+ * an emulator and for a tool, because both are a program that wants the
+ * whole display and then gives it back. */
+static void hand_over(struct ui *u, char *const argv[], const char *cwd)
+{
+	if (kms_drop_master(&u->kms) < 0)
+		return;
+
+	pid_t pid = fork();
+	if (pid == 0) {
+		if (cwd && chdir(cwd) < 0)
+			_exit(127);
+		execv(argv[0], argv);
+		_exit(127);
+	}
+
+	if (pid < 0) {
+		fprintf(stderr, "fork: %s\n", strerror(errno));
+	} else {
+		int status = 0;
+		while (waitpid(pid, &status, 0) < 0 && errno == EINTR)
+			;
+	}
+
+	kms_set_master(&u->kms);
+	kms_present(&u->kms);
+	term_invalidate(&u->term);   /* it owned the panel; assume nothing */
+	input_drain(&u->in);         /* and everything pressed meanwhile   */
 }
 
 /* Runs the emulator with the panel, then takes it back.
@@ -551,36 +679,23 @@ static void launch(struct ui *u, const struct psystem *s, const struct game *g)
 		(char *)"--controllers=", NULL
 	};
 
-	draw_launching(u, s, g);
+	draw_launching(u, g->name, s->core[0] ? s->core : s->emulator);
+	hand_over(u, argv, NULL);
+}
 
-	if (kms_drop_master(&u->kms) < 0)
-		return;
+/* Runs a script from the Tools folder, from inside that folder, the way
+ * EmulationStation did - some of them use relative paths.
+ *
+ * Directly, not through /usr/bin/run as ES did: run stops ${UI_SERVICE}
+ * before it starts anything, and the UI service is this program. */
+static void run_tool(struct ui *u, const struct tool *tl)
+{
+	char path[256];
+	snprintf(path, sizeof(path), "%s/%s", u->tools.dir, tl->file);
+	char *const argv[] = { (char *)"/bin/bash", path, NULL };
 
-	pid_t pid = fork();
-	if (pid == 0) {
-		execv(argv[0], argv);
-		_exit(127);
-	}
-
-	if (pid < 0) {
-		fprintf(stderr, "fork: %s\n", strerror(errno));
-	} else {
-		int status = 0;
-		while (waitpid(pid, &status, 0) < 0 && errno == EINTR)
-			;
-	}
-
-	/* runemu.sh restarts the EmulationStation session on its way out,
-	 * because until now something had to put a front-end back. We are the
-	 * front-end and never went away, so send it back. This is a shim: the
-	 * right fix is for runemu to know it was called by a resident
-	 * launcher, and it belongs in that script rather than here. */
-	if (system("systemctl stop essway sway >/dev/null 2>&1") < 0)
-		fprintf(stderr, "could not stop the emulationstation session\n");
-
-	kms_set_master(&u->kms);
-	kms_present(&u->kms);
-	term_invalidate(&u->term);   /* the emulator owned the panel; assume nothing */
+	draw_launching(u, tl->name, tl->file);
+	hand_over(u, argv, u->tools.dir);
 }
 
 /* Joins the network the keyboard is for, or says why not. On success the
@@ -623,7 +738,6 @@ static void join(struct ui *u, const char *password)
 
 static void on_action(struct ui *u, enum action a)
 {
-	const struct psystem *s = &u->cat.sys[u->sys_sel];
 
 	if (a == ACT_AUX) {
 		/* Something changed a setting we show. The pipe carries a
@@ -648,7 +762,14 @@ static void on_action(struct ui *u, enum action a)
 	switch (u->screen) {
 	case SCR_SYSTEMS:
 		if (a == ACT_UP && u->sys_sel > 0) u->sys_sel--;
-		else if (a == ACT_DOWN && u->sys_sel < u->cat.n - 1) u->sys_sel++;
+		else if (a == ACT_DOWN && u->sys_sel < system_rows(u) - 1) u->sys_sel++;
+		else if (a == ACT_CONFIRM && on_tools_row(u)) {
+			/* Re-read on the way in: a package or an update may have
+			 * changed the folder since start, and it costs one readdir. */
+			tools_load(&u->tools);
+			u->tool_sel = u->tool_top = 0;
+			u->screen = SCR_TOOLS;
+		}
 		else if (a == ACT_CONFIRM) {
 			u->screen = SCR_GAMES;
 			u->game_sel = u->game_top = 0;
@@ -658,10 +779,21 @@ static void on_action(struct ui *u, enum action a)
 		} else if (a == ACT_QUIT) u->running = 0;
 		break;
 
-	case SCR_GAMES:
+	case SCR_GAMES: {
+		const struct psystem *s = &u->cat.sys[u->sys_sel];
 		if (a == ACT_UP && u->game_sel > 0) u->game_sel--;
 		else if (a == ACT_DOWN && u->game_sel < s->ngames - 1) u->game_sel++;
 		else if (a == ACT_CONFIRM) launch(u, s, &s->games[u->game_sel]);
+		else if (a == ACT_BACK) u->screen = SCR_SYSTEMS;
+		else if (a == ACT_QUIT) u->running = 0;
+		break;
+	}
+
+	case SCR_TOOLS:
+		if (a == ACT_UP && u->tool_sel > 0) u->tool_sel--;
+		else if (a == ACT_DOWN && u->tool_sel < u->tools.n - 1) u->tool_sel++;
+		else if (a == ACT_CONFIRM && u->tool_sel < u->tools.n)
+			run_tool(u, &u->tools.t[u->tool_sel]);
 		else if (a == ACT_BACK) u->screen = SCR_SYSTEMS;
 		else if (a == ACT_QUIT) u->running = 0;
 		break;
@@ -900,6 +1032,7 @@ int main(void)
 	/* Read what is cheap now and leave the scan until the Wi-Fi screen is
 	 * opened: a rescan takes seconds and nothing on the first screen shows
 	 * it. */
+	tools_load(&u.tools);
 	usb_modes(u.usb_opts, &u.n_usb, 8);
 	usb_mode(u.usb, sizeof(u.usb));
 	net_scan(&u.nets, 0);

@@ -16,6 +16,10 @@ settings menu. Nothing else.
 Runs on the device. It finds the systems that have games, lists them, lists
 the games, and launches one.
 
+Tools, the last row of the systems list, runs the scripts in the modules
+folder - the file manager, the gamepad tester, PortMaster - named and
+described from the folder's gamelist.xml.
+
 Settings: Wi-Fi, Bluetooth, USB gadget mode, button style and colour all
 work. Wi-Fi lists saved profiles and what is in range, connects to a saved
 one, and joins a new one through an on-screen keyboard;
