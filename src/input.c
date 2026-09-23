@@ -73,6 +73,16 @@ void input_set_aux(struct input *in, int fd)
 	in->aux_fd = fd;
 }
 
+void input_drain(struct input *in)
+{
+	struct input_event ev[64];
+	for (int i = 0; i < in->n; i++)
+		while (read(in->fd[i], ev, sizeof(ev)) > 0)
+			;
+	in->held = ACT_NONE;
+	in->repeats = 0;
+}
+
 void input_close(struct input *in)
 {
 	for (int i = 0; i < in->n; i++)

@@ -190,6 +190,30 @@
      B TYPE  A DELETE  Y SPACE  X SHIFT  START JOIN      |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
+    TOOLS
+    .....................................................  <- 53 columns
+     Tools              VOL 50%  BRI 70%  BAT 87%  23:59 |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+      TOOLS                                     5 found  |
+                                                         |
+        File Manager                                     |
+        PortMaster                                       |
+        Remove ._ Files                                  |
+        Start RetroArch (64-bit)                         |
+      ▸ Test Gamepad                                     |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+        A simple SDL GUI gamepad tester to help          |
+        validate gamepad inputs. To exit, hold L1 and    |
+        press START + SELECT.                            |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     B RUN   A BACK                                      |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
     LAUNCHING
     .....................................................  <- 53 columns
      PortareOS                            23:59  BAT 87% |
