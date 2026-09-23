@@ -20,8 +20,12 @@ Tools, the last row of the systems list, runs the scripts in the modules
 folder - the file manager, the gamepad tester, PortMaster - named and
 described from the folder's gamelist.xml.
 
-Settings: Wi-Fi, Bluetooth, USB gadget mode, button style and colour all
-work. Wi-Fi lists saved profiles and what is in range, connects to a saved
+Settings: Wi-Fi, Bluetooth, USB gadget mode, button style, colour and
+About all work. About shows the version, commit, build date, device and IP
+address, and holds Update, which asks GitHub what the chosen channel -
+nightly or release - has for this device, downloads it over Wi-Fi with a
+progress bar, and offers a restart once portareos-update has checked and
+staged it. Wi-Fi lists saved profiles and what is in range, connects to a saved
 one, and joins a new one through an on-screen keyboard;
 Bluetooth powers the adapter, scans, pairs, connects and has the
 auto-connect toggle. Brightness and volume are shown in the header rather
@@ -40,9 +44,9 @@ drift from the dimensions it claims.
 It is PortareOS's front-end: the image starts it as the UI service, and
 EmulationStation and sway are gone. What is still missing before the public
 beta is tracked in portareos under the beta milestone - power off and
-restart, applying updates, multi-file games listed once, faster movement
-through long lists, the time zone, and a version line (portare-ch/portareos#255
-to #262). Nothing has been measured about idle power yet.
+restart, multi-file games listed once, faster movement
+through long lists, and the time zone (portare-ch/portareos#255
+to #261). Nothing has been measured about idle power yet.
 
 ## Building
 
