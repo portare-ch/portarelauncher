@@ -16,16 +16,18 @@ settings menu. Nothing else.
 Runs on the device. It finds the systems that have games, lists them, lists
 the games, and launches one.
 
-Settings: button style, USB gadget mode, Wi-Fi and Bluetooth all work.
-Wi-Fi lists saved profiles and what is in range and connects to a saved one;
+Settings: Wi-Fi, Bluetooth, USB gadget mode, button style and colour all
+work. Wi-Fi lists saved profiles and what is in range, connects to a saved
+one, and joins a new one through an on-screen keyboard;
 Bluetooth powers the adapter, scans, pairs, connects and has the
 auto-connect toggle. Brightness and volume are shown in the header rather
 than set here, because the volume keys already set them.
 
-The gap in both: there is no on-screen keyboard, so a Wi-Fi network whose
-password has never been entered cannot be joined from here. Bluetooth does
-not need one - pairing on this device is a NoInputNoOutput agent - so
-headphones work from a cold start and a new network still does not.
+The keyboard reaches all 95 printable ASCII characters, because a WPA
+passphrase may use any of them. A join that fails leaves nothing saved -
+NetworkManager writes the profile before it knows the password was right,
+so a wrong one is deleted rather than left in the list looking joinable.
+Enterprise (802.1X) networks need a username as well and are not supported.
 
 `docs/mockup.txt` is the layout at the real grid and `tools/mockup.py`
 regenerates it — the mockup is a program rather than a picture so it cannot
@@ -53,12 +55,17 @@ right one goes back, on any pad. The button style setting changes what the UI
 calls them — `B`/`A` on a Retroid, cross and circle on a PS pad — and nothing
 else.
 
-| position | does |
-|---|---|
-| bottom | confirm, launch |
-| right | back |
-| left | settings |
-| top | cycle the colour ramp |
+| position | does | on the keyboard |
+|---|---|---|
+| bottom | confirm, launch | type the focused key |
+| right | back | delete; leave when empty |
+| left | settings | space |
+| top | — | shift: once for a letter, twice to lock |
+| START | settings | join |
+| SELECT | — | show or hide the password |
+
+The colour ramp is chosen in Settings, where each choice is previewed as
+the four levels it uses.
 
 ## The grid
 

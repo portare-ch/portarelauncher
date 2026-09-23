@@ -90,9 +90,13 @@ static enum action from_key(unsigned code)
 	 * what any button does. */
 	case BTN_SOUTH:  return ACT_CONFIRM;
 	case BTN_EAST:   return ACT_BACK;
-	case BTN_NORTH:  return ACT_PALETTE;
+	case BTN_NORTH:  return ACT_ALT;
 	case BTN_WEST:   return ACT_MENU;
-	case BTN_START:  return ACT_MENU;
+	/* Their own actions rather than aliases, because the keyboard needs
+	 * START to mean "done" while the left button types a space. Screens
+	 * that have no use for the difference fold START back into MENU. */
+	case BTN_START:  return ACT_START;
+	case BTN_SELECT: return ACT_SELECT;
 
 	case BTN_DPAD_UP:    return ACT_UP;
 	case BTN_DPAD_DOWN:  return ACT_DOWN;
@@ -109,7 +113,6 @@ static enum action from_key(unsigned code)
 	case KEY_SPACE:  return ACT_CONFIRM;
 	case KEY_BACKSPACE: return ACT_BACK;
 	case KEY_TAB:    return ACT_MENU;
-	case KEY_P:      return ACT_PALETTE;
 	case KEY_ESC:    return ACT_QUIT;
 	default:         return ACT_NONE;
 	}

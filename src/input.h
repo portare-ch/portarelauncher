@@ -20,7 +20,9 @@ enum action {
 	ACT_CONFIRM,
 	ACT_BACK,
 	ACT_MENU,     /* the settings key            */
-	ACT_PALETTE,  /* cycles the colour ramp, for choosing one */
+	ACT_ALT,      /* the top face button; each screen gives it a meaning */
+	ACT_START,    /* START: "open settings" everywhere except the keyboard */
+	ACT_SELECT,   /* SELECT: only the keyboard uses it, to hide the text */
 	ACT_TICK,     /* the idle timeout expired; nothing was pressed */
 	ACT_AUX,      /* the auxiliary fd has something to read */
 	ACT_QUIT,     /* only bound to a keyboard escape hatch */

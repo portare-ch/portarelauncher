@@ -24,6 +24,8 @@ struct net_entry {
 	int  saved;       /* NetworkManager has credentials for it  */
 	int  active;      /* currently connected                    */
 	int  signal;      /* 0-100, or -1 when not seen in a scan   */
+	char security[32];/* "WPA2", "WPA2 WPA3", "" when open or
+	                     not seen in a scan                     */
 };
 
 struct net_list {
@@ -38,10 +40,23 @@ void net_scan(struct net_list *l, int rescan);
 int  net_wifi_enabled(void);
 void net_wifi_set(int on);
 
-/* Brings up a saved profile. Returns 0 on success. Connecting to a network
- * with no saved credentials needs a password, and there is nowhere to type
- * one yet. */
+/* Brings up a saved profile. Returns 0 on success. */
 int  net_connect(const char *name);
+
+/* Joins a network that has no saved profile, saving one if it works.
+ * password may be empty for an open network. Returns 0 on success, or
+ * nmcli's exit status: 4 when activation failed (almost always the
+ * password), 10 when the network is no longer there, or PROC_TIMEOUT.
+ *
+ * A failed join leaves nothing behind. NetworkManager saves the profile
+ * before it knows whether the password was right, so a wrong one would
+ * otherwise sit in the saved list looking like a network you can join. */
+int  net_join(const char *ssid, const char *password);
+
+/* The shortest password the network's security allows, or -1 when it needs
+ * more than a password - a username too, for 802.1X - which this cannot
+ * ask for. 0 means open: no password at all. */
+int  net_min_password(const char *security);
 int  net_disconnect(void);
 
 /* "192.168.1.42", or empty when not connected. */

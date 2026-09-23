@@ -59,12 +59,15 @@ static void cb_saved(char *line, void *ctx)
 static void cb_visible(char *line, void *ctx)
 {
 	struct net_list *l = ctx;
-	char f[4][80];
+	char f[4][80] = { { 0 } };   /* a line without SECURITY leaves f[3] */
 	if (terse_split(line, f, 4) < 3 || !f[1][0])
 		return;
 
 	int active = f[0][0] == '*';
 	int sig = atoi(f[2]);
+	/* Open networks report "" in terse mode and "--" in the tabular one;
+	 * accept both rather than depend on which this nmcli does. */
+	const char *sec = strcmp(f[3], "--") == 0 ? "" : f[3];
 
 	/* Already listed as a saved profile: fill in what the scan knows. */
 	for (int i = 0; i < l->n; i++) {
@@ -73,6 +76,7 @@ static void cb_visible(char *line, void *ctx)
 				l->e[i].signal = sig;
 			if (active)
 				l->e[i].active = 1;
+			str_copy(l->e[i].security, sizeof(l->e[i].security), sec);
 			return;
 		}
 	}
@@ -82,6 +86,7 @@ static void cb_visible(char *line, void *ctx)
 	struct net_entry *e = &l->e[l->n++];
 	memset(e, 0, sizeof(*e));
 	str_copy(e->name, sizeof(e->name), f[1]);
+	str_copy(e->security, sizeof(e->security), sec);
 	e->signal = sig;
 	e->active = active;
 }
@@ -110,7 +115,7 @@ void net_scan(struct net_list *l, int rescan)
 	}
 
 	char *const vis[] = { (char *)NMCLI, (char *)"-t", (char *)"-f",
-	                      (char *)"IN-USE,SSID,SIGNAL", (char *)"device",
+	                      (char *)"IN-USE,SSID,SIGNAL,SECURITY", (char *)"device",
 	                      (char *)"wifi", (char *)"list", NULL };
 	proc_run(vis, cb_visible, l);
 
@@ -145,6 +150,54 @@ int net_connect(const char *name)
 	char *const argv[] = { (char *)NMCLI, (char *)"connection", (char *)"up",
 	                       (char *)"id", (char *)name, NULL };
 	return proc_run(argv, NULL, NULL);
+}
+
+int net_join(const char *ssid, const char *password)
+{
+	/* The password goes on nmcli's command line, where anything running
+	 * as root can read it for the second or two nmcli takes. That is
+	 * accepted rather than engineered around: NetworkManager stores the
+	 * same password in plain text in its profile the moment this
+	 * succeeds, and everything on this device runs as root. What would
+	 * not be acceptable is a long-lived process holding it there, which
+	 * is the problem with the file server in portareos#239.
+	 *
+	 * nmcli's own --wait comes in under our ceiling, so a slow join is
+	 * reported by nmcli as a timeout rather than killed by us. */
+	char *const argv_pw[] = { (char *)NMCLI, (char *)"--wait", (char *)"30",
+	                          (char *)"device", (char *)"wifi", (char *)"connect",
+	                          (char *)ssid, (char *)"password",
+	                          (char *)password, NULL };
+	char *const argv_open[] = { (char *)NMCLI, (char *)"--wait", (char *)"30",
+	                            (char *)"device", (char *)"wifi",
+	                            (char *)"connect", (char *)ssid, NULL };
+	int rc = proc_run_for(password && password[0] ? argv_pw : argv_open,
+	                      NULL, NULL, 40000);
+
+	if (rc != 0) {
+		/* Only ever called for a network with no saved profile, so a
+		 * profile by this name now is the one this attempt created. */
+		char *const del[] = { (char *)NMCLI, (char *)"connection",
+		                      (char *)"delete", (char *)"id", (char *)ssid,
+		                      NULL };
+		proc_run(del, NULL, NULL);
+	}
+	return rc;
+}
+
+int net_min_password(const char *security)
+{
+	if (!security || !security[0])
+		return 0;
+	if (strstr(security, "802.1X"))
+		return -1;
+	/* WPA and WPA2 personal: an 8 to 63 character passphrase. WPA3's SAE
+	 * has no such floor in the standard, and WEP keys are 5 or 13
+	 * characters; nmcli rejects what is wrong for either, so 1 is enough
+	 * to stop an empty submit. */
+	if (strstr(security, "WPA1") || strstr(security, "WPA2"))
+		return 8;
+	return 1;
 }
 
 int net_disconnect(void)
