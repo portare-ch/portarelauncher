@@ -29,7 +29,7 @@ PL_WARN    := -Wall -Wextra -Wshadow -Wvla -Wno-unused-parameter
 
 CFLAGS     ?= -O2 -g
 
-SRC  := src/settings.c src/status.c src/osd.c src/term.c src/kms.c \
+SRC  := src/net.c src/settings.c src/status.c src/osd.c src/term.c src/kms.c \
         src/input.c src/catalog.c src/main.c
 OBJ  := $(SRC:.c=.o)
 BIN  := portarelauncher

@@ -6,6 +6,7 @@
 #include "catalog.h"
 #include "input.h"
 #include "kms.h"
+#include "net.h"
 #include "osd.h"
 #include "settings.h"
 #include "status.h"
@@ -27,7 +28,7 @@
 #define LIST_TOP    5
 #define LIST_MARGIN 3          /* rows kept below the list for the footer  */
 
-enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS };
+enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI };
 
 struct ui {
 	struct term term;
@@ -38,6 +39,12 @@ struct ui {
 	const char *pal_name;
 	struct status st;
 	struct osd osd;
+
+	struct net_list nets;
+	int wifi_sel, wifi_top;
+	char usb[24];
+	char usb_opts[8][24];
+	int n_usb;
 	int retroid;         /* which printing the pad carries */
 	enum screen screen;
 	int sys_sel, sys_top;
@@ -56,15 +63,13 @@ struct ui {
 #define G_TRIANGLE  0x1E   /* /\  */
 #define G_SQUARE    0xFE   /* []  */
 
-enum { SET_BUTTONS = 0, SET_WIFI, SET_BLUETOOTH, SET_BRIGHTNESS, SET_USB,
-       N_SETTINGS };
+enum { SET_WIFI = 0, SET_USB, SET_BUTTONS, SET_BLUETOOTH, N_SETTINGS };
 
 static const char *const settings_labels[N_SETTINGS] = {
-	"Button style",
 	"Wi-Fi",
-	"Bluetooth",
-	"Brightness",
 	"USB gadget mode",
+	"Button style",
+	"Bluetooth",
 };
 
 static volatile sig_atomic_t stop_requested;
@@ -242,19 +247,63 @@ static void draw_settings(struct ui *u)
 
 	draw_frame(u, "Settings");
 
+	char val[64];
 	for (int i = 0; i < N_SETTINGS; i++) {
 		const char *value = "not wired up";
-		if (i == SET_BUTTONS)
+		switch (i) {
+		case SET_WIFI: {
+			const char *ssid = NULL;
+			for (int k = 0; k < u->nets.n; k++)
+				if (u->nets.e[k].active)
+					ssid = u->nets.e[k].name;
+			value = ssid ? ssid : (net_wifi_enabled() ? "not connected" : "off");
+			break;
+		}
+		case SET_USB:
+			snprintf(val, sizeof(val), "%s", u->usb[0] ? u->usb : "unknown");
+			value = val;
+			break;
+		case SET_BUTTONS:
 			value = u->retroid ? "Retroid" : "PS";
+			break;
+		}
 		draw_row(u, (unsigned)(3 + i), i == u->set_sel,
 		         settings_labels[i], value);
 	}
 
-	term_hline(t, 3 + N_SETTINGS + 1, G_HLINE, ATTR_DIM);
-	if (u->set_sel == SET_BUTTONS)
-		draw_face(u, 3 + N_SETTINGS + 3, u->retroid);
-	else
-		term_puts(t, 4, 3 + N_SETTINGS + 3, "Not implemented yet.", ATTR_DIM);
+	unsigned y = 3 + N_SETTINGS + 1;
+	term_hline(t, y, G_HLINE, ATTR_DIM);
+
+	switch (u->set_sel) {
+	case SET_BUTTONS:
+		draw_face(u, y + 2, u->retroid);
+		break;
+	case SET_WIFI: {
+		char addr[40] = "";
+		net_address(addr, sizeof(addr));
+		term_puts(t, 4, y + 2, "Saved networks reconnect without a", ATTR_DIM);
+		term_puts(t, 4, y + 3, "password. Open to pick one.", ATTR_DIM);
+		if (addr[0]) {
+			snprintf(val, sizeof(val), "address  %s", addr);
+			term_puts(t, 4, y + 5, val, ATTR_MID);
+		}
+		break;
+	}
+	case SET_USB: {
+		char addr[40] = "";
+		usb_address(addr, sizeof(addr));
+		term_puts(t, 4, y + 2, "network shares the link over USB,", ATTR_DIM);
+		term_puts(t, 4, y + 3, "file_transfer exposes storage.", ATTR_DIM);
+		if (addr[0] && strcmp(u->usb, "network") == 0) {
+			snprintf(val, sizeof(val), "address  %s", addr);
+			term_puts(t, 4, y + 5, val, ATTR_MID);
+		}
+		break;
+	}
+	default:
+		term_puts(t, 4, y + 2, "Not implemented yet.", ATTR_DIM);
+		break;
+	}
 
 	{
 		struct face f = face_of(u->retroid);
@@ -264,14 +313,60 @@ static void draw_settings(struct ui *u)
 	}
 }
 
+/* Saved networks first, then whatever else is in range. The distinction is
+ * the point of the screen: a saved one connects on a button press, a new one
+ * needs a password and there is nowhere to type it yet. */
+static void draw_wifi(struct ui *u)
+{
+	struct term *t = &u->term;
+	char buf[64];
+	int on = net_wifi_enabled();
+
+	draw_frame(u, "Settings  >  Wi-Fi");
+	term_puts(t, 2, 3, on ? "NETWORKS" : "WI-FI IS OFF", ATTR_MID);
+	snprintf(buf, sizeof(buf), "%d found", u->nets.n);
+	term_puts_right(t, t->cols - 2, 3, buf, ATTR_MID);
+
+	int visible = (int)list_rows(u);
+	scroll_to(u->wifi_sel, &u->wifi_top, u->nets.n, visible);
+
+	for (int i = 0; i < visible && u->wifi_top + i < u->nets.n; i++) {
+		const struct net_entry *e = &u->nets.e[u->wifi_top + i];
+		if (e->active)
+			snprintf(buf, sizeof(buf), "connected");
+		else if (e->saved)
+			snprintf(buf, sizeof(buf), "saved");
+		else if (e->signal >= 0)
+			snprintf(buf, sizeof(buf), "%d%%", e->signal);
+		else
+			buf[0] = '\0';
+		draw_row(u, (unsigned)(LIST_TOP + i), u->wifi_top + i == u->wifi_sel,
+		         e->name, buf);
+	}
+
+	struct face f = face_of(u->retroid);
+	snprintf(buf, sizeof(buf), "%c CONNECT   %c BACK   %c RESCAN",
+	         f.bottom, f.right, f.left);
+	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
+}
+
 static void redraw(struct ui *u)
 {
 	switch (u->screen) {
 	case SCR_SYSTEMS:  draw_systems(u);  break;
 	case SCR_GAMES:    draw_games(u);    break;
 	case SCR_SETTINGS: draw_settings(u); break;
+	case SCR_WIFI:     draw_wifi(u);     break;
 	}
 	term_flush(&u->term);
+}
+
+/* nmcli and usbgadget both take a moment. Say so rather than appear frozen. */
+static void draw_busy(struct ui *u, const char *what)
+{
+	struct term *t = &u->term;
+	term_puts(t, 4, t->rows - 4, what, ATTR_BRIGHT);
+	term_flush(t);
 }
 
 static void draw_launching(struct ui *u, const struct psystem *s,
@@ -399,6 +494,27 @@ static void on_action(struct ui *u, enum action a)
 	case SCR_SETTINGS:
 		if (a == ACT_UP && u->set_sel > 0) u->set_sel--;
 		else if (a == ACT_DOWN && u->set_sel < N_SETTINGS - 1) u->set_sel++;
+		else if (a == ACT_CONFIRM && u->set_sel == SET_WIFI) {
+			draw_busy(u, "scanning...");
+			net_scan(&u->nets, 1);
+			u->wifi_sel = u->wifi_top = 0;
+			u->screen = SCR_WIFI;
+		}
+		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
+		         u->set_sel == SET_USB && u->n_usb > 0) {
+			/* Cycle through whatever usbgadget --options reported,
+			 * rather than a list of our own that could drift from it. */
+			int cur = 0;
+			for (int i = 0; i < u->n_usb; i++)
+				if (strcmp(u->usb_opts[i], u->usb) == 0)
+					cur = i;
+			int next = (a == ACT_LEFT)
+			         ? (cur + u->n_usb - 1) % u->n_usb
+			         : (cur + 1) % u->n_usb;
+			draw_busy(u, "switching...");
+			usb_set_mode(u->usb_opts[next]);
+			usb_mode(u->usb, sizeof(u->usb));
+		}
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
 		         u->set_sel == SET_BUTTONS) {
 			u->retroid = !u->retroid;
@@ -410,6 +526,30 @@ static void on_action(struct ui *u, enum action a)
 			             u->retroid ? "retroid" : "ps");
 		}
 		else if (a == ACT_BACK || a == ACT_MENU) u->screen = SCR_SYSTEMS;
+		else if (a == ACT_QUIT) u->running = 0;
+		break;
+
+	case SCR_WIFI:
+		if (a == ACT_UP && u->wifi_sel > 0) u->wifi_sel--;
+		else if (a == ACT_DOWN && u->wifi_sel < u->nets.n - 1) u->wifi_sel++;
+		else if (a == ACT_MENU) {
+			draw_busy(u, "rescanning...");
+			net_scan(&u->nets, 1);
+			if (u->wifi_sel >= u->nets.n) u->wifi_sel = 0;
+		}
+		else if (a == ACT_CONFIRM && u->wifi_sel < u->nets.n) {
+			const struct net_entry *e = &u->nets.e[u->wifi_sel];
+			if (!e->saved) {
+				/* No password, nowhere to type one. Say which, rather
+				 * than fail silently against a network we cannot join. */
+				draw_busy(u, "no saved password for this network");
+			} else {
+				draw_busy(u, "connecting...");
+				net_connect(e->name);
+				net_scan(&u->nets, 0);
+			}
+		}
+		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
 		else if (a == ACT_QUIT) u->running = 0;
 		break;
 	}
@@ -471,6 +611,13 @@ int main(void)
 	 * spare string comparison. */
 	u.retroid = !(settings_get(SETTINGS, KEY_BUTTONS, style, sizeof(style)) &&
 	              (strcmp(style, "ps") == 0 || strcmp(style, "sony") == 0));
+	/* Read what is cheap now and leave the scan until the Wi-Fi screen is
+	 * opened: a rescan takes seconds and nothing on the first screen shows
+	 * it. */
+	usb_modes(u.usb_opts, &u.n_usb, 8);
+	usb_mode(u.usb, sizeof(u.usb));
+	net_scan(&u.nets, 0);
+
 	u.screen = SCR_SYSTEMS;
 	u.running = 1;
 	status_read(&u.st);
