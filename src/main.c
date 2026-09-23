@@ -15,6 +15,7 @@
 #include "status.h"
 #include "term.h"
 #include "tools.h"
+#include "update.h"
 
 #include <errno.h>
 #include <signal.h>
@@ -33,7 +34,7 @@
 #define LIST_MARGIN 3          /* rows kept below the list for the footer  */
 
 enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI, SCR_BT,
-              SCR_KEYBOARD, SCR_TOOLS };
+              SCR_KEYBOARD, SCR_TOOLS, SCR_UPDATE };
 
 struct ui {
 	struct term term;
@@ -57,6 +58,10 @@ struct ui {
 
 	struct tools tools;
 	int tool_sel, tool_top;
+
+	struct update_info upd;
+	int upd_sel;
+	int upd_staged;      /* a verified .tar is waiting for the next boot */
 	/* One line of news for the screen that is up, kept until the next
 	 * press. Drawn by the screen itself, because anything drawn beside
 	 * the screen is gone in the redraw that follows every action. */
@@ -84,7 +89,7 @@ struct ui {
 #define G_SQUARE    0xFE   /* []  */
 
 enum { SET_WIFI = 0, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_COLOUR,
-       N_SETTINGS };
+       SET_UPDATE, N_SETTINGS };
 
 static const char *const settings_labels[N_SETTINGS] = {
 	"Wi-Fi",
@@ -92,6 +97,7 @@ static const char *const settings_labels[N_SETTINGS] = {
 	"USB gadget mode",
 	"Button style",
 	"Colour",
+	"Update",
 };
 
 static volatile sig_atomic_t stop_requested;
@@ -327,6 +333,15 @@ static void draw_settings(struct ui *u)
 		case SET_COLOUR:
 			value = u->pal_name;
 			break;
+		case SET_UPDATE:
+			if (u->upd_staged)
+				value = "restart to install";
+			else if (settings_get(SETTINGS, "updates.branch", val, sizeof(val)) &&
+			         (!strcmp(val, "nightly") || !strcmp(val, "release")))
+				value = val;
+			else
+				value = "automatic";
+			break;
 		}
 		draw_row(u, (unsigned)(3 + i), i == u->set_sel,
 		         settings_labels[i], value);
@@ -361,6 +376,10 @@ static void draw_settings(struct ui *u)
 	case SET_BLUETOOTH:
 		term_puts(t, 4, y + 2, "Headphones, controllers. Open to", ATTR_DIM);
 		term_puts(t, 4, y + 3, "scan, connect, set auto-connect.", ATTR_DIM);
+		break;
+	case SET_UPDATE:
+		term_puts(t, 4, y + 2, "Downloads the newest build from", ATTR_DIM);
+		term_puts(t, 4, y + 3, "GitHub over Wi-Fi. Open to check.", ATTR_DIM);
 		break;
 	case SET_USB: {
 		char addr[40] = "";
@@ -582,6 +601,131 @@ static void draw_keyboard(struct ui *u)
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
+/* ---- update --------------------------------------------------------------- */
+
+static void draw_busy(struct ui *u, const char *what);
+
+#define STAGE_DIR "/storage/.update"
+
+static const char *update_action(const struct ui *u)
+{
+	if (u->upd_staged)
+		return "Restart to install";
+	if (u->upd.state == UPD_AVAILABLE)
+		return "Download and install";
+	return "Check again";
+}
+
+/* Two rows - the channel and whatever the next step is - and what is known
+ * underneath. One action row that changes rather than three that are mostly
+ * greyed out: at any moment there is exactly one thing to do next. */
+static void draw_update(struct ui *u)
+{
+	struct term *t = &u->term;
+	char buf[128];
+
+	draw_frame(u, "Settings  >  Update");
+	draw_row(u, 3, u->upd_sel == 0, "Channel",
+	         u->upd.channel[0] ? u->upd.channel : "unknown");
+	draw_row(u, 4, u->upd_sel == 1, update_action(u), NULL);
+	term_hline(t, 6, G_HLINE, ATTR_DIM);
+
+	term_puts(t, 4, 8, "installed", ATTR_MID);
+	term_puts(t, 16, 8, u->upd.installed[0] ? u->upd.installed : "-", ATTR_TEXT);
+	if (u->upd.tag[0]) {
+		term_puts(t, 4, 9, "latest", ATTR_MID);
+		snprintf(buf, sizeof(buf), "%s  %lld MB", u->upd.tag,
+		         u->upd.size / (1024 * 1024));
+		term_puts(t, 16, 9, buf, ATTR_TEXT);
+	}
+
+	const char *l1 = "", *l2 = "";
+	if (u->upd_staged) {
+		l1 = "Downloaded and checked. Restart to";
+		l2 = "install it; that takes a minute.";
+	} else switch (u->upd.state) {
+	case UPD_AVAILABLE: l1 = "An update is available."; break;
+	case UPD_CURRENT:   l1 = "This is the newest build on this"; l2 = "channel."; break;
+	case UPD_NEWER:     l1 = "The installed build is newer than"; l2 = "anything on this channel."; break;
+	case UPD_NONE:      l1 = "Nothing published on this channel"; l2 = "for this device yet."; break;
+	case UPD_ERROR:     l1 = u->upd.error; break;
+	case UPD_UNKNOWN:   break;
+	}
+	term_puts(t, 4, 11, l1, ATTR_BRIGHT);
+	term_puts(t, 4, 12, l2, ATTR_BRIGHT);
+
+	if (!strcmp(u->upd.channel, "release")) {
+		term_puts(t, 4, 14, "release: the monthly builds only.", ATTR_DIM);
+		term_puts(t, 4, 15, "Fewer changes, each one tested longer.", ATTR_DIM);
+	} else {
+		term_puts(t, 4, 14, "nightly: every build, most days.", ATTR_DIM);
+		term_puts(t, 4, 15, "Newest fixes first, and newest bugs.", ATTR_DIM);
+	}
+
+	if (u->note[0])
+		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
+
+	struct face f = face_of(u->retroid);
+	snprintf(buf, sizeof(buf), "%c SELECT   %c BACK", f.bottom, f.right);
+	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
+}
+
+/* Called by update_fetch as the download moves. Draws the whole screen each
+ * time, which is once per percent - a hundred frames over several minutes. */
+static void draw_download(int pct, int verifying, void *ctx)
+{
+	struct ui *u = ctx;
+	struct term *t = &u->term;
+	char buf[64];
+
+	draw_frame(u, "Settings  >  Update");
+	term_puts(t, 4, 4, verifying ? "Checking the download..." : "Downloading",
+	          ATTR_BRIGHT);
+	term_puts(t, 4, 5, u->upd.tag, ATTR_MID);
+
+	unsigned width = t->cols - 8 - 6;
+	unsigned filled = (unsigned)pct * width / 100;
+	for (unsigned i = 0; i < width; i++)
+		term_putc(t, 4 + i, 8, i < filled ? 0xDB : 0xB0,
+		          i < filled ? ATTR_BRIGHT : ATTR_DIM);
+	snprintf(buf, sizeof(buf), "%3d%%", pct);
+	term_puts(t, 4 + width + 1, 8, buf, ATTR_TEXT);
+
+	if (u->upd.size > 0) {
+		long long mb = u->upd.size / (1024 * 1024);
+		snprintf(buf, sizeof(buf), "%lld of %lld MB", mb * pct / 100, mb);
+		term_puts(t, 4, 10, buf, ATTR_MID);
+	}
+
+	term_puts(t, 4, 13, "Keep Wi-Fi on. If it stops, choosing", ATTR_DIM);
+	term_puts(t, 4, 14, "it again continues where it was.", ATTR_DIM);
+	term_flush(t);
+}
+
+static void open_update(struct ui *u)
+{
+	draw_busy(u, "checking for updates...");
+	update_check(&u->upd);
+	u->upd_staged = update_staged(STAGE_DIR);
+	u->upd_sel = 1;
+	u->screen = SCR_UPDATE;
+}
+
+/* The update is applied by the boot that follows, so this is the last thing
+ * the launcher does. systemd stops this program on the way down. */
+static void restart(struct ui *u)
+{
+	struct term *t = &u->term;
+	draw_frame(u, "PortareOS");
+	term_puts(t, 4, 6, "Restarting to install the update...", ATTR_BRIGHT);
+	term_flush(t);
+
+	char *const argv[] = { (char *)"/usr/bin/systemctl", (char *)"reboot", NULL };
+	int rc = proc_run_for(argv, NULL, NULL, 10000);
+	if (rc != 0)
+		snprintf(u->note, sizeof(u->note), "Could not restart (%d).", rc);
+}
+
 static void redraw(struct ui *u)
 {
 	switch (u->screen) {
@@ -592,6 +736,7 @@ static void redraw(struct ui *u)
 	case SCR_BT:       draw_bt(u);       break;
 	case SCR_KEYBOARD: draw_keyboard(u); break;
 	case SCR_TOOLS:    draw_tools(u);    break;
+	case SCR_UPDATE:   draw_update(u);   break;
 	}
 	term_flush(&u->term);
 }
@@ -849,6 +994,8 @@ static void on_action(struct ui *u, enum action a)
 			u->wifi_sel = u->wifi_top = 0;
 			u->screen = SCR_WIFI;
 		}
+		else if (a == ACT_CONFIRM && u->set_sel == SET_UPDATE)
+			open_update(u);
 		else if (a == ACT_CONFIRM && u->set_sel == SET_BLUETOOTH) {
 			draw_busy(u, "reading devices...");
 			u->bt_on = bt_powered();
@@ -940,6 +1087,35 @@ static void on_action(struct ui *u, enum action a)
 				u->running = 0;
 			break;
 		}
+		break;
+
+	case SCR_UPDATE:
+		if (a == ACT_UP && u->upd_sel > 0) u->upd_sel--;
+		else if (a == ACT_DOWN && u->upd_sel < 1) u->upd_sel++;
+		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
+		         u->upd_sel == 0) {
+			/* Two channels, so any press flips it, and the answer for
+			 * the other channel is fetched straight away. */
+			const char *next = strcmp(u->upd.channel, "release") == 0
+			                 ? "nightly" : "release";
+			update_set_channel(SETTINGS, next);
+			draw_busy(u, "checking for updates...");
+			update_check(&u->upd);
+		}
+		else if (a == ACT_CONFIRM && u->upd_sel == 1) {
+			if (u->upd_staged) {
+				restart(u);
+			} else if (u->upd.state == UPD_AVAILABLE) {
+				draw_download(0, 0, u);
+				if (update_fetch(draw_download, u, u->note, sizeof(u->note)) == 0)
+					u->upd_staged = 1;
+			} else {
+				draw_busy(u, "checking for updates...");
+				update_check(&u->upd);
+			}
+		}
+		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
+		else if (a == ACT_QUIT) u->running = 0;
 		break;
 
 	case SCR_BT: {
