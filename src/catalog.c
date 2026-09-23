@@ -197,6 +197,12 @@ int catalog_load(struct catalog *c, const char *es_systems, const char *settings
 			in_system = 0;
 			if (!cur.name[0] || !cur.path[0])
 				continue;
+			/* EmulationStation's Tools system: no core, so it could only
+			 * ever say "Cannot launch". The launcher's own Tools row runs
+			 * the same folder (tools.c), and listing both put two rows
+			 * called Tools in the list. */
+			if (strcmp(cur.name, "tools") == 0)
+				continue;
 
 			{
 				char key[96], v[64];
