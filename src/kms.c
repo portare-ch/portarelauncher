@@ -70,6 +70,9 @@ int kms_open(struct kms *k, const char *card)
 		fprintf(stderr, "open %s: %s\n", card, strerror(errno));
 		return -1;
 	}
+	/* Every plane, cursor included, so kms_present can find and clear the
+	 * ones another program left behind. */
+	drmSetClientCap(k->fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
 
 	drmModeRes *res = drmModeGetResources(k->fd);
 	if (!res) {
@@ -153,6 +156,34 @@ fail_fd:
 	return -1;
 }
 
+/* Switches off every plane on our CRTC that is not showing our buffer.
+ *
+ * A program that set a cursor through the legacy cursor call leaves it on
+ * the CRTC after it exits: the kernel made that framebuffer itself, so it is
+ * not among the program's own and is not removed with them. gmu - SDL - left
+ * a 512x512 arrow in the top-left corner that then showed over SwanStation,
+ * ARMSX2 and the launcher alike, since none of them touches the cursor
+ * plane. The launcher is the one thing that runs between every program, so
+ * it clears the slate each time it takes the panel back. */
+static void clear_other_planes(struct kms *k)
+{
+	drmModeSetCursor(k->fd, k->crtc_id, 0, 0, 0);
+
+	drmModePlaneRes *pr = drmModeGetPlaneResources(k->fd);
+	if (!pr)
+		return;
+	for (uint32_t i = 0; i < pr->count_planes; i++) {
+		drmModePlane *pl = drmModeGetPlane(k->fd, pr->planes[i]);
+		if (!pl)
+			continue;
+		if (pl->crtc_id == k->crtc_id && pl->fb_id && pl->fb_id != k->fb_id)
+			drmModeSetPlane(k->fd, pl->plane_id, k->crtc_id, 0, 0,
+			                0, 0, 0, 0, 0, 0, 0, 0);
+		drmModeFreePlane(pl);
+	}
+	drmModeFreePlaneResources(pr);
+}
+
 int kms_present(struct kms *k)
 {
 	if (drmModeSetCrtc(k->fd, k->crtc_id, k->fb_id, 0, 0,
@@ -160,6 +191,7 @@ int kms_present(struct kms *k)
 		fprintf(stderr, "setcrtc: %s\n", strerror(errno));
 		return -1;
 	}
+	clear_other_planes(k);
 	return 0;
 }
 
@@ -181,13 +213,10 @@ int kms_drop_master(struct kms *k)
 	return 0;
 }
 
+/* Quiet, because it is retried: the caller says so when it gives up. */
 int kms_set_master(struct kms *k)
 {
-	if (drmSetMaster(k->fd) < 0) {
-		fprintf(stderr, "set master: %s\n", strerror(errno));
-		return -1;
-	}
-	return 0;
+	return drmSetMaster(k->fd) < 0 ? -1 : 0;
 }
 
 void kms_close(struct kms *k)

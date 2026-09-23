@@ -37,12 +37,27 @@ struct input {
 	 * poll: the OSD pipe. Kept separate so its bytes are never parsed as
 	 * evdev events. */
 	int aux_fd;
+	/* inotify on /dev/input. InputPlumber recreates its virtual pad
+	 * whenever it restarts - which happens at the end of a game - and a
+	 * Bluetooth pad comes and goes; either way the devices are reopened
+	 * rather than read through descriptors whose device is gone. */
+	int notify_fd;
+	int quit_only;         /* the mask input_quit_only set, reapplied */
 	enum action held;      /* direction currently held, for repeat */
 	int repeats;           /* how many repeats have fired          */
 };
 
 /* Clears *in before opening anything, so input_set_aux comes after it. */
 int  input_open(struct input *in);
+
+/* For a caller with a poll loop of its own: adds the devices and the
+ * hotplug watch to pfd (room for INPUT_MAX_DEV + 1) and returns how many.
+ * After poll, input_refresh reopens the devices if one has gone or appeared
+ * and returns 1 when it did; the caller then reads nothing from this round,
+ * since the descriptors it polled are closed. */
+struct pollfd;
+int  input_fill_poll(struct input *in, struct pollfd *pfd);
+int  input_refresh(struct input *in, const struct pollfd *pfd, int n);
 void input_set_aux(struct input *in, int fd);
 void input_close(struct input *in);
 
@@ -53,6 +68,18 @@ void input_close(struct input *in);
  * the launcher is back: START+SELECT out of the gamepad tester, replayed,
  * opens Settings. */
 void input_drain(struct input *in);
+
+/* While another program has the panel, the launcher only listens for the quit
+ * combo (quit.h). on=1 asks the kernel to deliver nothing but Home and START
+ * key events on every device, so a game's stick movements do not wake this
+ * program hundreds of times a second; on=0 puts everything back. A kernel
+ * without EVIOCSMASK just delivers everything, which costs wake-ups but
+ * works. */
+void input_quit_only(struct input *in, int on);
+
+/* Reads whatever is waiting and returns 1 if it completed Home + START. */
+struct quit_combo;
+int  input_quit_read(struct input *in, struct quit_combo *q);
 
 /* Blocks until something happens and returns one action.
  *
