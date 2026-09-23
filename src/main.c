@@ -9,6 +9,7 @@
 #include "kms.h"
 #include "net.h"
 #include "osd.h"
+#include "osinfo.h"
 #include "osk.h"
 #include "proc.h"
 #include "settings.h"
@@ -34,7 +35,7 @@
 #define LIST_MARGIN 3          /* rows kept below the list for the footer  */
 
 enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI, SCR_BT,
-              SCR_KEYBOARD, SCR_TOOLS, SCR_UPDATE };
+              SCR_KEYBOARD, SCR_TOOLS, SCR_ABOUT, SCR_UPDATE };
 
 struct ui {
 	struct term term;
@@ -58,6 +59,10 @@ struct ui {
 
 	struct tools tools;
 	int tool_sel, tool_top;
+
+	struct osinfo os;
+	char addr[40];       /* empty when offline */
+	int about_sel;
 
 	struct update_info upd;
 	int upd_sel;
@@ -89,7 +94,7 @@ struct ui {
 #define G_SQUARE    0xFE   /* []  */
 
 enum { SET_WIFI = 0, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_COLOUR,
-       SET_UPDATE, N_SETTINGS };
+       SET_ABOUT, N_SETTINGS };
 
 static const char *const settings_labels[N_SETTINGS] = {
 	"Wi-Fi",
@@ -97,7 +102,7 @@ static const char *const settings_labels[N_SETTINGS] = {
 	"USB gadget mode",
 	"Button style",
 	"Colour",
-	"Update",
+	"About",
 };
 
 static volatile sig_atomic_t stop_requested;
@@ -333,14 +338,14 @@ static void draw_settings(struct ui *u)
 		case SET_COLOUR:
 			value = u->pal_name;
 			break;
-		case SET_UPDATE:
+		case SET_ABOUT:
 			if (u->upd_staged)
 				value = "restart to install";
-			else if (settings_get(SETTINGS, "updates.branch", val, sizeof(val)) &&
-			         (!strcmp(val, "nightly") || !strcmp(val, "release")))
+			else if (u->os.version[0]) {
+				snprintf(val, sizeof(val), "%s %s", u->os.version, u->os.build);
 				value = val;
-			else
-				value = "automatic";
+			} else
+				value = "unknown";
 			break;
 		}
 		draw_row(u, (unsigned)(3 + i), i == u->set_sel,
@@ -377,9 +382,9 @@ static void draw_settings(struct ui *u)
 		term_puts(t, 4, y + 2, "Headphones, controllers. Open to", ATTR_DIM);
 		term_puts(t, 4, y + 3, "scan, connect, set auto-connect.", ATTR_DIM);
 		break;
-	case SET_UPDATE:
-		term_puts(t, 4, y + 2, "Downloads the newest build from", ATTR_DIM);
-		term_puts(t, 4, y + 3, "GitHub over Wi-Fi. Open to check.", ATTR_DIM);
+	case SET_ABOUT:
+		term_puts(t, 4, y + 2, "The version, for bug reports, the", ATTR_DIM);
+		term_puts(t, 4, y + 3, "address for ssh, and updates.", ATTR_DIM);
 		break;
 	case SET_USB: {
 		char addr[40] = "";
@@ -616,6 +621,53 @@ static const char *update_action(const struct ui *u)
 	return "Check again";
 }
 
+/* What is installed and where it can be reached, then Update. The version is
+ * what a bug report needs first and the address is what ssh needs; both were
+ * nowhere on the device before. */
+static void draw_about(struct ui *u)
+{
+	struct term *t = &u->term;
+	char buf[96], val[16];
+	const struct osinfo *o = &u->os;
+
+	draw_frame(u, "Settings  >  About");
+
+	const char *upd;
+	if (u->upd_staged)
+		upd = "restart to install";
+	else if (settings_get(SETTINGS, "updates.branch", val, sizeof(val)) &&
+	         (!strcmp(val, "nightly") || !strcmp(val, "release")))
+		upd = val;
+	else
+		upd = "automatic";
+	draw_row(u, 3, u->about_sel == 0, "Update", upd);
+	term_hline(t, 5, G_HLINE, ATTR_DIM);
+
+	term_puts(t, 4, 7, "version", ATTR_MID);
+	snprintf(buf, sizeof(buf), "%s  %s", o->version[0] ? o->version : "unknown",
+	         o->build);
+	term_puts(t, 15, 7, buf, ATTR_TEXT);
+
+	term_puts(t, 4, 8, "commit", ATTR_MID);
+	snprintf(buf, sizeof(buf), "%.7s  %s", o->commit[0] ? o->commit : "-",
+	         o->branch);
+	term_puts(t, 15, 8, buf, ATTR_TEXT);
+
+	term_puts(t, 4, 9, "built", ATTR_MID);
+	term_puts(t, 15, 9, o->date[0] ? o->date : "-", ATTR_TEXT);
+
+	term_puts(t, 4, 10, "device", ATTR_MID);
+	snprintf(buf, sizeof(buf), "%s  %s", o->device, o->cpu);
+	term_puts(t, 15, 10, buf, ATTR_TEXT);
+
+	term_puts(t, 4, 11, "address", ATTR_MID);
+	term_puts(t, 15, 11, u->addr[0] ? u->addr : "offline", ATTR_TEXT);
+
+	struct face f = face_of(u->retroid);
+	snprintf(buf, sizeof(buf), "%c OPEN   %c BACK", f.bottom, f.right);
+	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
+}
+
 /* Two rows - the channel and whatever the next step is - and what is known
  * underneath. One action row that changes rather than three that are mostly
  * greyed out: at any moment there is exactly one thing to do next. */
@@ -624,7 +676,7 @@ static void draw_update(struct ui *u)
 	struct term *t = &u->term;
 	char buf[128];
 
-	draw_frame(u, "Settings  >  Update");
+	draw_frame(u, "Settings  >  About  >  Update");
 	draw_row(u, 3, u->upd_sel == 0, "Channel",
 	         u->upd.channel[0] ? u->upd.channel : "unknown");
 	draw_row(u, 4, u->upd_sel == 1, update_action(u), NULL);
@@ -678,7 +730,7 @@ static void draw_download(int pct, int verifying, void *ctx)
 	struct term *t = &u->term;
 	char buf[64];
 
-	draw_frame(u, "Settings  >  Update");
+	draw_frame(u, "Settings  >  About  >  Update");
 	term_puts(t, 4, 4, verifying ? "Checking the download..." : "Downloading",
 	          ATTR_BRIGHT);
 	term_puts(t, 4, 5, u->upd.tag, ATTR_MID);
@@ -700,6 +752,17 @@ static void draw_download(int pct, int verifying, void *ctx)
 	term_puts(t, 4, 13, "Keep Wi-Fi on. If it stops, choosing", ATTR_DIM);
 	term_puts(t, 4, 14, "it again continues where it was.", ATTR_DIM);
 	term_flush(t);
+}
+
+/* The address is read when the screen opens rather than kept fresh: it
+ * changes with the network, and nobody is looking at it the rest of the
+ * time. */
+static void open_about(struct ui *u)
+{
+	net_address(u->addr, sizeof(u->addr));
+	u->upd_staged = update_staged(STAGE_DIR);
+	u->about_sel = 0;
+	u->screen = SCR_ABOUT;
 }
 
 static void open_update(struct ui *u)
@@ -736,6 +799,7 @@ static void redraw(struct ui *u)
 	case SCR_BT:       draw_bt(u);       break;
 	case SCR_KEYBOARD: draw_keyboard(u); break;
 	case SCR_TOOLS:    draw_tools(u);    break;
+	case SCR_ABOUT:    draw_about(u);    break;
 	case SCR_UPDATE:   draw_update(u);   break;
 	}
 	term_flush(&u->term);
@@ -994,8 +1058,8 @@ static void on_action(struct ui *u, enum action a)
 			u->wifi_sel = u->wifi_top = 0;
 			u->screen = SCR_WIFI;
 		}
-		else if (a == ACT_CONFIRM && u->set_sel == SET_UPDATE)
-			open_update(u);
+		else if (a == ACT_CONFIRM && u->set_sel == SET_ABOUT)
+			open_about(u);
 		else if (a == ACT_CONFIRM && u->set_sel == SET_BLUETOOTH) {
 			draw_busy(u, "reading devices...");
 			u->bt_on = bt_powered();
@@ -1089,6 +1153,12 @@ static void on_action(struct ui *u, enum action a)
 		}
 		break;
 
+	case SCR_ABOUT:
+		if (a == ACT_CONFIRM && u->about_sel == 0) open_update(u);
+		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
+		else if (a == ACT_QUIT) u->running = 0;
+		break;
+
 	case SCR_UPDATE:
 		if (a == ACT_UP && u->upd_sel > 0) u->upd_sel--;
 		else if (a == ACT_DOWN && u->upd_sel < 1) u->upd_sel++;
@@ -1114,7 +1184,7 @@ static void on_action(struct ui *u, enum action a)
 				update_check(&u->upd);
 			}
 		}
-		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
+		else if (a == ACT_BACK) u->screen = SCR_ABOUT;
 		else if (a == ACT_QUIT) u->running = 0;
 		break;
 
@@ -1253,6 +1323,10 @@ int main(void)
 	tools_load(&u.tools);
 	usb_modes(u.usb_opts, &u.n_usb, 8);
 	usb_mode(u.usb, sizeof(u.usb));
+	/* For the version on the About row. The file cannot change while the
+	 * system runs; an update takes a reboot. */
+	osinfo_read(OS_RELEASE, &u.os);
+	u.upd_staged = update_staged(STAGE_DIR);
 	net_scan(&u.nets, 0);
 	u.bt_auto = bt_autoconnect();
 	u.bt_on = bt_powered();
