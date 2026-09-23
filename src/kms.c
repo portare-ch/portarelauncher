@@ -181,13 +181,10 @@ int kms_drop_master(struct kms *k)
 	return 0;
 }
 
+/* Quiet, because it is retried: the caller says so when it gives up. */
 int kms_set_master(struct kms *k)
 {
-	if (drmSetMaster(k->fd) < 0) {
-		fprintf(stderr, "set master: %s\n", strerror(errno));
-		return -1;
-	}
-	return 0;
+	return drmSetMaster(k->fd) < 0 ? -1 : 0;
 }
 
 void kms_close(struct kms *k)

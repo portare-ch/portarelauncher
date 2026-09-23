@@ -77,6 +77,7 @@ struct ui {
 	int power_sel;
 	int power_armed;     /* the row pressed once, waiting for a second; -1 */
 	int going_down;      /* reboot or poweroff accepted, panel off         */
+	int panel_lost;      /* master not yet back after a child; retrying    */
 
 	struct osinfo os;
 	char addr[40];       /* empty when offline */
@@ -1092,9 +1093,39 @@ static void wait_or_quit(struct ui *u, pid_t pid)
 		close(pidfd);
 }
 
+/* Takes the panel back after a child. The program that had it can still be
+ * tearing down when its parent has already exited - gmu was still saving
+ * its playlist a second after runemu.sh returned - and drmSetMaster says
+ * EBUSY until it has closed the device. One attempt left the launcher
+ * without a display for good; so it retries for a while here, and if that
+ * is not enough, marks the panel lost and keeps trying from the main loop. */
+static int reclaim_panel(struct ui *u, int patience_ms)
+{
+	long long until = now_ms() + patience_ms;
+	while (kms_set_master(&u->kms) < 0) {
+		int err = errno;
+		if (now_ms() >= until) {
+			if (!u->panel_lost)
+				fprintf(stderr, "set master: %s - retrying\n", strerror(err));
+			u->panel_lost = 1;
+			return -1;
+		}
+		struct timespec ts = { 0, 50 * 1000000L };
+		nanosleep(&ts, NULL);
+	}
+	if (u->panel_lost)
+		fprintf(stderr, "set master: back\n");
+	u->panel_lost = 0;
+	kms_present(&u->kms);
+	term_invalidate(&u->term);   /* someone else owned the panel */
+	return 0;
+}
+
 static void hand_over(struct ui *u, char *const argv[], const char *cwd)
 {
-	if (kms_drop_master(&u->kms) < 0)
+	/* Without master there is nothing to hand over; start it anyway
+	 * rather than refuse, since the panel is free for the child. */
+	if (!u->panel_lost && kms_drop_master(&u->kms) < 0)
 		return;
 
 	pid_t pid = fork();
@@ -1113,10 +1144,8 @@ static void hand_over(struct ui *u, char *const argv[], const char *cwd)
 		wait_or_quit(u, pid);
 	}
 
-	kms_set_master(&u->kms);
-	kms_present(&u->kms);
-	term_invalidate(&u->term);   /* it owned the panel; assume nothing */
-	input_drain(&u->in);         /* and everything pressed meanwhile   */
+	reclaim_panel(u, 3000);
+	input_drain(&u->in);         /* and everything pressed meanwhile */
 }
 
 /* Runs the emulator with the panel, then takes it back.
@@ -1664,6 +1693,8 @@ int main(void)
 		 * to come down, or until something is pressed. Nothing else
 		 * wakes this program. */
 		int idle = status_ms_to_next_minute();
+		if (u.panel_lost && idle > 1000)
+			idle = 1000;         /* keep asking for the panel back */
 		int osd_left = osd_remaining(&u.osd);
 		if (osd_left >= 0 && osd_left < idle)
 			idle = osd_left;
@@ -1682,6 +1713,13 @@ int main(void)
 				kms_blank(&u.kms);
 			}
 			continue;
+		}
+
+		if (u.panel_lost) {
+			if (reclaim_panel(&u, 0) == 0)
+				redraw(&u);
+			if (a == ACT_TICK || u.panel_lost)
+				continue;
 		}
 
 		if (a == ACT_NONE)
