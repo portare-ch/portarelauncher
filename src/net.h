@@ -10,9 +10,7 @@
  * a menu wants: --options lists the modes, no argument reports the current
  * one, and a mode name sets it.
  *
- * Everything is run with fork and execvp rather than a shell. Network names
- * come from the air and from other people, and a network called
- * `; rm -rf /` is a string, not a command.
+ * Both are run through proc_run, which never involves a shell. See proc.h.
  */
 #ifndef PL_NET_H
 #define PL_NET_H

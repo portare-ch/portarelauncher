@@ -43,15 +43,28 @@ games += [""] * 4
 games += [row("    swanstation", "8 of 112  "), "", THIN,
           row(" A LAUNCH   B BACK", "\u2191\u2193 MOVE ")]
 
-SET = [("Wi-Fi", "Hofmann-5G"), ("Bluetooth", "off"),
-       ("Brightness", "70%"), ("USB gadget mode", "off")]
-settings = [row(" PortareOS  \u203a  Settings", ""), RULE, ""]
-settings += [item(i == 0, n, v) for i, (n, v) in enumerate(SET)]
+SET = [("Wi-Fi", "Hofmann-5G"), ("Bluetooth", "WH-1000XM4"),
+       ("USB gadget mode", "network"), ("Button style", "Retroid")]
+settings = [row(" Settings", ""), RULE, ""]
+settings += [item(i == 1, n, v) for i, (n, v) in enumerate(SET)]
 settings += ["", THIN, "",
-             "    Everything here is a stub in the first cut.",
-             "    The list renders and moves, nothing applies yet."]
+             "    Headphones, controllers. Open to",
+             "    scan, connect, set auto-connect."]
 settings += [""] * 5
 settings += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
+
+# Two toggles and the devices in one list: switching it on, letting known
+# headphones come back, and picking them when they have not.
+BT = [("WH-1000XM4", "connected"), ("DualSense Edge", "paired"),
+      ("Bose QC35", "paired"), ("JBL Flip 5", "new")]
+bluetooth = [row(" Settings  \u203a  Bluetooth", ""), RULE, "",
+             item(False, "Bluetooth", "on"),
+             item(False, "Auto-connect known devices", "yes"),
+             THIN,
+             row("  DEVICES", "4 found  ")]
+bluetooth += [item(i == 0, n, v) for i, (n, v) in enumerate(BT)]
+bluetooth += [""] * 6
+bluetooth += [THIN, row(" A DISCONNECT   B BACK   Y SCAN", "")]
 
 launching = [row(" PortareOS", "23:59  BAT 87% "), RULE] + [""] * 4
 launching += ["           Tekken 3 (USA)", "",
@@ -61,6 +74,7 @@ launching += [""] * 7
 
 if __name__ == "__main__":
     for t, s in (("SYSTEMS", systems), ("GAMES", games),
-                 ("SETTINGS (stub)", settings), ("LAUNCHING", launching)):
+                 ("SETTINGS", settings), ("BLUETOOTH", bluetooth),
+                 ("LAUNCHING", launching)):
         print(screen(t, s))
         print()

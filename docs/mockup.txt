@@ -46,20 +46,20 @@
                                                          |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
-    SETTINGS (stub)
+    SETTINGS
     .....................................................  <- 53 columns
-     PortareOS  ›  Settings                              |
+     Settings                                            |
      ═══════════════════════════════════════════════════ |
                                                          |
-      ▸ Wi-Fi                                Hofmann-5G  |
-        Bluetooth                                   off  |
-        Brightness                                  70%  |
-        USB gadget mode                             off  |
+        Wi-Fi                                Hofmann-5G  |
+      ▸ Bluetooth                            WH-1000XM4  |
+        USB gadget mode                         network  |
+        Button style                            Retroid  |
                                                          |
      ─────────────────────────────────────────────────── |
                                                          |
-        Everything here is a stub in the first cut.      |
-        The list renders and moves, nothing applies yet. |
+        Headphones, controllers. Open to                 |
+        scan, connect, set auto-connect.                 |
                                                          |
                                                          |
                                                          |
@@ -67,6 +67,30 @@
                                                          |
      ─────────────────────────────────────────────────── |
      A CHANGE   B BACK                           ↑↓ MOVE |
+                                                         |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    BLUETOOTH
+    .....................................................  <- 53 columns
+     Settings  ›  Bluetooth                              |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+        Bluetooth                                    on  |
+        Auto-connect known devices                  yes  |
+     ─────────────────────────────────────────────────── |
+      DEVICES                                   4 found  |
+      ▸ WH-1000XM4                            connected  |
+        DualSense Edge                           paired  |
+        Bose QC35                                paired  |
+        JBL Flip 5                                  new  |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A DISCONNECT   B BACK   Y SCAN                      |
                                                          |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
