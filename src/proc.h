@@ -13,6 +13,10 @@
 
 #include <stddef.h>
 
+/* str_copy and strip_ansi used to live here; everything that runs a
+ * command also needs them. */
+#include "text.h"
+
 /* Could not be run at all, and ran past its ceiling. Both are failures; a
  * caller that wants to tell the user which can. */
 #define PROC_FAILED  (-1)
@@ -43,13 +47,5 @@ int proc_run_for(char *const argv[], void (*cb)(char *line, void *ctx),
  * reparented and there is no zombie to reap, because the point of calling
  * this is that nothing here wants to know how it went. */
 void proc_spawn(char *const argv[]);
-
-/* strncpy that always terminates, which strncpy does not. */
-void str_copy(char *dst, size_t dsz, const char *src);
-
-/* Removes ANSI escape sequences in place. bluetoothctl colours its output
- * even when it is not talking to a terminal, and the colour lands in the
- * middle of device names. */
-void strip_ansi(char *s);
 
 #endif

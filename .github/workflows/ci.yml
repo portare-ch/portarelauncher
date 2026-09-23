@@ -1,0 +1,34 @@
+# Build and test on every push to main and every pull request.
+#
+# arm64, like the device. The launcher is built with warnings as errors, and
+# the tests run twice: plain, and under AddressSanitizer and UBSan, because a
+# memory bug in the one program that owns the panel is a black screen.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install libdrm headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libdrm-dev
+
+      - name: Build
+        run: make CFLAGS="-O2 -g -Werror"
+
+      - name: Tests
+        run: make test
+
+      - name: Tests under ASan and UBSan
+        run: make test SAN=1

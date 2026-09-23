@@ -18,7 +18,7 @@ DRM_LIBS   := $(shell $(PKG_CONFIG) --libs libdrm 2>/dev/null)
 # text file and has no business demanding a graphics library, least of all on
 # the laptop this is written on.
 GOALS := $(or $(MAKECMDGOALS),all)
-ifneq ($(filter-out clean font mockup,$(GOALS)),)
+ifneq ($(filter-out clean font mockup test tests/%,$(GOALS)),)
 ifeq ($(strip $(DRM_LIBS)),)
 $(error libdrm not found by '$(PKG_CONFIG)'. Point PKG_CONFIG at the one for \
 the target, or install the libdrm development headers. The device ships \
@@ -35,7 +35,7 @@ PL_WARN    := -Wall -Wextra -Wshadow -Wvla -Wno-unused-parameter
 
 CFLAGS     ?= -O2 -g
 
-SRC  := src/proc.c src/net.c src/bt.c src/osk.c src/tools.c src/settings.c src/status.c src/osd.c src/term.c src/kms.c \
+SRC  := src/text.c src/proc.c src/net.c src/bt.c src/osk.c src/tools.c src/settings.c src/status.c src/osd.c src/term.c src/kms.c \
         src/input.c src/catalog.c src/main.c
 OBJ  := $(SRC:.c=.o)
 BIN  := portarelauncher
@@ -51,7 +51,7 @@ $(BIN): $(OBJ)
 src/term.o: src/font8x16.h
 
 clean:
-	rm -f $(OBJ) $(BIN)
+	rm -f $(OBJ) $(BIN) $(TESTS)
 
 # Regenerates the font from the kernel's VGA console font. Needs the source
 # file; see tools/mkfont.py for where it comes from.
@@ -62,4 +62,42 @@ font: tools/mkfont.py
 mockup:
 	python3 tools/mockup.py > docs/mockup.txt
 
-.PHONY: all clean font mockup
+.PHONY: all clean font mockup test
+
+# ---- tests ------------------------------------------------------------------
+#
+# Host programs, one per module, linked against only what they test - never
+# kms.c or input.c, so they need no libdrm and run on the laptop as well as in
+# CI. bt.c and net.c are linked with tests/fake_proc.c instead of proc.c, which
+# replays recorded nmcli and bluetoothctl output rather than running them.
+#
+#   make test          build and run them all
+#   make test SAN=1    the same under AddressSanitizer and UBSan
+
+TEST_CFLAGS := -std=c11 -D_GNU_SOURCE -Isrc -Itests -O1 -g -Werror
+ifeq ($(SAN),1)
+TEST_CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer \
+               -fno-sanitize-recover=all
+endif
+
+TESTS := tests/test_text tests/test_settings tests/test_proc \
+         tests/test_catalog tests/test_tools tests/test_net tests/test_bt \
+         tests/test_osk
+
+tests/test_text:     src/text.c
+tests/test_settings: src/settings.c
+tests/test_proc:     src/proc.c src/text.c
+tests/test_catalog:  src/catalog.c src/settings.c
+tests/test_tools:    src/tools.c src/text.c
+tests/test_net:      src/net.c src/text.c tests/fake_proc.c
+tests/test_bt:       src/bt.c src/text.c src/settings.c tests/fake_proc.c
+tests/test_osk:      src/osk.c src/term.c
+
+$(TESTS): %: %.c tests/check.h
+	$(CC) $(TEST_CFLAGS) $(PL_WARN) -o $@ $(filter %.c,$^)
+
+# Always rebuilt: SAN=1 and a plain run must not reuse each other's binaries.
+test:
+	@rm -f $(TESTS)
+	@$(MAKE) --no-print-directory $(TESTS)
+	@fail=0; for t in $(TESTS); do ./$$t || fail=1; done; exit $$fail

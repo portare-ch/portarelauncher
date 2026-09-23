@@ -1,0 +1,148 @@
+#include "check.h"
+#include "fake_proc.h"
+#include "net.h"
+
+#define SAVED "/usr/bin/nmcli -t -f NAME,TYPE connection show"
+#define VISIBLE "/usr/bin/nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY device wifi list"
+
+/* The shape of the device's own output, names replaced. Terse mode escapes
+ * ':' in values, an SSID can be hidden, and an open network's security is
+ * empty. */
+static void test_scan(void)
+{
+	fake_reset();
+	fake_reply(SAVED,
+		"Home:802-11-wireless\n"
+		"lo:loopback\n"
+		"Cafe\\:Guest:802-11-wireless\n", 0);
+	fake_reply(VISIBLE,
+		"*:Home:59:WPA2\n"
+		" :Neighbour:45:WPA2\n"
+		" :Cafe\\:Guest:40:\n"
+		" :Open Net:37:\n"
+		" ::30:WPA2\n"
+		" :Far Away:12:WPA1 WPA2\n", 0);
+
+	struct net_list l;
+	net_scan(&l, 0);
+	CHECK(!fake_called("/usr/bin/nmcli device wifi rescan"));
+
+	/* Connected, then saved, then the rest by signal. */
+	CHECK_INT(l.n, 5);
+	if (l.n == 5) {
+		CHECK_STR(l.e[0].name, "Home");
+		CHECK(l.e[0].active && l.e[0].saved);
+		CHECK_INT(l.e[0].signal, 59);
+		CHECK_STR(l.e[0].security, "WPA2");
+
+		CHECK_STR(l.e[1].name, "Cafe:Guest");
+		CHECK(l.e[1].saved && !l.e[1].active);
+		CHECK_INT(l.e[1].signal, 40);
+		CHECK_STR(l.e[1].security, "");
+
+		CHECK_STR(l.e[2].name, "Neighbour");
+		CHECK(!l.e[2].saved);
+		CHECK_STR(l.e[3].name, "Open Net");
+		CHECK_STR(l.e[4].name, "Far Away");
+		CHECK_STR(l.e[4].security, "WPA1 WPA2");
+	}
+
+	fake_reset();
+	fake_reply(SAVED, "", 0);
+	fake_reply(VISIBLE, "", 0);
+	net_scan(&l, 1);
+	CHECK(fake_called("/usr/bin/nmcli device wifi rescan"));
+	CHECK_INT(l.n, 0);
+}
+
+static void test_saved_out_of_range(void)
+{
+	fake_reset();
+	fake_reply(SAVED, "Holiday Flat:802-11-wireless\n", 0);
+	fake_reply(VISIBLE, "", 0);
+
+	struct net_list l;
+	net_scan(&l, 0);
+	CHECK_INT(l.n, 1);
+	CHECK(l.e[0].saved);
+	CHECK_INT(l.e[0].signal, -1);
+}
+
+static void test_min_password(void)
+{
+	CHECK_INT(net_min_password(NULL), 0);
+	CHECK_INT(net_min_password(""), 0);
+	CHECK_INT(net_min_password("WPA2"), 8);
+	CHECK_INT(net_min_password("WPA1 WPA2"), 8);
+	CHECK_INT(net_min_password("WPA3"), 1);
+	CHECK_INT(net_min_password("WPA2 802.1X"), -1);
+}
+
+static void test_join(void)
+{
+	/* Wrong password: nmcli fails with 4 and the profile it saved on the
+	 * way is deleted, so it does not sit in the list looking joinable. */
+	fake_reset();
+	fake_reply("/usr/bin/nmcli --wait 30 device wifi connect Neighbour password hunter22",
+	           "", 4);
+	fake_reply("/usr/bin/nmcli connection delete id Neighbour", "", 0);
+	CHECK_INT(net_join("Neighbour", "hunter22"), 4);
+	CHECK(fake_called("/usr/bin/nmcli connection delete id Neighbour"));
+
+	/* Success keeps it. */
+	fake_reset();
+	fake_reply("/usr/bin/nmcli --wait 30 device wifi connect Neighbour password hunter22",
+	           "", 0);
+	CHECK_INT(net_join("Neighbour", "hunter22"), 0);
+	CHECK(!fake_called("/usr/bin/nmcli connection delete id Neighbour"));
+
+	/* An open network gets no password argument at all. */
+	fake_reset();
+	fake_reply("/usr/bin/nmcli --wait 30 device wifi connect Open Net", "", 0);
+	CHECK_INT(net_join("Open Net", ""), 0);
+	CHECK_INT(fake_n_calls, 1);
+}
+
+static void test_address(void)
+{
+	char ip[40];
+	fake_reset();
+	fake_reply("/usr/bin/nmcli -t -f IP4.ADDRESS device show",
+	           "IP4.ADDRESS[1]:192.168.178.81/24\n\nIP4.ADDRESS[1]:127.0.0.1/8\n", 0);
+	net_address(ip, sizeof(ip));
+	CHECK_STR(ip, "192.168.178.81");
+
+	fake_reset();
+	fake_reply("/usr/bin/nmcli -t -f IP4.ADDRESS device show", "", 0);
+	net_address(ip, sizeof(ip));
+	CHECK_STR(ip, "");
+}
+
+static void test_usb(void)
+{
+	char modes[8][24];
+	int n = 0;
+	fake_reset();
+	fake_reply("/usr/bin/usbgadget --options", "disabled network file_transfer\n", 0);
+	usb_modes(modes, &n, 8);
+	CHECK_INT(n, 3);
+	if (n == 3) {
+		CHECK_STR(modes[0], "disabled");
+		CHECK_STR(modes[2], "file_transfer");
+	}
+
+	/* Never more than asked for. */
+	usb_modes(modes, &n, 2);
+	CHECK_INT(n, 2);
+}
+
+int main(void)
+{
+	test_scan();
+	test_saved_out_of_range();
+	test_min_password();
+	test_join();
+	test_address();
+	test_usb();
+	return check_report("net");
+}

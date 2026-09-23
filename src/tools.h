@@ -34,4 +34,8 @@ struct tools {
  * that has none. */
 int tools_load(struct tools *ts);
 
+/* The same for a folder named here, which is what tools_load calls once it
+ * has picked one. Separate so the tests can point it at a fixture. */
+int tools_load_from(struct tools *ts, const char *dir);
+
 #endif

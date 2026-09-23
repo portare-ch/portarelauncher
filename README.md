@@ -37,9 +37,12 @@ Enterprise (802.1X) networks need a username as well and are not supported.
 regenerates it — the mockup is a program rather than a picture so it cannot
 drift from the dimensions it claims.
 
-Not yet done: it is run by hand rather than by a service, `runemu.sh` still
-starts the EmulationStation session on its way out and has to be told not to,
-and nothing has been measured about idle power.
+It is PortareOS's front-end: the image starts it as the UI service, and
+EmulationStation and sway are gone. What is still missing before the public
+beta is tracked in portareos under the beta milestone - power off and
+restart, applying updates, multi-file games listed once, faster movement
+through long lists, the time zone, and a version line (portare-ch/portareos#255
+to #262). Nothing has been measured about idle power yet.
 
 ## Building
 
@@ -51,6 +54,24 @@ container:
 Debian bookworm is glibc 2.36 and the device is 2.41; glibc is forward
 compatible, so a binary built there runs here. Native arm64 under Apple's
 `container`, so this is a compile rather than a cross-compile.
+
+## Tests
+
+    make test          # every module that can run off the device
+    make test SAN=1    # the same under AddressSanitizer and UBSan
+
+Host programs in `tests/`, one per module, and they need no libdrm, so they
+run on a laptop as well as on the device's architecture. What they cover is
+what has no screen: the catalogue scan, `system.cfg` reads and writes, the
+Tools folder, the Wi-Fi and Bluetooth parsers, running a command with a
+ceiling, and the keyboard - including a search that proves every printable
+character can be typed. Wi-Fi and Bluetooth are tested against recorded
+`nmcli` and `bluetoothctl` output replayed by `tests/fake_proc.c`, so no
+radio is involved. Drawing, KMS and input are not covered here; that is the
+on-device checklist in portare-ch/portareos#238.
+
+CI (`.github/workflows/ci.yml`) builds with warnings as errors on arm64 and
+runs both, on every push to main and every pull request.
 
 ## Controls
 
