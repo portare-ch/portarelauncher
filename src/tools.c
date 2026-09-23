@@ -1,5 +1,5 @@
 #include "tools.h"
-#include "proc.h"
+#include "text.h"
 
 #include <dirent.h>
 #include <stdio.h>
@@ -118,14 +118,20 @@ static int by_name(const void *a, const void *b)
 
 int tools_load(struct tools *ts)
 {
-	memset(ts, 0, sizeof(*ts));
-
 	if (is_dir(TOOLS_DIR))
-		str_copy(ts->dir, sizeof(ts->dir), TOOLS_DIR);
-	else if (is_dir(TOOLS_DIR_FALLBACK))
-		str_copy(ts->dir, sizeof(ts->dir), TOOLS_DIR_FALLBACK);
-	else
+		return tools_load_from(ts, TOOLS_DIR);
+	if (is_dir(TOOLS_DIR_FALLBACK))
+		return tools_load_from(ts, TOOLS_DIR_FALLBACK);
+	memset(ts, 0, sizeof(*ts));
+	return 0;
+}
+
+int tools_load_from(struct tools *ts, const char *dir)
+{
+	memset(ts, 0, sizeof(*ts));
+	if (!is_dir(dir))
 		return 0;
+	str_copy(ts->dir, sizeof(ts->dir), dir);
 
 	/* The folder, a slash, and a name as long as a directory entry can be. */
 	char path[sizeof(ts->dir) + 1 + 256];
