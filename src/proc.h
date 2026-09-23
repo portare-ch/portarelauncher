@@ -13,15 +13,31 @@
 
 #include <stddef.h>
 
+/* Could not be run at all, and ran past its ceiling. Both are failures; a
+ * caller that wants to tell the user which can. */
+#define PROC_FAILED  (-1)
+#define PROC_TIMEOUT (-2)
+
+/* Nothing this program shells out to may block it forever. Measured on the
+ * device: `bluetoothctl connect` against a device that is not there never
+ * returns at all, and this process owns the panel, so "never" means a black
+ * screen and a battery pull. Hence a wall-clock ceiling on every call. */
+#define PROC_CEILING_MS 15000
+
 /* Runs argv, feeding each line of its stdout to cb with the newline already
  * stripped. Blank lines are skipped. stderr goes to /dev/null: these tools
  * are chatty about things this UI has no room to show.
  *
- * Returns the exit status, or -1 if it could not be run at all. Blocks for
- * as long as the program takes - a wifi rescan is seconds and a bluetooth
- * scan is however long it was asked to be, so callers say so on screen
- * before calling. */
+ * Returns the exit status, PROC_FAILED, or PROC_TIMEOUT. Blocks for as long
+ * as the program takes, up to the ceiling - a wifi rescan is seconds and a
+ * bluetooth scan is however long it was asked to be, so callers say so on
+ * screen before calling. */
 int proc_run(char *const argv[], void (*cb)(char *line, void *ctx), void *ctx);
+
+/* The same, with the ceiling given: short for something that answers from a
+ * cache, long for something that has to talk to a radio. */
+int proc_run_for(char *const argv[], void (*cb)(char *line, void *ctx),
+                 void *ctx, int ceiling_ms);
 
 /* Starts argv and does not wait for it. Double-forks so the child is
  * reparented and there is no zombie to reap, because the point of calling
