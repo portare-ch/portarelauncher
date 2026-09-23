@@ -37,7 +37,7 @@
 
 enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI, SCR_BT,
               SCR_KEYBOARD, SCR_TOOLS, SCR_ABOUT, SCR_UPDATE,
-              SCR_TZ };
+              SCR_TZ, SCR_POWER };
 
 struct ui {
 	struct term term;
@@ -69,6 +69,10 @@ struct ui {
 	int tz_region;
 	int tz_sel, tz_top;
 	char tz_cur[48];     /* the zone in use                              */
+
+	int power_sel;
+	int power_armed;     /* the row pressed once, waiting for a second; -1 */
+	int going_down;      /* reboot or poweroff accepted, panel off         */
 
 	struct osinfo os;
 	char addr[40];       /* empty when offline */
@@ -104,7 +108,7 @@ struct ui {
 #define G_SQUARE    0xFE   /* []  */
 
 enum { SET_WIFI = 0, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_COLOUR,
-       SET_TIMEZONE, SET_ABOUT, N_SETTINGS };
+       SET_TIMEZONE, SET_ABOUT, SET_POWER, N_SETTINGS };
 
 static const char *const settings_labels[N_SETTINGS] = {
 	"Wi-Fi",
@@ -114,6 +118,7 @@ static const char *const settings_labels[N_SETTINGS] = {
 	"Colour",
 	"Time zone",
 	"About",
+	"Power",
 };
 
 static volatile sig_atomic_t stop_requested;
@@ -349,6 +354,9 @@ static void draw_settings(struct ui *u)
 		case SET_COLOUR:
 			value = u->pal_name;
 			break;
+		case SET_POWER:
+			value = "";
+			break;
 		case SET_TIMEZONE:
 			if (settings_get(SETTINGS, TZ_KEY, val, sizeof(val)))
 				value = val;
@@ -402,6 +410,9 @@ static void draw_settings(struct ui *u)
 	case SET_TIMEZONE:
 		term_puts(t, 4, y + 2, "The clock in the header. Open to", ATTR_DIM);
 		term_puts(t, 4, y + 3, "pick a region, then a city.", ATTR_DIM);
+		break;
+	case SET_POWER:
+		term_puts(t, 4, y + 2, "Restart, or switch the device off.", ATTR_DIM);
 		break;
 	case SET_ABOUT:
 		term_puts(t, 4, y + 2, "The version, for bug reports, the", ATTR_DIM);
@@ -624,6 +635,56 @@ static void draw_keyboard(struct ui *u)
 	struct face f = face_of(u->retroid);
 	snprintf(buf, sizeof(buf), "%c TYPE  %c DELETE  %c SPACE  %c SHIFT  START JOIN",
 	         f.bottom, f.right, f.left, f.top);
+	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
+}
+
+/* ---- power -------------------------------------------------------------- */
+
+/* The panel goes off first, so the last thing on it is not a menu that has
+ * stopped answering while systemd takes everything down. If systemctl
+ * refuses, the panel comes back with the reason; if it accepts and the
+ * system still has not gone down by the next press, that press brings the
+ * panel back rather than leaving a dark screen with no way out. */
+static void power(struct ui *u, const char *verb)
+{
+	kms_blank(&u->kms);
+	char *const argv[] = { (char *)"/usr/bin/systemctl", (char *)verb, NULL };
+	int rc = proc_run_for(argv, NULL, NULL, 10000);
+	if (rc == 0) {
+		u->going_down = 1;
+		return;
+	}
+	kms_present(&u->kms);
+	term_invalidate(&u->term);
+	snprintf(u->note, sizeof(u->note), "Could not %s (%d).",
+	         strcmp(verb, "reboot") == 0 ? "restart" : "switch off", rc);
+}
+
+static const char *const power_rows[] = { "Restart", "Power off" };
+static const char *const power_verbs[] = { "reboot", "poweroff" };
+
+static void draw_power(struct ui *u)
+{
+	struct term *t = &u->term;
+	struct face f = face_of(u->retroid);
+	char buf[64];
+
+	draw_frame(u, "Settings  >  Power");
+	for (int i = 0; i < 2; i++)
+		draw_row(u, (unsigned)(3 + i), i == u->power_sel, power_rows[i], NULL);
+	term_hline(t, 6, G_HLINE, ATTR_DIM);
+
+	/* One press arms it and says so; the second does it. Anything else
+	 * disarms, so a stray press on the way through never switches off. */
+	if (u->power_armed >= 0) {
+		snprintf(buf, sizeof(buf), "Press %c again to %s.", f.bottom,
+		         u->power_armed == 0 ? "restart" : "switch off");
+		term_puts(t, 4, 8, buf, ATTR_BRIGHT);
+	}
+	if (u->note[0])
+		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
+
+	snprintf(buf, sizeof(buf), "%c SELECT   %c BACK", f.bottom, f.right);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -876,19 +937,10 @@ static void open_update(struct ui *u)
 	u->screen = SCR_UPDATE;
 }
 
-/* The update is applied by the boot that follows, so this is the last thing
- * the launcher does. systemd stops this program on the way down. */
+/* The update is applied by the boot that follows. */
 static void restart(struct ui *u)
 {
-	struct term *t = &u->term;
-	draw_frame(u, "PortareOS");
-	term_puts(t, 4, 6, "Restarting to install the update...", ATTR_BRIGHT);
-	term_flush(t);
-
-	char *const argv[] = { (char *)"/usr/bin/systemctl", (char *)"reboot", NULL };
-	int rc = proc_run_for(argv, NULL, NULL, 10000);
-	if (rc != 0)
-		snprintf(u->note, sizeof(u->note), "Could not restart (%d).", rc);
+	power(u, "reboot");
 }
 
 static void redraw(struct ui *u)
@@ -903,6 +955,7 @@ static void redraw(struct ui *u)
 	case SCR_TOOLS:    draw_tools(u);    break;
 	case SCR_ABOUT:    draw_about(u);    break;
 	case SCR_TZ:       draw_tz(u);       break;
+	case SCR_POWER:    draw_power(u);    break;
 	case SCR_UPDATE:   draw_update(u);   break;
 	}
 	term_flush(&u->term);
@@ -1104,6 +1157,15 @@ static void on_action(struct ui *u, enum action a)
 		return;
 	}
 
+	/* A reboot or poweroff that was accepted but has not happened: the
+	 * press that follows brings the panel back, and does nothing else. */
+	if (u->going_down) {
+		u->going_down = 0;
+		kms_present(&u->kms);
+		term_invalidate(&u->term);
+		return;
+	}
+
 	/* Only the keyboard tells START from the settings button. */
 	if (a == ACT_START && u->screen != SCR_KEYBOARD)
 		a = ACT_MENU;
@@ -1165,6 +1227,11 @@ static void on_action(struct ui *u, enum action a)
 			open_about(u);
 		else if (a == ACT_CONFIRM && u->set_sel == SET_TIMEZONE)
 			open_tz(u);
+		else if (a == ACT_CONFIRM && u->set_sel == SET_POWER) {
+			u->power_sel = 0;
+			u->power_armed = -1;
+			u->screen = SCR_POWER;
+		}
 		else if (a == ACT_CONFIRM && u->set_sel == SET_BLUETOOTH) {
 			draw_busy(u, "reading devices...");
 			u->bt_on = bt_powered();
@@ -1256,6 +1323,20 @@ static void on_action(struct ui *u, enum action a)
 				u->running = 0;
 			break;
 		}
+		break;
+
+	case SCR_POWER:
+		if (a == ACT_CONFIRM && u->power_armed == u->power_sel) {
+			u->power_armed = -1;
+			power(u, power_verbs[u->power_sel]);
+			break;
+		}
+		u->power_armed = -1;
+		if (a == ACT_UP && u->power_sel > 0) u->power_sel--;
+		else if (a == ACT_DOWN && u->power_sel < 1) u->power_sel++;
+		else if (a == ACT_CONFIRM) u->power_armed = u->power_sel;
+		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
+		else if (a == ACT_QUIT) u->running = 0;
 		break;
 
 	case SCR_TZ: {
