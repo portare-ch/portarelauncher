@@ -20,8 +20,9 @@ Tools, the last row of the systems list, runs the scripts in the modules
 folder - the file manager, the gamepad tester, PortMaster - named and
 described from the folder's gamelist.xml.
 
-Settings: Wi-Fi, Bluetooth, USB gadget mode, button style, colour and
-About all work. About shows the version, commit, build date, device and IP
+Settings: Wi-Fi, Bluetooth, USB gadget mode, button style, colour, time
+zone and About all work. The time zone is a region, then a city, each city
+shown with the time it is there now. About shows the version, commit, build date, device and IP
 address, and holds Update, which asks GitHub what the chosen channel -
 nightly or release - has for this device, downloads it over Wi-Fi with a
 progress bar, and offers a restart once portareos-update has checked and
@@ -45,8 +46,7 @@ It is PortareOS's front-end: the image starts it as the UI service, and
 EmulationStation and sway are gone. What is still missing before the public
 beta is tracked in portareos under the beta milestone - power off and
 restart, multi-file games listed once, faster movement
-through long lists, and the time zone (portare-ch/portareos#255
-to #261). Nothing has been measured about idle power yet.
+through long lists (portare-ch/portareos#255 to #260). Nothing has been measured about idle power yet.
 
 ## Building
 
