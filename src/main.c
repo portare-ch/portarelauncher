@@ -3,6 +3,7 @@
  * Owns the panel, lists what there is to play, hands the display to an
  * emulator and takes it back. See README.md for why it looks like this.
  */
+#include "bt.h"
 #include "catalog.h"
 #include "input.h"
 #include "kms.h"
@@ -28,7 +29,7 @@
 #define LIST_TOP    5
 #define LIST_MARGIN 3          /* rows kept below the list for the footer  */
 
-enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI };
+enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI, SCR_BT };
 
 struct ui {
 	struct term term;
@@ -42,6 +43,10 @@ struct ui {
 
 	struct net_list nets;
 	int wifi_sel, wifi_top;
+
+	struct bt_list bt;
+	int bt_on, bt_auto;
+	int bt_sel, bt_top;
 	char usb[24];
 	char usb_opts[8][24];
 	int n_usb;
@@ -63,13 +68,13 @@ struct ui {
 #define G_TRIANGLE  0x1E   /* /\  */
 #define G_SQUARE    0xFE   /* []  */
 
-enum { SET_WIFI = 0, SET_USB, SET_BUTTONS, SET_BLUETOOTH, N_SETTINGS };
+enum { SET_WIFI = 0, SET_BLUETOOTH, SET_USB, SET_BUTTONS, N_SETTINGS };
 
 static const char *const settings_labels[N_SETTINGS] = {
 	"Wi-Fi",
+	"Bluetooth",
 	"USB gadget mode",
 	"Button style",
-	"Bluetooth",
 };
 
 static volatile sig_atomic_t stop_requested;
@@ -263,6 +268,14 @@ static void draw_settings(struct ui *u)
 			snprintf(val, sizeof(val), "%s", u->usb[0] ? u->usb : "unknown");
 			value = val;
 			break;
+		case SET_BLUETOOTH: {
+			const char *dev = NULL;
+			for (int k = 0; k < u->bt.n; k++)
+				if (u->bt.d[k].connected)
+					dev = u->bt.d[k].name;
+			value = dev ? dev : (u->bt_on ? "no devices" : "off");
+			break;
+		}
 		case SET_BUTTONS:
 			value = u->retroid ? "Retroid" : "PS";
 			break;
@@ -289,6 +302,10 @@ static void draw_settings(struct ui *u)
 		}
 		break;
 	}
+	case SET_BLUETOOTH:
+		term_puts(t, 4, y + 2, "Headphones, controllers. Open to", ATTR_DIM);
+		term_puts(t, 4, y + 3, "scan, connect, set auto-connect.", ATTR_DIM);
+		break;
 	case SET_USB: {
 		char addr[40] = "";
 		usb_address(addr, sizeof(addr));
@@ -350,6 +367,67 @@ static void draw_wifi(struct ui *u)
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
+/* Two toggles and then the devices, in one list.
+ *
+ * One list rather than a settings page with a sub-page, because everything
+ * here is about the same four inches of the evening: switch it on, let the
+ * headphones come back on their own, and if they have not, pick them.
+ */
+#define BT_HEAD 2          /* the two toggle rows above the device list */
+#define BT_LIST_TOP 7
+
+static int bt_rows(const struct ui *u)
+{
+	return (int)u->term.rows - BT_LIST_TOP - 2;
+}
+
+static void draw_bt(struct ui *u)
+{
+	struct term *t = &u->term;
+	char buf[64];
+
+	draw_frame(u, "Settings  >  Bluetooth");
+
+	draw_row(u, 3, u->bt_sel == 0, "Bluetooth", u->bt_on ? "on" : "off");
+	draw_row(u, 4, u->bt_sel == 1, "Auto-connect known devices",
+	         u->bt_auto ? "yes" : "no");
+	term_hline(t, 5, G_HLINE, ATTR_DIM);
+
+	term_puts(t, 2, 6, "DEVICES", ATTR_MID);
+	snprintf(buf, sizeof(buf), "%d found", u->bt.n);
+	term_puts_right(t, t->cols - 2, 6, buf, ATTR_MID);
+
+	int visible = bt_rows(u);
+	int sel = u->bt_sel - BT_HEAD;
+	scroll_to(sel < 0 ? 0 : sel, &u->bt_top, u->bt.n, visible);
+
+	if (u->bt.n == 0)
+		term_puts(t, 4, BT_LIST_TOP,
+		          u->bt_on ? "none known - scan to find some"
+		                   : "bluetooth is off", ATTR_DIM);
+
+	for (int i = 0; i < visible && u->bt_top + i < u->bt.n; i++) {
+		const struct bt_device *d = &u->bt.d[u->bt_top + i];
+		if (d->connected)
+			snprintf(buf, sizeof(buf), "connected");
+		else if (d->paired)
+			snprintf(buf, sizeof(buf), "%s",
+			         d->trusted ? "paired" : "not trusted");
+		else
+			snprintf(buf, sizeof(buf), "new");
+		draw_row(u, (unsigned)(BT_LIST_TOP + i), u->bt_top + i == sel,
+		         d->name, buf);
+	}
+
+	struct face f = face_of(u->retroid);
+	const char *verb = "CHANGE";
+	if (sel >= 0 && sel < u->bt.n)
+		verb = u->bt.d[sel].connected ? "DISCONNECT" : "CONNECT";
+	snprintf(buf, sizeof(buf), "%c %s   %c BACK   %c SCAN",
+	         f.bottom, verb, f.right, f.left);
+	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
+}
+
 static void redraw(struct ui *u)
 {
 	switch (u->screen) {
@@ -357,6 +435,7 @@ static void redraw(struct ui *u)
 	case SCR_GAMES:    draw_games(u);    break;
 	case SCR_SETTINGS: draw_settings(u); break;
 	case SCR_WIFI:     draw_wifi(u);     break;
+	case SCR_BT:       draw_bt(u);       break;
 	}
 	term_flush(&u->term);
 }
@@ -500,6 +579,15 @@ static void on_action(struct ui *u, enum action a)
 			u->wifi_sel = u->wifi_top = 0;
 			u->screen = SCR_WIFI;
 		}
+		else if (a == ACT_CONFIRM && u->set_sel == SET_BLUETOOTH) {
+			draw_busy(u, "reading devices...");
+			u->bt_on = bt_powered();
+			u->bt_auto = bt_autoconnect();
+			if (u->bt_on)
+				bt_list(&u->bt);
+			u->bt_sel = u->bt_top = 0;
+			u->screen = SCR_BT;
+		}
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
 		         u->set_sel == SET_USB && u->n_usb > 0) {
 			/* Cycle through whatever usbgadget --options reported,
@@ -552,6 +640,59 @@ static void on_action(struct ui *u, enum action a)
 		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
 		else if (a == ACT_QUIT) u->running = 0;
 		break;
+
+	case SCR_BT: {
+		int sel = u->bt_sel - BT_HEAD;
+		int last = BT_HEAD + u->bt.n - 1;
+
+		if (a == ACT_UP && u->bt_sel > 0) u->bt_sel--;
+		else if (a == ACT_DOWN && u->bt_sel < last) u->bt_sel++;
+		else if (a == ACT_MENU) {
+			if (!u->bt_on) {
+				draw_busy(u, "bluetooth is off");
+				break;
+			}
+			/* Eight seconds with the panel frozen. Long enough for
+			 * headphones to announce themselves, short enough that
+			 * nobody thinks this has crashed - which is why the
+			 * message says how long. */
+			draw_busy(u, "scanning for 8 seconds...");
+			bt_scan(&u->bt, 8);
+			if (u->bt_sel > BT_HEAD + u->bt.n - 1)
+				u->bt_sel = BT_HEAD;
+		}
+		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
+		         u->bt_sel == 0) {
+			draw_busy(u, u->bt_on ? "switching off..." : "switching on...");
+			bt_power(!u->bt_on);
+			u->bt_on = bt_powered();
+			memset(&u->bt, 0, sizeof(u->bt));
+			if (u->bt_on)
+				bt_list(&u->bt);
+		}
+		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
+		         u->bt_sel == 1) {
+			u->bt_auto = !u->bt_auto;
+			draw_busy(u, "applying...");
+			bt_set_autoconnect(u->bt_auto);
+			if (u->bt_on)
+				bt_list(&u->bt);
+		}
+		else if (a == ACT_CONFIRM && sel >= 0 && sel < u->bt.n) {
+			struct bt_device d = u->bt.d[sel];
+			if (d.connected) {
+				draw_busy(u, "disconnecting...");
+				bt_disconnect(d.addr);
+			} else {
+				draw_busy(u, "connecting...");
+				bt_connect(d.addr);
+			}
+			bt_list(&u->bt);
+		}
+		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
+		else if (a == ACT_QUIT) u->running = 0;
+		break;
+	}
 	}
 }
 
@@ -617,6 +758,10 @@ int main(void)
 	usb_modes(u.usb_opts, &u.n_usb, 8);
 	usb_mode(u.usb, sizeof(u.usb));
 	net_scan(&u.nets, 0);
+	u.bt_auto = bt_autoconnect();
+	u.bt_on = bt_powered();
+	if (u.bt_on)
+		bt_list(&u.bt);
 
 	u.screen = SCR_SYSTEMS;
 	u.running = 1;

@@ -14,9 +14,18 @@ settings menu. Nothing else.
 ## Status
 
 Runs on the device. It finds the systems that have games, lists them, lists
-the games, and launches one. The settings screen exists with one working
-entry, the button style; Wi-Fi, Bluetooth, brightness and USB gadget mode are
-labelled and do nothing.
+the games, and launches one.
+
+Settings: button style, USB gadget mode, Wi-Fi and Bluetooth all work.
+Wi-Fi lists saved profiles and what is in range and connects to a saved one;
+Bluetooth powers the adapter, scans, pairs, connects and has the
+auto-connect toggle. Brightness and volume are shown in the header rather
+than set here, because the volume keys already set them.
+
+The gap in both: there is no on-screen keyboard, so a Wi-Fi network whose
+password has never been entered cannot be joined from here. Bluetooth does
+not need one - pairing on this device is a NoInputNoOutput agent - so
+headphones work from a cold start and a new network still does not.
 
 `docs/mockup.txt` is the layout at the real grid and `tools/mockup.py`
 regenerates it — the mockup is a program rather than a picture so it cannot

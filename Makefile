@@ -14,10 +14,16 @@ PKG_CONFIG ?= pkg-config
 DRM_CFLAGS := $(shell $(PKG_CONFIG) --cflags libdrm 2>/dev/null)
 DRM_LIBS   := $(shell $(PKG_CONFIG) --libs libdrm 2>/dev/null)
 
+# Only when something is actually being compiled: `make mockup` regenerates a
+# text file and has no business demanding a graphics library, least of all on
+# the laptop this is written on.
+GOALS := $(or $(MAKECMDGOALS),all)
+ifneq ($(filter-out clean font mockup,$(GOALS)),)
 ifeq ($(strip $(DRM_LIBS)),)
 $(error libdrm not found by '$(PKG_CONFIG)'. Point PKG_CONFIG at the one for \
 the target, or install the libdrm development headers. The device ships \
 libdrm.so.2 without them, which is why this is cross-built)
+endif
 endif
 
 # Kept out of CFLAGS deliberately. A build system that passes CFLAGS on the
@@ -29,7 +35,7 @@ PL_WARN    := -Wall -Wextra -Wshadow -Wvla -Wno-unused-parameter
 
 CFLAGS     ?= -O2 -g
 
-SRC  := src/net.c src/settings.c src/status.c src/osd.c src/term.c src/kms.c \
+SRC  := src/proc.c src/net.c src/bt.c src/settings.c src/status.c src/osd.c src/term.c src/kms.c \
         src/input.c src/catalog.c src/main.c
 OBJ  := $(SRC:.c=.o)
 BIN  := portarelauncher
