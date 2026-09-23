@@ -41,6 +41,7 @@ struct input {
 	int repeats;           /* how many repeats have fired          */
 };
 
+/* Clears *in before opening anything, so input_set_aux comes after it. */
 int  input_open(struct input *in);
 void input_set_aux(struct input *in, int fd);
 void input_close(struct input *in);
