@@ -24,6 +24,11 @@ int osd_open(struct osd *o)
 		fprintf(stderr, "mkfifo %s: %s\n", OSD_PATH, strerror(errno));
 		return -1;
 	}
+	/* mkfifo's mode goes through the umask, which on this system leaves
+	 * 0600 and means only root could ever write. Set it for real, so a
+	 * writer that is not root can still ask for an overlay. */
+	if (chmod(OSD_PATH, 0622) < 0)
+		fprintf(stderr, "chmod %s: %s\n", OSD_PATH, strerror(errno));
 
 	/* Read-write rather than read-only: a read-only FIFO with no writer
 	 * reports EOF continuously and would spin the poll loop. */

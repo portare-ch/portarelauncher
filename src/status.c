@@ -1,4 +1,5 @@
 #include "status.h"
+#include "settings.h"
 
 #include <dirent.h>
 #include <stdio.h>
@@ -80,6 +81,12 @@ void status_read(struct status *s)
 	struct tm tm;
 	localtime_r(&now, &tm);
 	snprintf(s->clock, sizeof(s->clock), "%02d:%02d", tm.tm_hour, tm.tm_min);
+
+	char v[32];
+	s->volume = settings_get(SETTINGS_PATH, "audio.volume", v, sizeof(v))
+	            ? atoi(v) : -1;
+	s->brightness = settings_get(SETTINGS_PATH, "display.brightness", v, sizeof(v))
+	                ? atoi(v) : -1;
 
 	s->capacity = -1;
 	s->charging = 0;

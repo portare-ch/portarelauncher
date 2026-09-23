@@ -12,9 +12,14 @@
 struct status {
 	int capacity;    /* percent, or -1 when there is no battery */
 	int charging;
+	int volume;      /* percent, or -1 when unknown */
+	int brightness;
 	char clock[8];   /* "HH:MM" */
 };
 
+/* Volume and brightness come from system.cfg rather than from pipewire and
+ * sysfs, because that is where input_sense puts them and where every other
+ * setting on this device lives. One source, already authoritative. */
 void status_read(struct status *s);
 
 /* Milliseconds until the next minute ticks over, so the clock is never more

@@ -105,16 +105,23 @@ static void scroll_to(int sel, int *top, int count, int visible)
 static void draw_frame(struct ui *u, const char *crumb)
 {
 	struct term *t = &u->term;
-	char right[32];
+	char right[64];
 
 	term_clear(t);
 	term_puts(t, 1, 0, crumb, ATTR_TEXT);
 
+	/* Retro machines did not pop up overlays; they showed the state on the
+	 * panel and left it there. Volume and brightness sit beside the
+	 * battery for the same reason. */
+	int n = 0;
+	if (u->st.volume >= 0)
+		n += snprintf(right + n, sizeof(right) - n, "VOL %d%%  ", u->st.volume);
+	if (u->st.brightness >= 0)
+		n += snprintf(right + n, sizeof(right) - n, "BRI %d%%  ", u->st.brightness);
 	if (u->st.capacity >= 0)
-		snprintf(right, sizeof(right), "%s  %s %d%%", u->st.clock,
-		         u->st.charging ? "CHG" : "BAT", u->st.capacity);
-	else
-		snprintf(right, sizeof(right), "%s", u->st.clock);
+		n += snprintf(right + n, sizeof(right) - n, "%s %d%%  ",
+		              u->st.charging ? "CHG" : "BAT", u->st.capacity);
+	snprintf(right + n, sizeof(right) - n, "%s", u->st.clock);
 	term_puts_right(t, t->cols - 1, 0, right, ATTR_MID);
 
 	term_hline(t, 1, G_HLINE_D, ATTR_DIM);
@@ -186,7 +193,7 @@ static void draw_games(struct ui *u)
 	const struct psystem *s = &u->cat.sys[u->sys_sel];
 	char crumb[96], buf[64];
 
-	snprintf(crumb, sizeof(crumb), "PortareOS  >  %s",
+	snprintf(crumb, sizeof(crumb), "%s",
 	         s->fullname[0] ? s->fullname : s->name);
 	draw_frame(u, crumb);
 
@@ -233,7 +240,7 @@ static void draw_settings(struct ui *u)
 {
 	struct term *t = &u->term;
 
-	draw_frame(u, "PortareOS  >  Settings");
+	draw_frame(u, "Settings");
 
 	for (int i = 0; i < N_SETTINGS; i++) {
 		const char *value = "not wired up";
@@ -257,23 +264,6 @@ static void draw_settings(struct ui *u)
 	}
 }
 
-/* One line, bright, over whatever is underneath. Drawn last so it does not
- * have to care which screen is showing. */
-static void draw_osd(struct ui *u)
-{
-	struct term *t = &u->term;
-	size_t len = strlen(u->osd.text);
-	if (!len || len > t->cols - 4)
-		return;
-
-	unsigned y = t->rows - 4;
-	unsigned x = (unsigned)((t->cols - len) / 2);
-
-	for (unsigned i = 1; i + 1 < t->cols; i++)
-		term_putc(t, i, y, ' ', ATTR_BG);
-	term_puts(t, x, y, u->osd.text, ATTR_BRIGHT);
-}
-
 static void redraw(struct ui *u)
 {
 	switch (u->screen) {
@@ -281,8 +271,6 @@ static void redraw(struct ui *u)
 	case SCR_GAMES:    draw_games(u);    break;
 	case SCR_SETTINGS: draw_settings(u); break;
 	}
-	if (u->osd.text[0])
-		draw_osd(u);
 	term_flush(&u->term);
 }
 
@@ -368,7 +356,11 @@ static void on_action(struct ui *u, enum action a)
 	const struct psystem *s = &u->cat.sys[u->sys_sel];
 
 	if (a == ACT_AUX) {
+		/* Something changed a setting we show. The pipe carries a
+		 * message but the header is the display now, so only the
+		 * nudge matters. */
 		osd_read(&u->osd);
+		status_read(&u->st);
 		return;
 	}
 
