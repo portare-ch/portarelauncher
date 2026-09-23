@@ -16,6 +16,7 @@
 #include "status.h"
 #include "term.h"
 #include "tools.h"
+#include "tz.h"
 #include "update.h"
 
 #include <errno.h>
@@ -35,7 +36,8 @@
 #define LIST_MARGIN 3          /* rows kept below the list for the footer  */
 
 enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI, SCR_BT,
-              SCR_KEYBOARD, SCR_TOOLS, SCR_ABOUT, SCR_UPDATE };
+              SCR_KEYBOARD, SCR_TOOLS, SCR_ABOUT, SCR_UPDATE,
+              SCR_TZ, SCR_POWER };
 
 struct ui {
 	struct term term;
@@ -59,6 +61,18 @@ struct ui {
 
 	struct tools tools;
 	int tool_sel, tool_top;
+
+	struct tzlist tz;
+	int tz_idx[TZ_MAX];  /* the zones of the region being shown        */
+	int tz_nidx;
+	int tz_level;        /* 0 the regions, 1 the cities of one           */
+	int tz_region;
+	int tz_sel, tz_top;
+	char tz_cur[48];     /* the zone in use                              */
+
+	int power_sel;
+	int power_armed;     /* the row pressed once, waiting for a second; -1 */
+	int going_down;      /* reboot or poweroff accepted, panel off         */
 
 	struct osinfo os;
 	char addr[40];       /* empty when offline */
@@ -94,7 +108,7 @@ struct ui {
 #define G_SQUARE    0xFE   /* []  */
 
 enum { SET_WIFI = 0, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_COLOUR,
-       SET_ABOUT, N_SETTINGS };
+       SET_TIMEZONE, SET_ABOUT, SET_POWER, N_SETTINGS };
 
 static const char *const settings_labels[N_SETTINGS] = {
 	"Wi-Fi",
@@ -102,7 +116,9 @@ static const char *const settings_labels[N_SETTINGS] = {
 	"USB gadget mode",
 	"Button style",
 	"Colour",
+	"Time zone",
 	"About",
+	"Power",
 };
 
 static volatile sig_atomic_t stop_requested;
@@ -338,6 +354,15 @@ static void draw_settings(struct ui *u)
 		case SET_COLOUR:
 			value = u->pal_name;
 			break;
+		case SET_POWER:
+			value = "";
+			break;
+		case SET_TIMEZONE:
+			if (settings_get(SETTINGS, TZ_KEY, val, sizeof(val)))
+				value = val;
+			else
+				value = "UTC";
+			break;
 		case SET_ABOUT:
 			if (u->upd_staged)
 				value = "restart to install";
@@ -381,6 +406,13 @@ static void draw_settings(struct ui *u)
 	case SET_BLUETOOTH:
 		term_puts(t, 4, y + 2, "Headphones, controllers. Open to", ATTR_DIM);
 		term_puts(t, 4, y + 3, "scan, connect, set auto-connect.", ATTR_DIM);
+		break;
+	case SET_TIMEZONE:
+		term_puts(t, 4, y + 2, "The clock in the header. Open to", ATTR_DIM);
+		term_puts(t, 4, y + 3, "pick a region, then a city.", ATTR_DIM);
+		break;
+	case SET_POWER:
+		term_puts(t, 4, y + 2, "Restart, or switch the device off.", ATTR_DIM);
 		break;
 	case SET_ABOUT:
 		term_puts(t, 4, y + 2, "The version, for bug reports, the", ATTR_DIM);
@@ -606,6 +638,137 @@ static void draw_keyboard(struct ui *u)
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
+/* ---- power -------------------------------------------------------------- */
+
+/* The panel goes off first, so the last thing on it is not a menu that has
+ * stopped answering while systemd takes everything down. If systemctl
+ * refuses, the panel comes back with the reason; if it accepts and the
+ * system still has not gone down by the next press, that press brings the
+ * panel back rather than leaving a dark screen with no way out. */
+static void power(struct ui *u, const char *verb)
+{
+	kms_blank(&u->kms);
+	char *const argv[] = { (char *)"/usr/bin/systemctl", (char *)verb, NULL };
+	int rc = proc_run_for(argv, NULL, NULL, 10000);
+	if (rc == 0) {
+		u->going_down = 1;
+		return;
+	}
+	kms_present(&u->kms);
+	term_invalidate(&u->term);
+	snprintf(u->note, sizeof(u->note), "Could not %s (%d).",
+	         strcmp(verb, "reboot") == 0 ? "restart" : "switch off", rc);
+}
+
+static const char *const power_rows[] = { "Restart", "Power off" };
+static const char *const power_verbs[] = { "reboot", "poweroff" };
+
+static void draw_power(struct ui *u)
+{
+	struct term *t = &u->term;
+	struct face f = face_of(u->retroid);
+	char buf[64];
+
+	draw_frame(u, "Settings  >  Power");
+	for (int i = 0; i < 2; i++)
+		draw_row(u, (unsigned)(3 + i), i == u->power_sel, power_rows[i], NULL);
+	term_hline(t, 6, G_HLINE, ATTR_DIM);
+
+	/* One press arms it and says so; the second does it. Anything else
+	 * disarms, so a stray press on the way through never switches off. */
+	if (u->power_armed >= 0) {
+		snprintf(buf, sizeof(buf), "Press %c again to %s.", f.bottom,
+		         u->power_armed == 0 ? "restart" : "switch off");
+		term_puts(t, 4, 8, buf, ATTR_BRIGHT);
+	}
+	if (u->note[0])
+		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
+
+	snprintf(buf, sizeof(buf), "%c SELECT   %c BACK", f.bottom, f.right);
+	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
+}
+
+/* ---- time zone ------------------------------------------------------------ */
+
+/* A region, then its cities with the time it is there now: the quickest way
+ * to find the right one is often to look for the clock that is right. */
+static void draw_tz(struct ui *u)
+{
+	struct term *t = &u->term;
+	char buf[96], now[8];
+	int visible = (int)list_rows(u);
+
+	if (u->tz_level == 0) {
+		draw_frame(u, "Settings  >  Time zone");
+		term_puts(t, 2, 3, "REGION", ATTR_MID);
+		term_puts_right(t, t->cols - 2, 3, u->tz_cur, ATTR_MID);
+		scroll_to(u->tz_sel, &u->tz_top, u->tz.nregions, visible);
+		for (int i = 0; i < visible && u->tz_top + i < u->tz.nregions; i++) {
+			const char *r = u->tz.region[u->tz_top + i];
+			size_t n = strlen(r);
+			int here = strncmp(u->tz_cur, r, n) == 0 &&
+			           (u->tz_cur[n] == '/' || u->tz_cur[n] == '\0');
+			draw_row(u, (unsigned)(LIST_TOP + i), u->tz_top + i == u->tz_sel,
+			         r, here ? "current" : NULL);
+		}
+	} else {
+		snprintf(buf, sizeof(buf), "Settings  >  Time zone  >  %s",
+		         u->tz.region[u->tz_region]);
+		draw_frame(u, buf);
+		term_puts(t, 2, 3, "CITY", ATTR_MID);
+		snprintf(buf, sizeof(buf), "%d", u->tz_nidx);
+		term_puts_right(t, t->cols - 2, 3, buf, ATTR_MID);
+		scroll_to(u->tz_sel, &u->tz_top, u->tz_nidx, visible);
+		for (int i = 0; i < visible && u->tz_top + i < u->tz_nidx; i++) {
+			const char *zone = u->tz.zone[u->tz_idx[u->tz_top + i]];
+			char city[48];
+			tz_city(zone, city, sizeof(city));
+			tz_clock(zone, now, sizeof(now));
+			snprintf(buf, sizeof(buf), "%s%s", now,
+			         strcmp(zone, u->tz_cur) == 0 ? "  current" : "");
+			draw_row(u, (unsigned)(LIST_TOP + i), u->tz_top + i == u->tz_sel,
+			         city, buf);
+		}
+	}
+
+	if (u->note[0])
+		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
+
+	struct face f = face_of(u->retroid);
+	snprintf(buf, sizeof(buf), "%c %s   %c BACK", f.bottom,
+	         u->tz_level ? "SET" : "OPEN", f.right);
+	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
+}
+
+/* The cities of one region, with the zone in use selected if it is there. */
+static void tz_show_region(struct ui *u, int region)
+{
+	u->tz_region = region;
+	u->tz_nidx = tz_in_region(&u->tz, u->tz.region[region], u->tz_idx, TZ_MAX);
+	u->tz_sel = u->tz_top = 0;
+	for (int i = 0; i < u->tz_nidx; i++)
+		if (strcmp(u->tz.zone[u->tz_idx[i]], u->tz_cur) == 0)
+			u->tz_sel = i;
+	u->tz_level = 1;
+}
+
+/* Read when opened, not at start: 600 lines nobody needs until now. */
+static void open_tz(struct ui *u)
+{
+	tz_load(&u->tz, TZ_LIST, TZ_ZONEINFO);
+	if (!settings_get(SETTINGS, TZ_KEY, u->tz_cur, sizeof(u->tz_cur)))
+		str_copy(u->tz_cur, sizeof(u->tz_cur), "UTC");
+	u->tz_level = 0;
+	u->tz_sel = u->tz_top = 0;
+	for (int i = 0; i < u->tz.nregions; i++) {
+		size_t n = strlen(u->tz.region[i]);
+		if (strncmp(u->tz_cur, u->tz.region[i], n) == 0 &&
+		    (u->tz_cur[n] == '/' || u->tz_cur[n] == '\0'))
+			u->tz_sel = i;
+	}
+	u->screen = SCR_TZ;
+}
+
 /* ---- update --------------------------------------------------------------- */
 
 static void draw_busy(struct ui *u, const char *what);
@@ -774,19 +937,10 @@ static void open_update(struct ui *u)
 	u->screen = SCR_UPDATE;
 }
 
-/* The update is applied by the boot that follows, so this is the last thing
- * the launcher does. systemd stops this program on the way down. */
+/* The update is applied by the boot that follows. */
 static void restart(struct ui *u)
 {
-	struct term *t = &u->term;
-	draw_frame(u, "PortareOS");
-	term_puts(t, 4, 6, "Restarting to install the update...", ATTR_BRIGHT);
-	term_flush(t);
-
-	char *const argv[] = { (char *)"/usr/bin/systemctl", (char *)"reboot", NULL };
-	int rc = proc_run_for(argv, NULL, NULL, 10000);
-	if (rc != 0)
-		snprintf(u->note, sizeof(u->note), "Could not restart (%d).", rc);
+	power(u, "reboot");
 }
 
 static void redraw(struct ui *u)
@@ -800,6 +954,8 @@ static void redraw(struct ui *u)
 	case SCR_KEYBOARD: draw_keyboard(u); break;
 	case SCR_TOOLS:    draw_tools(u);    break;
 	case SCR_ABOUT:    draw_about(u);    break;
+	case SCR_TZ:       draw_tz(u);       break;
+	case SCR_POWER:    draw_power(u);    break;
 	case SCR_UPDATE:   draw_update(u);   break;
 	}
 	term_flush(&u->term);
@@ -1001,6 +1157,15 @@ static void on_action(struct ui *u, enum action a)
 		return;
 	}
 
+	/* A reboot or poweroff that was accepted but has not happened: the
+	 * press that follows brings the panel back, and does nothing else. */
+	if (u->going_down) {
+		u->going_down = 0;
+		kms_present(&u->kms);
+		term_invalidate(&u->term);
+		return;
+	}
+
 	/* Only the keyboard tells START from the settings button. */
 	if (a == ACT_START && u->screen != SCR_KEYBOARD)
 		a = ACT_MENU;
@@ -1060,6 +1225,13 @@ static void on_action(struct ui *u, enum action a)
 		}
 		else if (a == ACT_CONFIRM && u->set_sel == SET_ABOUT)
 			open_about(u);
+		else if (a == ACT_CONFIRM && u->set_sel == SET_TIMEZONE)
+			open_tz(u);
+		else if (a == ACT_CONFIRM && u->set_sel == SET_POWER) {
+			u->power_sel = 0;
+			u->power_armed = -1;
+			u->screen = SCR_POWER;
+		}
 		else if (a == ACT_CONFIRM && u->set_sel == SET_BLUETOOTH) {
 			draw_busy(u, "reading devices...");
 			u->bt_on = bt_powered();
@@ -1152,6 +1324,47 @@ static void on_action(struct ui *u, enum action a)
 			break;
 		}
 		break;
+
+	case SCR_POWER:
+		if (a == ACT_CONFIRM && u->power_armed == u->power_sel) {
+			u->power_armed = -1;
+			power(u, power_verbs[u->power_sel]);
+			break;
+		}
+		u->power_armed = -1;
+		if (a == ACT_UP && u->power_sel > 0) u->power_sel--;
+		else if (a == ACT_DOWN && u->power_sel < 1) u->power_sel++;
+		else if (a == ACT_CONFIRM) u->power_armed = u->power_sel;
+		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
+		else if (a == ACT_QUIT) u->running = 0;
+		break;
+
+	case SCR_TZ: {
+		int count = u->tz_level ? u->tz_nidx : u->tz.nregions;
+		if (a == ACT_UP && u->tz_sel > 0) u->tz_sel--;
+		else if (a == ACT_DOWN && u->tz_sel < count - 1) u->tz_sel++;
+		else if (a == ACT_CONFIRM && u->tz_level == 0 && u->tz_sel < count)
+			tz_show_region(u, u->tz_sel);
+		else if (a == ACT_CONFIRM && u->tz_level == 1 && u->tz_sel < count) {
+			const char *zone = u->tz.zone[u->tz_idx[u->tz_sel]];
+			draw_busy(u, "setting the time zone...");
+			if (tz_apply(zone, SETTINGS, TZ_CACHE) == 0) {
+				str_copy(u->tz_cur, sizeof(u->tz_cur), zone);
+				status_read(&u->st);        /* the header clock, now */
+				u->screen = SCR_SETTINGS;
+			} else {
+				str_copy(u->note, sizeof(u->note), "Could not save it.");
+			}
+		}
+		else if (a == ACT_BACK && u->tz_level == 1) {
+			u->tz_level = 0;
+			u->tz_sel = u->tz_region;
+			u->tz_top = 0;
+		}
+		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
+		else if (a == ACT_QUIT) u->running = 0;
+		break;
+	}
 
 	case SCR_ABOUT:
 		if (a == ACT_CONFIRM && u->about_sel == 0) open_update(u);
