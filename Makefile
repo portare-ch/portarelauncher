@@ -13,7 +13,7 @@ CFLAGS   += -D_GNU_SOURCE
 CFLAGS   += $(shell $(PKGCONFIG) --cflags libdrm)
 LDLIBS   += $(shell $(PKGCONFIG) --libs libdrm)
 
-SRC  := src/settings.c src/status.c src/term.c src/kms.c src/input.c src/catalog.c src/main.c
+SRC  := src/settings.c src/status.c src/osd.c src/term.c src/kms.c src/input.c src/catalog.c src/main.c
 OBJ  := $(SRC:.c=.o)
 BIN  := portarelauncher
 

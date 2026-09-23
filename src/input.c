@@ -35,6 +35,7 @@ static int has_keys(int fd)
 int input_open(struct input *in)
 {
 	memset(in, 0, sizeof(*in));
+	in->aux_fd = -1;
 
 	DIR *d = opendir("/dev/input");
 	if (!d) {
@@ -65,6 +66,11 @@ int input_open(struct input *in)
 		return -1;
 	}
 	return 0;
+}
+
+void input_set_aux(struct input *in, int fd)
+{
+	in->aux_fd = fd;
 }
 
 void input_close(struct input *in)
@@ -139,11 +145,18 @@ static enum action from_abs(unsigned code, int value)
 
 enum action input_wait(struct input *in, int idle_ms)
 {
-	struct pollfd pfd[INPUT_MAX_DEV];
+	struct pollfd pfd[INPUT_MAX_DEV + 1];
 	for (int i = 0; i < in->n; i++) {
 		pfd[i].fd = in->fd[i];
 		pfd[i].events = POLLIN;
 		pfd[i].revents = 0;
+	}
+	int nfd = in->n;
+	if (in->aux_fd >= 0) {
+		pfd[nfd].fd = in->aux_fd;
+		pfd[nfd].events = POLLIN;
+		pfd[nfd].revents = 0;
+		nfd++;
 	}
 
 	/* Whichever comes first: the caller's refresh, or the next repeat of a
@@ -155,7 +168,7 @@ enum action input_wait(struct input *in, int idle_ms)
 			timeout = rep;
 	}
 
-	int n = poll(pfd, (nfds_t)in->n, timeout);
+	int n = poll(pfd, (nfds_t)nfd, timeout);
 	if (n < 0)
 		return ACT_NONE;
 	if (n == 0) {
@@ -165,6 +178,9 @@ enum action input_wait(struct input *in, int idle_ms)
 		}
 		return ACT_TICK;
 	}
+
+	if (in->aux_fd >= 0 && (pfd[nfd - 1].revents & POLLIN))
+		return ACT_AUX;
 
 	enum action out = ACT_NONE;
 	for (int i = 0; i < in->n; i++) {

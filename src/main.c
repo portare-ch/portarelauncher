@@ -6,6 +6,7 @@
 #include "catalog.h"
 #include "input.h"
 #include "kms.h"
+#include "osd.h"
 #include "settings.h"
 #include "status.h"
 #include "term.h"
@@ -36,6 +37,7 @@ struct ui {
 
 	const char *pal_name;
 	struct status st;
+	struct osd osd;
 	int retroid;         /* which printing the pad carries */
 	enum screen screen;
 	int sys_sel, sys_top;
@@ -255,6 +257,23 @@ static void draw_settings(struct ui *u)
 	}
 }
 
+/* One line, bright, over whatever is underneath. Drawn last so it does not
+ * have to care which screen is showing. */
+static void draw_osd(struct ui *u)
+{
+	struct term *t = &u->term;
+	size_t len = strlen(u->osd.text);
+	if (!len || len > t->cols - 4)
+		return;
+
+	unsigned y = t->rows - 4;
+	unsigned x = (unsigned)((t->cols - len) / 2);
+
+	for (unsigned i = 1; i + 1 < t->cols; i++)
+		term_putc(t, i, y, ' ', ATTR_BG);
+	term_puts(t, x, y, u->osd.text, ATTR_BRIGHT);
+}
+
 static void redraw(struct ui *u)
 {
 	switch (u->screen) {
@@ -262,6 +281,8 @@ static void redraw(struct ui *u)
 	case SCR_GAMES:    draw_games(u);    break;
 	case SCR_SETTINGS: draw_settings(u); break;
 	}
+	if (u->osd.text[0])
+		draw_osd(u);
 	term_flush(&u->term);
 }
 
@@ -346,6 +367,11 @@ static void on_action(struct ui *u, enum action a)
 {
 	const struct psystem *s = &u->cat.sys[u->sys_sel];
 
+	if (a == ACT_AUX) {
+		osd_read(&u->osd);
+		return;
+	}
+
 	if (a == ACT_TICK) {
 		status_read(&u->st);
 		return;
@@ -426,6 +452,9 @@ int main(void)
 		return 1;
 	}
 
+	if (osd_open(&u.osd) == 0)
+		input_set_aux(&u.in, u.osd.fd);
+
 	if (input_open(&u.in) < 0) {
 		term_free(&u.term);
 		kms_close(&u.kms);
@@ -456,9 +485,15 @@ int main(void)
 	redraw(&u);
 
 	while (u.running && !stop_requested) {
-		/* Sleep until the minute turns over, or until a button is
-		 * pressed. Nothing else wakes this program. */
-		enum action a = input_wait(&u.in, status_ms_to_next_minute());
+		/* Sleep until the minute turns over, until the overlay is due
+		 * to come down, or until something is pressed. Nothing else
+		 * wakes this program. */
+		int idle = status_ms_to_next_minute();
+		int osd_left = osd_remaining(&u.osd);
+		if (osd_left >= 0 && osd_left < idle)
+			idle = osd_left;
+
+		enum action a = input_wait(&u.in, idle);
 
 		if (blank_requested) {
 			int on = blank_requested > 0;
@@ -477,9 +512,11 @@ int main(void)
 		if (a == ACT_NONE)
 			continue;
 		on_action(&u, a);
+		osd_remaining(&u.osd);   /* clears the text once it has expired */
 		redraw(&u);
 	}
 
+	osd_close(&u.osd);
 	input_close(&u.in);
 	term_free(&u.term);
 	kms_close(&u.kms);

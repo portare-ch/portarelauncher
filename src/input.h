@@ -22,6 +22,7 @@ enum action {
 	ACT_MENU,     /* the settings key            */
 	ACT_PALETTE,  /* cycles the colour ramp, for choosing one */
 	ACT_TICK,     /* the idle timeout expired; nothing was pressed */
+	ACT_AUX,      /* the auxiliary fd has something to read */
 	ACT_QUIT,     /* only bound to a keyboard escape hatch */
 };
 
@@ -30,11 +31,16 @@ enum action {
 struct input {
 	int fd[INPUT_MAX_DEV];
 	int n;
+	/* Something that is not an input device but has to wake the same
+	 * poll: the OSD pipe. Kept separate so its bytes are never parsed as
+	 * evdev events. */
+	int aux_fd;
 	enum action held;      /* direction currently held, for repeat */
 	int repeats;           /* how many repeats have fired          */
 };
 
 int  input_open(struct input *in);
+void input_set_aux(struct input *in, int fd);
 void input_close(struct input *in);
 
 /* Blocks until something happens and returns one action.
