@@ -736,6 +736,45 @@ static void join(struct ui *u, const char *password)
 	}
 }
 
+/* Re-reads es_systems.cfg and every rom folder, keeping the selection on
+ * the same system by name. Without this the catalogue was read once, at
+ * start: a film copied over ssh while the launcher ran stayed invisible
+ * until a restart. A full reload measured 5-7 ms on the device, so it is
+ * simply done whenever a list is about to be shown. If the reload fails -
+ * no system with games any more - the old catalogue stays rather than
+ * leaving nothing to show. */
+static void refresh_catalog(struct ui *u)
+{
+	char keep[64] = "";
+	int on_tools = on_tools_row(u);
+	struct catalog fresh;
+
+	if (u->sys_sel < u->cat.n)
+		str_copy(keep, sizeof(keep), u->cat.sys[u->sys_sel].name);
+
+	if (catalog_load(&fresh, ES_SYSTEMS, SETTINGS) < 0)
+		return;
+	catalog_free(&u->cat);
+	u->cat = fresh;
+	tools_load(&u->tools);
+
+	u->sys_sel = 0;
+	if (on_tools && u->tools.n > 0) {
+		u->sys_sel = u->cat.n;
+		return;
+	}
+	for (int i = 0; i < u->cat.n; i++)
+		if (strcmp(u->cat.sys[i].name, keep) == 0)
+			u->sys_sel = i;
+}
+
+/* Back to the systems list, current as of now. */
+static void show_systems(struct ui *u)
+{
+	refresh_catalog(u);
+	u->screen = SCR_SYSTEMS;
+}
+
 static void on_action(struct ui *u, enum action a)
 {
 
@@ -771,8 +810,11 @@ static void on_action(struct ui *u, enum action a)
 			u->screen = SCR_TOOLS;
 		}
 		else if (a == ACT_CONFIRM) {
-			u->screen = SCR_GAMES;
-			u->game_sel = u->game_top = 0;
+			refresh_catalog(u);
+			if (u->sys_sel < u->cat.n) {
+				u->screen = SCR_GAMES;
+				u->game_sel = u->game_top = 0;
+			}
 		} else if (a == ACT_MENU) {
 			u->screen = SCR_SETTINGS;
 			u->set_sel = 0;
@@ -784,7 +826,7 @@ static void on_action(struct ui *u, enum action a)
 		if (a == ACT_UP && u->game_sel > 0) u->game_sel--;
 		else if (a == ACT_DOWN && u->game_sel < s->ngames - 1) u->game_sel++;
 		else if (a == ACT_CONFIRM) launch(u, s, &s->games[u->game_sel]);
-		else if (a == ACT_BACK) u->screen = SCR_SYSTEMS;
+		else if (a == ACT_BACK) show_systems(u);
 		else if (a == ACT_QUIT) u->running = 0;
 		break;
 	}
@@ -794,7 +836,7 @@ static void on_action(struct ui *u, enum action a)
 		else if (a == ACT_DOWN && u->tool_sel < u->tools.n - 1) u->tool_sel++;
 		else if (a == ACT_CONFIRM && u->tool_sel < u->tools.n)
 			run_tool(u, &u->tools.t[u->tool_sel]);
-		else if (a == ACT_BACK) u->screen = SCR_SYSTEMS;
+		else if (a == ACT_BACK) show_systems(u);
 		else if (a == ACT_QUIT) u->running = 0;
 		break;
 
@@ -850,7 +892,7 @@ static void on_action(struct ui *u, enum action a)
 			settings_set(SETTINGS, KEY_BUTTONS,
 			             u->retroid ? "retroid" : "ps");
 		}
-		else if (a == ACT_BACK || a == ACT_MENU) u->screen = SCR_SYSTEMS;
+		else if (a == ACT_BACK || a == ACT_MENU) show_systems(u);
 		else if (a == ACT_QUIT) u->running = 0;
 		break;
 
