@@ -34,6 +34,10 @@
 #define CARD        "/dev/dri/card0"
 #define ES_SYSTEMS  "/usr/config/emulationstation/es_systems.cfg"
 #define SETTINGS    "/storage/.config/system/configs/system.cfg"
+
+#ifndef PL_VERSION
+#define PL_VERSION "dev"   /* set by the Makefile, from VERSION or git */
+#endif
 #define SCALE       3          /* 8x16 glyphs at 3x is 53x20 on this panel */
 
 #define LIST_TOP    5
@@ -870,6 +874,9 @@ static void draw_about(struct ui *u)
 	term_puts(t, 15, 12,
 	          settings_get(SETTINGS, "root.password", pw, sizeof(pw)) ? pw : "-",
 	          ATTR_TEXT);
+
+	term_puts(t, 4, 13, "launcher", ATTR_MID);
+	term_puts(t, 15, 13, PL_VERSION, ATTR_TEXT);
 
 	struct face f = face_of(u->retroid);
 	snprintf(buf, sizeof(buf), "%c OPEN   %c BACK", f.bottom, f.right);

@@ -82,6 +82,14 @@ on-device checklist in portare-ch/portareos#238.
 CI (`.github/workflows/ci.yml`) builds with warnings as errors on arm64 and
 runs both, on every push to main and every pull request.
 
+## Releases
+
+PortareOS builds a release, not a commit. To publish one, tag `main` and push the tag:
+
+    git tag v0.2.0 && git push origin v0.2.0
+
+`.github/workflows/release.yml` then builds and tests the tag as CI does. It publishes `portarelauncher-0.2.0.tar.gz` and its `.sha256`, and the launcher shows the tag under Settings > About. In PortareOS, the bump sets `PKG_VERSION` to the version and `PKG_SHA256` to the value from the `.sha256` file.
+
 ## Controls
 
 Bindings are by position and never move. The bottom button confirms and the
