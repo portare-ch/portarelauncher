@@ -136,6 +136,31 @@ static void test_usb(void)
 	CHECK_INT(n, 2);
 }
 
+static void test_wifi_switch(void)
+{
+	/* Both switches, the rfkill block first: the boot's wifictl disable is
+	 * what an official image starts with, and nmcli alone does not lift it. */
+	fake_reset();
+	fake_reply("/usr/bin/wifictl enable", "", 0);
+	fake_reply("/usr/bin/nmcli radio wifi on", "", 0);
+	net_wifi_set(1);
+	CHECK_INT(fake_n_calls, 2);
+	CHECK_STR(fake_calls[0], "/usr/bin/wifictl enable");
+	CHECK_STR(fake_calls[1], "/usr/bin/nmcli radio wifi on");
+
+	fake_reset();
+	net_wifi_set(0);
+	CHECK_STR(fake_calls[0], "/usr/bin/wifictl disable");
+	CHECK_STR(fake_calls[1], "/usr/bin/nmcli radio wifi off");
+
+	fake_reset();
+	fake_reply("/usr/bin/nmcli -t radio wifi", "enabled\n", 0);
+	CHECK(net_wifi_enabled());
+	fake_reset();
+	fake_reply("/usr/bin/nmcli -t radio wifi", "disabled\n", 0);
+	CHECK(!net_wifi_enabled());
+}
+
 int main(void)
 {
 	test_scan();
@@ -144,5 +169,6 @@ int main(void)
 	test_join();
 	test_address();
 	test_usb();
+	test_wifi_switch();
 	return check_report("net");
 }

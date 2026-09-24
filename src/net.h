@@ -38,6 +38,9 @@ struct net_list {
 void net_scan(struct net_list *l, int rescan);
 
 int  net_wifi_enabled(void);
+/* Switches the radio: the rfkill block the boot applies through wifictl,
+ * and NetworkManager's switch. Persisting the choice (wifi.enabled) is the
+ * caller's, since that is a setting and this file runs commands. */
 void net_wifi_set(int on);
 
 /* Brings up a saved profile. Returns 0 on success. */
