@@ -1,5 +1,6 @@
 #include "catalog.h"
 #include "settings.h"
+#include "sheets.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -158,6 +159,51 @@ static void scan(struct psystem *s, const char *dir, int depth)
 	closedir(d);
 }
 
+static int by_path(const void *a, const void *b)
+{
+	return strcasecmp((const char *)a, (const char *)b);
+}
+
+/* Drops every game that a sheet in the same system names, so a game made
+ * of a .cue and its tracks, or an .m3u and its discs, is listed once, as
+ * its sheet. Names are compared without regard to case: a sheet written on
+ * Windows often spells its tracks differently from the files on the card. */
+static void hide_referenced(struct psystem *s)
+{
+	char (*refs)[512] = NULL;
+	int nrefs = 0, cap = 0;
+
+	for (int i = 0; i < s->ngames; i++) {
+		if (!sheet_is(s->games[i].path))
+			continue;
+		if (nrefs + SHEET_MAX_REFS > cap) {
+			int ncap = cap ? cap * 2 : 256;
+			while (ncap < nrefs + SHEET_MAX_REFS)
+				ncap *= 2;
+			char (*r)[512] = realloc(refs, (size_t)ncap * sizeof(*refs));
+			if (!r)
+				break;
+			refs = r;
+			cap = ncap;
+		}
+		nrefs += sheet_refs(s->games[i].path, refs + nrefs, SHEET_MAX_REFS);
+	}
+	if (nrefs == 0) {
+		free(refs);
+		return;
+	}
+
+	qsort(refs, (size_t)nrefs, sizeof(*refs), by_path);
+	int w = 0;
+	for (int i = 0; i < s->ngames; i++) {
+		if (bsearch(s->games[i].path, refs, (size_t)nrefs, sizeof(*refs), by_path))
+			continue;
+		s->games[w++] = s->games[i];
+	}
+	s->ngames = w;
+	free(refs);
+}
+
 static int by_name(const void *a, const void *b)
 {
 	return strcasecmp(((const struct game *)a)->name,
@@ -215,6 +261,7 @@ int catalog_load(struct catalog *c, const char *es_systems, const char *settings
 			}
 
 			scan(&cur, cur.path, 1);
+			hide_referenced(&cur);
 			if (cur.ngames == 0) {
 				free(cur.games);
 				continue;

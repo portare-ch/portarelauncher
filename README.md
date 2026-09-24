@@ -11,6 +11,10 @@ in portare-ch/portareos#222.
 Lists consoles, lists games, launches one through `runemu.sh`, and offers a
 settings menu. Nothing else.
 
+A game made of several files is listed once: a .cue and its tracks, a .gdi
+and its tracks, an .m3u and its discs, a CloneCD .ccd and its image. Every
+file a sheet names is left out, and the sheet is what launches.
+
 ## Status
 
 Runs on the device. It finds the systems that have games, lists them, lists
@@ -45,9 +49,9 @@ drift from the dimensions it claims.
 
 It is PortareOS's front-end: the image starts it as the UI service, and
 EmulationStation and sway are gone. What is still missing before the public
-beta is tracked in portareos under the beta milestone - multi-file games
-listed once, faster movement through long lists (portare-ch/portareos#255
-to #260). Nothing has been measured about idle power yet.
+beta is tracked in portareos under the beta milestone - faster movement
+through long lists, remembering the selected game, and saying when a game
+exits with an error (portare-ch/portareos#258 to #260). Nothing has been measured about idle power yet.
 
 ## Building
 
