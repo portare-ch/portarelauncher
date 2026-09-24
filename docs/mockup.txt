@@ -52,6 +52,7 @@
      ═══════════════════════════════════════════════════ |
                                                          |
         Wi-Fi                                Hofmann-5G  |
+        SSH                                          on  |
       ▸ Bluetooth                            WH-1000XM4  |
         USB gadget mode                         network  |
         Button style                            Retroid  |
@@ -61,7 +62,6 @@
                                                          |
         Headphones, controllers. Open to                 |
         scan, connect, set auto-connect.                 |
-                                                         |
                                                          |
                                                          |
                                                          |

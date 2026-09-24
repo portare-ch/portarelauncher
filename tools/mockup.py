@@ -43,15 +43,15 @@ games += [""] * 4
 games += [row("    swanstation", "8 of 112  "), "", THIN,
           row(" A LAUNCH   B BACK", "\u2191\u2193 MOVE ")]
 
-SET = [("Wi-Fi", "Hofmann-5G"), ("Bluetooth", "WH-1000XM4"),
+SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
        ("USB gadget mode", "network"), ("Button style", "Retroid"),
        ("Colour", "grey")]
 settings = [row(" Settings", ""), RULE, ""]
-settings += [item(i == 1, n, v) for i, (n, v) in enumerate(SET)]
+settings += [item(i == 2, n, v) for i, (n, v) in enumerate(SET)]
 settings += ["", THIN, "",
              "    Headphones, controllers. Open to",
              "    scan, connect, set auto-connect."]
-settings += [""] * 5
+settings += [""] * 4
 settings += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
 
 # Two toggles and the devices in one list: switching it on, letting known

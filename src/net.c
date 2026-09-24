@@ -7,6 +7,8 @@
 #define NMCLI "/usr/bin/nmcli"
 #define USBGADGET "/usr/bin/usbgadget"
 #define WIFICTL "/usr/bin/wifictl"
+#define SYSTEMCTL "/usr/bin/systemctl"
+#define SSHD_CONF "/storage/.cache/services/sshd.conf"
 
 /* nmcli -t escapes ':' and '\' in values. Splits one terse line into fields,
  * unescaping as it goes. Returns how many it found. */
@@ -150,6 +152,33 @@ void net_wifi_set(int on)
 	                     (char *)(on ? "on" : "off"), NULL };
 	proc_run(rf, NULL, NULL);
 	proc_run(nm, NULL, NULL);
+}
+
+/* ---- SSH ------------------------------------------------------------ */
+
+int net_ssh_enabled(void)
+{
+	char v[80] = "";
+	char *const argv[] = { (char *)SYSTEMCTL, (char *)"is-active",
+	                       (char *)"sshd", NULL };
+	proc_run(argv, cb_first, v);
+	return strcmp(v, "active") == 0;
+}
+
+void net_ssh_set(int on)
+{
+	char *const touch[] = { (char *)"/usr/bin/touch", (char *)SSHD_CONF, NULL };
+	char *const rm[] = { (char *)"/usr/bin/rm", (char *)"-f", (char *)SSHD_CONF,
+	                     NULL };
+	char *const sc[] = { (char *)SYSTEMCTL, (char *)(on ? "start" : "stop"),
+	                     (char *)"sshd", NULL };
+	if (on) {
+		proc_run(touch, NULL, NULL);
+		proc_run(sc, NULL, NULL);
+	} else {
+		proc_run(sc, NULL, NULL);
+		proc_run(rm, NULL, NULL);
+	}
 }
 
 int net_connect(const char *name)
