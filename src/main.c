@@ -790,8 +790,8 @@ static const char *update_action(const struct ui *u)
 }
 
 /* What is installed and where it can be reached, then Update. The version is
- * what a bug report needs first and the address is what ssh needs; both were
- * nowhere on the device before. */
+ * what a bug report needs first; the address and password are what ssh
+ * needs. None of it was anywhere on the device before. */
 static void draw_about(struct ui *u)
 {
 	struct term *t = &u->term;
@@ -830,6 +830,15 @@ static void draw_about(struct ui *u)
 
 	term_puts(t, 4, 11, "address", ATTR_MID);
 	term_puts(t, 15, 11, u->addr[0] ? u->addr : "offline", ATTR_TEXT);
+
+	/* The root password, which ssh asks for. Every device makes its own
+	 * on first boot (portareos 007-rootpw), so this is the only place to
+	 * learn it without already being logged in. */
+	char pw[40];
+	term_puts(t, 4, 12, "password", ATTR_MID);
+	term_puts(t, 15, 12,
+	          settings_get(SETTINGS, "root.password", pw, sizeof(pw)) ? pw : "-",
+	          ATTR_TEXT);
 
 	struct face f = face_of(u->retroid);
 	snprintf(buf, sizeof(buf), "%c OPEN   %c BACK", f.bottom, f.right);
