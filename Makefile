@@ -35,6 +35,18 @@ PL_WARN    := -Wall -Wextra -Wshadow -Wvla -Wno-unused-parameter
 
 CFLAGS     ?= -O2 -g
 
+# The version shown under Settings > About. A release tarball has it in
+# VERSION, which git archive fills in from the tag (export-subst, see
+# .gitattributes). A checkout has the placeholder instead, so it asks git,
+# and a copy with neither says "dev".
+PL_VERSION := $(strip $(shell cat VERSION 2>/dev/null))
+ifneq ($(findstring $$Format,$(PL_VERSION)),)
+PL_VERSION := $(strip $(shell git describe --tags --always --dirty 2>/dev/null))
+endif
+ifeq ($(PL_VERSION),)
+PL_VERSION := dev
+endif
+
 SRC  := src/text.c src/proc.c src/update.c src/osinfo.c src/tz.c src/quit.c src/sheets.c src/net.c src/bt.c src/osk.c src/tools.c src/settings.c src/status.c src/osd.c src/term.c src/kms.c \
         src/input.c src/catalog.c src/main.c
 OBJ  := $(SRC:.c=.o)
@@ -49,6 +61,9 @@ $(BIN): $(OBJ)
 	$(CC) $(CFLAGS) $(PL_CFLAGS) $(PL_WARN) -c -o $@ $<
 
 src/term.o: src/font8x16.h
+
+# Only main.c prints it, so only main.o carries it.
+src/main.o: PL_CFLAGS += -DPL_VERSION='"$(PL_VERSION)"'
 
 clean:
 	rm -f $(OBJ) $(BIN) $(TESTS)

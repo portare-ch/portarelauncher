@@ -1,0 +1,3 @@
+# git archive writes the tag into VERSION (git describe), so a release
+# tarball knows its version without the repository. See the Makefile.
+VERSION export-subst

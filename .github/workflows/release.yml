@@ -1,0 +1,61 @@
+# Publishes a release for every version tag (v0.1.0, v0.2.0, ...).
+#
+# The tarball is made here, once, with git archive, and uploaded with its
+# checksum. PortareOS pins that file by version and sha256, so the file must
+# never change after publication. GitHub's own "Source code" archives are
+# generated on demand and are not something to hang a checksum on.
+#
+# The same build and tests as CI run first, so a tag that does not build
+# publishes nothing.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0     # git describe, for the version the binary shows
+
+      - name: Install libdrm headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libdrm-dev
+
+      - name: Build
+        run: make CFLAGS="-O2 -g -Werror"
+
+      - name: Tests
+        run: make test
+
+      - name: Tests under ASan and UBSan
+        run: make test SAN=1
+
+      - name: Tarball
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          mkdir dist
+          # The prefix is the directory PortareOS's build unpacks into:
+          # ${PKG_NAME}-${PKG_VERSION}.
+          git archive --format=tar.gz --prefix="portarelauncher-${VER}/" \
+            -o "dist/portarelauncher-${VER}.tar.gz" "${GITHUB_REF_NAME}"
+          # The tag has to reach VERSION, or the launcher shows "dev".
+          tar -xzOf "dist/portarelauncher-${VER}.tar.gz" \
+            "portarelauncher-${VER}/VERSION" | grep -qx "${GITHUB_REF_NAME}"
+          (cd dist && sha256sum "portarelauncher-${VER}.tar.gz" \
+            > "portarelauncher-${VER}.tar.gz.sha256")
+          cat dist/*.sha256
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --verify-tag --generate-notes --title "${GITHUB_REF_NAME}"
