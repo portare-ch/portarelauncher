@@ -7,11 +7,24 @@
 #
 # The same build and tests as CI run first, so a tag that does not build
 # publishes nothing.
+#
+# A release made on the GitHub page first (which also creates the tag) is
+# fine: the files are added to it rather than a second one being refused.
+# Run it by hand with a tag to (re)publish an existing one; a re-run would
+# use the workflow as it was at that tag.
 name: Release
 
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish, e.g. v0.1.0'
+        required: true
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 permissions:
   contents: write
@@ -22,6 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ env.TAG }}
           fetch-depth: 0     # git describe, for the version the binary shows
 
       - name: Install libdrm headers
@@ -40,15 +54,15 @@ jobs:
 
       - name: Tarball
         run: |
-          VER="${GITHUB_REF_NAME#v}"
+          VER="${TAG#v}"
           mkdir dist
           # The prefix is the directory PortareOS's build unpacks into:
           # ${PKG_NAME}-${PKG_VERSION}.
           git archive --format=tar.gz --prefix="portarelauncher-${VER}/" \
-            -o "dist/portarelauncher-${VER}.tar.gz" "${GITHUB_REF_NAME}"
+            -o "dist/portarelauncher-${VER}.tar.gz" "${TAG}"
           # The tag has to reach VERSION, or the launcher shows "dev".
           tar -xzOf "dist/portarelauncher-${VER}.tar.gz" \
-            "portarelauncher-${VER}/VERSION" | grep -qx "${GITHUB_REF_NAME}"
+            "portarelauncher-${VER}/VERSION" | grep -qx "${TAG}"
           (cd dist && sha256sum "portarelauncher-${VER}.tar.gz" \
             > "portarelauncher-${VER}.tar.gz.sha256")
           cat dist/*.sha256
@@ -57,5 +71,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" dist/* \
-            --verify-tag --generate-notes --title "${GITHUB_REF_NAME}"
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" dist/* --clobber
+          else
+            gh release create "${TAG}" dist/* \
+              --verify-tag --generate-notes --title "${TAG}"
+          fi
