@@ -52,6 +52,14 @@ static const char *es_systems =
 	"\t\t\t</emulator>\n"
 	"\t\t</emulators>\n"
 	"\t</system>\n"
+	/* Games made of several files, sorting last so the rest stay put. */
+	"\t<system>\n"
+	"\t\t<name>multi</name>\n"
+	"\t\t<fullname>Zz Multi-file</fullname>\n"
+	"\t\t<path>%1$s/roms/multi</path>\n"
+	"\t\t<extension>.bin .cue .img .ccd .m3u .chd</extension>\n"
+	"\t\t<command>/usr/bin/runemu.sh %%ROM%%</command>\n"
+	"\t</system>\n"
 	"</systemList>\n";
 
 static void touch(const char *rel)
@@ -95,6 +103,39 @@ static void build_fixture(void)
 	dir("roms/ps2/Game A/extras");
 	touch("roms/ps2/Game A/extras/deep.iso");    /* two levels: not */
 
+	/* Tekken 3 as on the test device: a .cue and three tracks, one of
+	 * them spelt in capitals on the card. */
+	dir("roms/multi");
+	char p[160];
+	snprintf(p, sizeof(p), "%s/roms/multi/Tekken 3 (USA).cue", root);
+	fixture_write(p,
+		"FILE \"Tekken 3 (USA) (Track 1).bin\" BINARY\r\n"
+		"FILE \"Tekken 3 (USA) (Track 2).bin\" BINARY\r\n"
+		"FILE \"Tekken 3 (USA) (Track 3).bin\" BINARY\r\n");
+	touch("roms/multi/Tekken 3 (USA) (Track 1).bin");
+	touch("roms/multi/Tekken 3 (USA) (Track 2).bin");
+	touch("roms/multi/TEKKEN 3 (USA) (TRACK 3).BIN");
+	/* Two discs behind an .m3u, each a .cue with its track. */
+	snprintf(p, sizeof(p), "%s/roms/multi/FF7.m3u", root);
+	fixture_write(p, "FF7 (Disc 1).cue\nFF7 (Disc 2).cue\n");
+	snprintf(p, sizeof(p), "%s/roms/multi/FF7 (Disc 1).cue", root);
+	fixture_write(p, "FILE \"FF7 (Disc 1).bin\" BINARY\n");
+	snprintf(p, sizeof(p), "%s/roms/multi/FF7 (Disc 2).cue", root);
+	fixture_write(p, "FILE \"FF7 (Disc 2).bin\" BINARY\n");
+	touch("roms/multi/FF7 (Disc 1).bin");
+	touch("roms/multi/FF7 (Disc 2).bin");
+	/* CloneCD. */
+	touch("roms/multi/Clone.ccd");
+	touch("roms/multi/Clone.img");
+	/* A PS2 game in its own folder, .bin and .cue side by side, with a
+	 * Windows path in the sheet. */
+	dir("roms/multi/Smuggler's Run (USA)");
+	snprintf(p, sizeof(p), "%s/roms/multi/Smuggler's Run (USA)/Smuggler's Run (USA).cue", root);
+	fixture_write(p, "FILE \".\\Smuggler's Run (USA).bin\" BINARY\n");
+	touch("roms/multi/Smuggler's Run (USA)/Smuggler's Run (USA).bin");
+	/* A .bin no sheet names is a game of its own and stays. */
+	touch("roms/multi/Orphan.bin");
+
 	dir("modules");
 	touch("modules/commander.sh");
 }
@@ -112,8 +153,8 @@ static void test_systems(void)
 	struct catalog c;
 	CHECK_INT(catalog_load(&c, cfg, sys_cfg), 0);
 
-	/* psx and ps2; tools and the empty snes are gone. By full name. */
-	CHECK_INT(c.n, 2);
+	/* psx, ps2 and multi; tools and the empty snes are gone. By full name. */
+	CHECK_INT(c.n, 3);
 	CHECK_STR(c.sys[0].fullname, "PlayStation");
 	CHECK_STR(c.sys[1].fullname, "PlayStation 2 & Friends");
 	CHECK(find(&c, "tools") == NULL);
@@ -169,6 +210,29 @@ static void test_games(void)
 	CHECK_INT(c.n, 0);
 }
 
+static void test_multi_file(void)
+{
+	struct catalog c;
+	CHECK_INT(catalog_load(&c, cfg, sys_cfg), 0);
+	const struct psystem *m = find(&c, "multi");
+	CHECK(m != NULL);
+	if (m) {
+		/* One entry per game: each sheet, not what it names. */
+		CHECK_INT(m->ngames, 5);
+		const char *want[] = { "Clone", "FF7", "Orphan", "Smuggler's Run (USA)",
+		                       "Tekken 3 (USA)" };
+		for (int i = 0; i < 5 && i < m->ngames; i++)
+			CHECK_STR(m->games[i].name, want[i]);
+		if (m->ngames == 5) {
+			const char *e = strrchr(m->games[1].path, '.');
+			CHECK_STR(e, ".m3u");                 /* FF7 is its playlist */
+			e = strrchr(m->games[3].path, '.');
+			CHECK_STR(e, ".cue");
+		}
+	}
+	catalog_free(&c);
+}
+
 static void test_overrides(void)
 {
 	/* system.cfg picks the core and emulator over es_systems.cfg. */
@@ -207,6 +271,7 @@ int main(void)
 
 	test_systems();
 	test_games();
+	test_multi_file();
 	test_overrides();
 	test_failures();
 
