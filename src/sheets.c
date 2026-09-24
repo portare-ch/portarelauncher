@@ -35,10 +35,12 @@ static void resolve(const char *dir, const char *name, char *out, size_t osz)
 	while (r[0] == '.' && r[1] == '/')
 		r += 2;
 
-	if (r[0] == '/')
-		snprintf(out, osz, "%s", r);
-	else
-		snprintf(out, osz, "%s/%s", dir, r);
+	/* A path too long for the buffer names nothing, rather than a cut-off
+	 * prefix that could hide some other file. */
+	int w = r[0] == '/' ? snprintf(out, osz, "%s", r)
+	                    : snprintf(out, osz, "%s/%s", dir, r);
+	if (w < 0 || (size_t)w >= osz)
+		out[0] = '\0';
 }
 
 /* The n-th whitespace-separated field of line, where a "quoted field" may
