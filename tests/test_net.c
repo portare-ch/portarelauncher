@@ -161,6 +161,33 @@ static void test_wifi_switch(void)
 	CHECK(!net_wifi_enabled());
 }
 
+static void test_ssh_switch(void)
+{
+	/* The marker first, or systemd skips the start on its condition. */
+	fake_reset();
+	fake_reply("/usr/bin/touch /storage/.cache/services/sshd.conf", "", 0);
+	fake_reply("/usr/bin/systemctl start sshd", "", 0);
+	net_ssh_set(1);
+	CHECK_INT(fake_n_calls, 2);
+	CHECK_STR(fake_calls[0], "/usr/bin/touch /storage/.cache/services/sshd.conf");
+	CHECK_STR(fake_calls[1], "/usr/bin/systemctl start sshd");
+
+	fake_reset();
+	net_ssh_set(0);
+	CHECK_INT(fake_n_calls, 2);
+	CHECK_STR(fake_calls[0], "/usr/bin/systemctl stop sshd");
+	CHECK_STR(fake_calls[1], "/usr/bin/rm -f /storage/.cache/services/sshd.conf");
+
+	fake_reset();
+	fake_reply("/usr/bin/systemctl is-active sshd", "active\n", 0);
+	CHECK(net_ssh_enabled());
+	fake_reset();
+	fake_reply("/usr/bin/systemctl is-active sshd", "inactive\n", 3);
+	CHECK(!net_ssh_enabled());
+	fake_reset();                  /* systemctl missing: off, not a crash */
+	CHECK(!net_ssh_enabled());
+}
+
 int main(void)
 {
 	test_scan();
@@ -170,5 +197,6 @@ int main(void)
 	test_address();
 	test_usb();
 	test_wifi_switch();
+	test_ssh_switch();
 	return check_report("net");
 }

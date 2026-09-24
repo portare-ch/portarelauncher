@@ -56,6 +56,7 @@ struct ui {
 	struct net_list nets;
 	int wifi_on;         /* the radio, as last asked                      */
 	int wifi_sel, wifi_top;  /* row 0 is the switch, 1.. the networks     */
+	int ssh_on;          /* sshd, read when Settings opens                */
 
 	struct bt_list bt;
 	int bt_on, bt_auto;
@@ -113,11 +114,12 @@ struct ui {
 #define G_TRIANGLE  0x1E   /* /\  */
 #define G_SQUARE    0xFE   /* []  */
 
-enum { SET_WIFI = 0, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_COLOUR,
+enum { SET_WIFI = 0, SET_SSH, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_COLOUR,
        SET_TIMEZONE, SET_ABOUT, SET_POWER, N_SETTINGS };
 
 static const char *const settings_labels[N_SETTINGS] = {
 	"Wi-Fi",
+	"SSH",
 	"Bluetooth",
 	"USB gadget mode",
 	"Button style",
@@ -342,6 +344,9 @@ static void draw_settings(struct ui *u)
 			value = ssid ? ssid : (net_wifi_enabled() ? "not connected" : "off");
 			break;
 		}
+		case SET_SSH:
+			value = u->ssh_on ? "on" : "off";
+			break;
 		case SET_USB:
 			snprintf(val, sizeof(val), "%s", u->usb[0] ? u->usb : "unknown");
 			value = val;
@@ -397,6 +402,17 @@ static void draw_settings(struct ui *u)
 		term_puts(t, 4, y + 3, "password. Open to pick one.", ATTR_DIM);
 		if (addr[0]) {
 			snprintf(val, sizeof(val), "address  %s", addr);
+			term_puts(t, 4, y + 5, val, ATTR_MID);
+		}
+		break;
+	}
+	case SET_SSH: {
+		char addr[40] = "";
+		net_address(addr, sizeof(addr));
+		term_puts(t, 4, y + 2, "Log in as root over the network.", ATTR_DIM);
+		term_puts(t, 4, y + 3, "The password is under About.", ATTR_DIM);
+		if (u->ssh_on && addr[0]) {
+			snprintf(val, sizeof(val), "ssh root@%s", addr);
 			term_puts(t, 4, y + 5, val, ATTR_MID);
 		}
 		break;
@@ -1354,6 +1370,7 @@ static void on_action(struct ui *u, enum action a)
 		} else if (a == ACT_MENU) {
 			u->screen = SCR_SETTINGS;
 			u->set_sel = 0;
+			u->ssh_on = net_ssh_enabled();
 		} else if (a == ACT_QUIT) u->running = 0;
 		break;
 
@@ -1409,6 +1426,16 @@ static void on_action(struct ui *u, enum action a)
 				bt_list(&u->bt);
 			u->bt_sel = u->bt_top = 0;
 			u->screen = SCR_BT;
+		}
+		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
+		         u->set_sel == SET_SSH) {
+			int on = !u->ssh_on;
+			draw_busy(u, on ? "starting ssh..." : "stopping ssh...");
+			net_ssh_set(on);
+			/* Written as well, so the next boot agrees with the switch:
+			 * the boot starts or stops sshd from this setting. */
+			settings_set(SETTINGS, "ssh.enabled", on ? "1" : "0");
+			u->ssh_on = net_ssh_enabled();
 		}
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
 		         u->set_sel == SET_USB && u->n_usb > 0) {

@@ -43,6 +43,13 @@ int  net_wifi_enabled(void);
  * caller's, since that is a setting and this file runs commands. */
 void net_wifi_set(int on);
 
+/* The SSH server. sshd.service only starts while its marker file exists
+ * (ConditionPathExists), which the boot creates from ssh.enabled - so "on"
+ * creates it and "off" removes it, or a later start would undo the switch.
+ * Persisting the choice (ssh.enabled) is the caller's, as for Wi-Fi. */
+int  net_ssh_enabled(void);
+void net_ssh_set(int on);
+
 /* Brings up a saved profile. Returns 0 on success. */
 int  net_connect(const char *name);
 
