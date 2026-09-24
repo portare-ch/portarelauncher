@@ -6,6 +6,7 @@
 
 #define NMCLI "/usr/bin/nmcli"
 #define USBGADGET "/usr/bin/usbgadget"
+#define WIFICTL "/usr/bin/wifictl"
 
 /* nmcli -t escapes ':' and '\' in values. Splits one terse line into fields,
  * unescaping as it goes. Returns how many it found. */
@@ -140,9 +141,15 @@ int net_wifi_enabled(void)
 
 void net_wifi_set(int on)
 {
-	char *const argv[] = { (char *)NMCLI, (char *)"radio", (char *)"wifi",
-	                       (char *)(on ? "on" : "off"), NULL };
-	proc_run(argv, NULL, NULL);
+	/* Both switches. The boot turns Wi-Fi off with wifictl, which is an
+	 * rfkill block, and NetworkManager's own radio switch does not lift
+	 * that - so "on" through nmcli alone left the radio blocked. */
+	char *const rf[] = { (char *)WIFICTL, (char *)(on ? "enable" : "disable"),
+	                     NULL };
+	char *const nm[] = { (char *)NMCLI, (char *)"radio", (char *)"wifi",
+	                     (char *)(on ? "on" : "off"), NULL };
+	proc_run(rf, NULL, NULL);
+	proc_run(nm, NULL, NULL);
 }
 
 int net_connect(const char *name)

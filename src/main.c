@@ -54,7 +54,8 @@ struct ui {
 	struct osd osd;
 
 	struct net_list nets;
-	int wifi_sel, wifi_top;
+	int wifi_on;         /* the radio, as last asked                      */
+	int wifi_sel, wifi_top;  /* row 0 is the switch, 1.. the networks     */
 
 	struct bt_list bt;
 	int bt_on, bt_auto;
@@ -454,17 +455,28 @@ static void draw_wifi(struct ui *u)
 {
 	struct term *t = &u->term;
 	char buf[64];
-	int on = net_wifi_enabled();
 
 	draw_frame(u, "Settings  >  Wi-Fi");
-	term_puts(t, 2, 3, on ? "NETWORKS" : "WI-FI IS OFF", ATTR_MID);
-	snprintf(buf, sizeof(buf), "%d found", u->nets.n);
-	term_puts_right(t, t->cols - 2, 3, buf, ATTR_MID);
+
+	/* The switch first. An official image boots with Wi-Fi off, and until
+	 * this row there was no way to turn it on from the device - no network
+	 * to join, and no update. */
+	draw_row(u, 3, u->wifi_sel == 0, "Wi-Fi", u->wifi_on ? "on" : "off");
+
+	if (!u->wifi_on) {
+		term_puts(t, 4, LIST_TOP + 1, "Switch Wi-Fi on to see the networks", ATTR_DIM);
+		term_puts(t, 4, LIST_TOP + 2, "in range and join one.", ATTR_DIM);
+	} else {
+		term_puts(t, 2, LIST_TOP - 1, "NETWORKS", ATTR_MID);
+		snprintf(buf, sizeof(buf), "%d found", u->nets.n);
+		term_puts_right(t, t->cols - 2, LIST_TOP - 1, buf, ATTR_MID);
+	}
 
 	int visible = (int)list_rows(u);
-	scroll_to(u->wifi_sel, &u->wifi_top, u->nets.n, visible);
+	int net_sel = u->wifi_sel - 1;          /* -1 while the switch is selected */
+	scroll_to(net_sel < 0 ? 0 : net_sel, &u->wifi_top, u->nets.n, visible);
 
-	for (int i = 0; i < visible && u->wifi_top + i < u->nets.n; i++) {
+	for (int i = 0; u->wifi_on && i < visible && u->wifi_top + i < u->nets.n; i++) {
 		const struct net_entry *e = &u->nets.e[u->wifi_top + i];
 		if (e->active)
 			snprintf(buf, sizeof(buf), "connected");
@@ -474,7 +486,7 @@ static void draw_wifi(struct ui *u)
 			snprintf(buf, sizeof(buf), "%d%%", e->signal);
 		else
 			buf[0] = '\0';
-		draw_row(u, (unsigned)(LIST_TOP + i), u->wifi_top + i == u->wifi_sel,
+		draw_row(u, (unsigned)(LIST_TOP + i), u->wifi_top + i == net_sel,
 		         e->name, buf);
 	}
 
@@ -482,8 +494,11 @@ static void draw_wifi(struct ui *u)
 		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
 
 	struct face f = face_of(u->retroid);
-	snprintf(buf, sizeof(buf), "%c CONNECT   %c BACK   %c RESCAN",
-	         f.bottom, f.right, f.left);
+	if (u->wifi_sel == 0)
+		snprintf(buf, sizeof(buf), "%c SWITCH   %c BACK", f.bottom, f.right);
+	else
+		snprintf(buf, sizeof(buf), "%c CONNECT   %c BACK   %c RESCAN",
+		         f.bottom, f.right, f.left);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -1226,7 +1241,8 @@ static void join(struct ui *u, const char *password)
 		memset(u->osk.text, 0, sizeof(u->osk.text));
 		u->osk.len = 0;
 		net_scan(&u->nets, 0);
-		u->wifi_sel = u->wifi_top = 0;
+		u->wifi_sel = u->nets.n > 0 ? 1 : 0;
+		u->wifi_top = 0;
 		u->screen = SCR_WIFI;
 		return;
 	case 4:
@@ -1365,8 +1381,15 @@ static void on_action(struct ui *u, enum action a)
 		else if (a == ACT_DOWN && u->set_sel < N_SETTINGS - 1) u->set_sel++;
 		else if (a == ACT_CONFIRM && u->set_sel == SET_WIFI) {
 			draw_busy(u, "scanning...");
-			net_scan(&u->nets, 1);
-			u->wifi_sel = u->wifi_top = 0;
+			u->wifi_on = net_wifi_enabled();
+			if (u->wifi_on)
+				net_scan(&u->nets, 1);
+			else
+				memset(&u->nets, 0, sizeof(u->nets));
+			/* On the first network when there are some, on the switch
+			 * when there is nothing else to pick. */
+			u->wifi_sel = (u->wifi_on && u->nets.n > 0) ? 1 : 0;
+			u->wifi_top = 0;
 			u->screen = SCR_WIFI;
 		}
 		else if (a == ACT_CONFIRM && u->set_sel == SET_ABOUT)
@@ -1427,14 +1450,41 @@ static void on_action(struct ui *u, enum action a)
 
 	case SCR_WIFI:
 		if (a == ACT_UP && u->wifi_sel > 0) u->wifi_sel--;
-		else if (a == ACT_DOWN && u->wifi_sel < u->nets.n - 1) u->wifi_sel++;
-		else if (a == ACT_MENU) {
+		else if (a == ACT_DOWN && u->wifi_on && u->wifi_sel < u->nets.n) u->wifi_sel++;
+		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
+		         u->wifi_sel == 0) {
+			int on = !u->wifi_on;
+			draw_busy(u, on ? "switching Wi-Fi on..." : "switching Wi-Fi off...");
+			net_wifi_set(on);
+			/* Kept, because 080-network applies it at every boot. */
+			settings_set(SETTINGS, "wifi.enabled", on ? "1" : "0");
+			if (on) {
+				/* The radio takes a moment after the block is lifted;
+				 * a scan asked for before then finds nothing. */
+				for (int i = 0; i < 20 && !net_wifi_enabled(); i++) {
+					struct timespec ts = { 0, 250 * 1000000L };
+					nanosleep(&ts, NULL);
+				}
+				draw_busy(u, "scanning...");
+				struct timespec settle = { 1, 500 * 1000000L };
+				nanosleep(&settle, NULL);
+			}
+			u->wifi_on = net_wifi_enabled();
+			if (u->wifi_on)
+				net_scan(&u->nets, 1);
+			else
+				memset(&u->nets, 0, sizeof(u->nets));
+			if (on && !u->wifi_on)
+				str_copy(u->note, sizeof(u->note), "Wi-Fi did not come on.");
+			u->wifi_top = 0;
+		}
+		else if (a == ACT_MENU && u->wifi_on) {
 			draw_busy(u, "rescanning...");
 			net_scan(&u->nets, 1);
-			if (u->wifi_sel >= u->nets.n) u->wifi_sel = 0;
+			if (u->wifi_sel > u->nets.n) u->wifi_sel = u->nets.n;
 		}
-		else if (a == ACT_CONFIRM && u->wifi_sel < u->nets.n) {
-			const struct net_entry *e = &u->nets.e[u->wifi_sel];
+		else if (a == ACT_CONFIRM && u->wifi_sel >= 1 && u->wifi_sel - 1 < u->nets.n) {
+			const struct net_entry *e = &u->nets.e[u->wifi_sel - 1];
 			int min = net_min_password(e->security);
 			if (!e->saved && min < 0) {
 				str_copy(u->note, sizeof(u->note),
