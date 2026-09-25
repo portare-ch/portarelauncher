@@ -48,4 +48,11 @@ int  kms_blank(struct kms *k);
 int  kms_drop_master(struct kms *k);
 int  kms_set_master(struct kms *k);
 
+/* Writes a color profile into the CRTC's CTM and GAMMA_LUT properties, or
+ * clears both with NULL. The display controller keeps them across every
+ * later modeset, so what is set here stays in force for whatever runs after
+ * the launcher has dropped master. Needs master. */
+struct color_profile;
+int  kms_color_apply(struct kms *k, const struct color_profile *p);
+
 #endif

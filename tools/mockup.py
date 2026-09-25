@@ -45,7 +45,7 @@ games += [row("    swanstation", "8 of 112  "), "", THIN,
 
 SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
        ("USB gadget mode", "network"), ("Button style", "Retroid"),
-       ("Colour", "grey")]
+       ("Color", "grey"), ("Color profile", "sRGB 2.2")]
 settings = [row(" Settings", ""), RULE, ""]
 settings += [item(i == 2, n, v) for i, (n, v) in enumerate(SET)]
 settings += ["", THIN, "",
