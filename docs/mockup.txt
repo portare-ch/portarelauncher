@@ -57,7 +57,7 @@
         USB gadget mode                         network  |
         Button style                            Retroid  |
         Color                                      grey  |
-        Color profile                          sRGB 2.2  |
+        Color profile                         Gamma 2.2  |
                                                          |
      ─────────────────────────────────────────────────── |
                                                          |
