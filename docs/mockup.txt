@@ -56,7 +56,8 @@
       ▸ Bluetooth                            WH-1000XM4  |
         USB gadget mode                         network  |
         Button style                            Retroid  |
-        Colour                                     grey  |
+        Color                                      grey  |
+        Color profile                          sRGB 2.2  |
                                                          |
      ─────────────────────────────────────────────────── |
                                                          |

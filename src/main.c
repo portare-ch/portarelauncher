@@ -5,6 +5,7 @@
  */
 #include "bt.h"
 #include "catalog.h"
+#include "color.h"
 #include "input.h"
 #include "kms.h"
 #include "net.h"
@@ -54,6 +55,9 @@ struct ui {
 	struct catalog cat;
 
 	const char *pal_name;
+	struct color_profile profile;
+	int profile_ok;      /* the profile file loaded                       */
+	int profile_on;      /* and is applied                                */
 	struct status st;
 	struct osd osd;
 
@@ -112,14 +116,21 @@ struct ui {
 #define KEY_BUTTONS "launcher.buttons"
 #define KEY_PALETTE "launcher.palette"
 
+/* The panel's color profile: "stock" leaves the display controller's color
+ * blocks off; "srgb22" loads the measured correction shipped with the image.
+ * The name is the file's, so a second profile is a second file. */
+#define KEY_PROFILE  "display.colorprofile"
+#define PROFILE_DIR  "/usr/config/color"
+#define PROFILE_NAME "srgb22"
+
 /* Sony's marks approximated out of CP437, which is all the VGA font has.
  * Close enough to be recognised, and not the real symbols. */
 #define G_CIRCLE    0x09   /* O   */
 #define G_TRIANGLE  0x1E   /* /\  */
 #define G_SQUARE    0xFE   /* []  */
 
-enum { SET_WIFI = 0, SET_SSH, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_COLOUR,
-       SET_TIMEZONE, SET_ABOUT, SET_POWER, N_SETTINGS };
+enum { SET_WIFI = 0, SET_SSH, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_COLOR,
+       SET_PROFILE, SET_TIMEZONE, SET_ABOUT, SET_POWER, N_SETTINGS };
 
 static const char *const settings_labels[N_SETTINGS] = {
 	"Wi-Fi",
@@ -127,7 +138,8 @@ static const char *const settings_labels[N_SETTINGS] = {
 	"Bluetooth",
 	"USB gadget mode",
 	"Button style",
-	"Colour",
+	"Color",
+	"Color profile",
 	"Time zone",
 	"About",
 	"Power",
@@ -366,8 +378,12 @@ static void draw_settings(struct ui *u)
 		case SET_BUTTONS:
 			value = u->retroid ? "Retroid" : "PS";
 			break;
-		case SET_COLOUR:
+		case SET_COLOR:
 			value = u->pal_name;
+			break;
+		case SET_PROFILE:
+			value = !u->profile_ok ? "unavailable"
+			      : u->profile_on ? "sRGB 2.2" : "stock";
 			break;
 		case SET_POWER:
 			value = "";
@@ -421,13 +437,23 @@ static void draw_settings(struct ui *u)
 		}
 		break;
 	}
-	case SET_COLOUR:
-		/* The ramp itself, in the colour being chosen: a name says
+	case SET_COLOR:
+		/* The ramp itself, in the color being chosen: a name says
 		 * nothing about how it reads on this panel. */
 		term_puts(t, 4, y + 2, "the selected row", ATTR_BRIGHT);
 		term_puts(t, 4, y + 3, "body text", ATTR_TEXT);
 		term_puts(t, 4, y + 4, "counts and hints", ATTR_MID);
 		term_puts(t, 4, y + 5, "rules and separators", ATTR_DIM);
+		break;
+	case SET_PROFILE:
+		/* The correction is in the display controller, ahead of the
+		 * panel, so it holds for everything drawn after this: games,
+		 * films, the launcher itself. */
+		term_puts(t, 4, y + 2, "The panel measured and corrected to", ATTR_DIM);
+		term_puts(t, 4, y + 3, "sRGB, D65 white, gamma 2.2. Applies", ATTR_DIM);
+		term_puts(t, 4, y + 4, "to everything, games included.", ATTR_DIM);
+		if (!u->profile_ok)
+			term_puts(t, 4, y + 6, "no profile file on this image", ATTR_MID);
 		break;
 	case SET_BLUETOOTH:
 		term_puts(t, 4, y + 2, "Headphones, controllers. Open to", ATTR_DIM);
@@ -1460,13 +1486,23 @@ static void on_action(struct ui *u, enum action a)
 			usb_mode(u->usb, sizeof(u->usb));
 		}
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
-		         u->set_sel == SET_COLOUR) {
+		         u->set_sel == SET_COLOR) {
 			int n = term_palette_count();
 			int cur = term_palette(&u->term);
 			int next = (a == ACT_LEFT) ? (cur + n - 1) % n : (cur + 1) % n;
 			u->pal_name = term_set_palette(&u->term, next);
-			term_invalidate(&u->term);   /* every cell changes colour */
+			term_invalidate(&u->term);   /* every cell changes color */
 			settings_set(SETTINGS, KEY_PALETTE, u->pal_name);
+		}
+		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
+		         u->set_sel == SET_PROFILE && u->profile_ok) {
+			int on = !u->profile_on;
+			if (kms_color_apply(&u->kms, on ? &u->profile : NULL) == 0) {
+				u->profile_on = on;
+				settings_set(SETTINGS, KEY_PROFILE, on ? PROFILE_NAME : "stock");
+			} else {
+				snprintf(u->note, sizeof(u->note), "the display refused the profile");
+			}
 		}
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
 		         u->set_sel == SET_BUTTONS) {
@@ -1749,6 +1785,18 @@ int main(void)
 		}
 		if (!found)   /* a name from a build that had other palettes */
 			u.pal_name = term_set_palette(&u.term, 0);
+	}
+
+	/* The color profile, before the first frame, so the launcher is the
+	 * first thing shown through it. Master is ours here. A boot leaves
+	 * the color blocks off, so "stock" needs nothing written. */
+	{
+		char prof[32] = "";
+		u.profile_ok = color_load(PROFILE_DIR "/" PROFILE_NAME ".profile",
+		                           &u.profile) == 0;
+		settings_get(SETTINGS, KEY_PROFILE, prof, sizeof(prof));
+		if (u.profile_ok && strcmp(prof, PROFILE_NAME) == 0)
+			u.profile_on = kms_color_apply(&u.kms, &u.profile) == 0;
 	}
 
 	/* Default to the layout printed on this device rather than to the

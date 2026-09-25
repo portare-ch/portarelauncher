@@ -24,8 +24,8 @@ Tools, the last row of the systems list, runs the scripts in the modules
 folder - the file manager, the gamepad tester, PortMaster - named and
 described from the folder's gamelist.xml.
 
-Settings: Wi-Fi, Bluetooth, USB gadget mode, button style, colour, time
-zone, About and Power all work. Power restarts or switches off after a
+Settings: Wi-Fi, SSH, Bluetooth, USB gadget mode, button style, color, color
+profile, time zone, About and Power all work. Power restarts or switches off after a
 second press, with the panel switched off first. The time zone is a region, then a city, each city
 shown with the time it is there now. About shows the version, commit, build date, device and IP
 address, and holds Update, which asks GitHub what the chosen channel -
@@ -114,8 +114,19 @@ it - gives the program 1.5 s to leave on its own, as RetroArch does, then
 sends it SIGTERM, then SIGKILL. Never to runemu.sh itself: its cleanup after
 the emulator, fan and GPU and CPU settings, has to run.
 
-The colour ramp is chosen in Settings, where each choice is previewed as
+The color ramp is chosen in Settings, where each choice is previewed as
 the four levels it uses.
+
+The color profile is a different thing: not the launcher's colors but the
+panel's. `stock` leaves the display controller's color blocks off; `sRGB 2.2`
+loads `/usr/config/color/srgb22.profile`, a 3x3 matrix and a 1024-entry gamma
+table, into the CRTC's CTM and GAMMA_LUT properties (color.c parses, kms.c
+writes). The controller keeps them across every later modeset, so the
+correction holds for whatever runs after the launcher has dropped master:
+every emulator, mpv, the launcher itself. It is applied before the first
+frame at start-up when `display.colorprofile=srgb22` is set, and switched
+live from Settings. The profile file is the image's; the launcher only
+carries it to the hardware.
 
 ## The grid
 
@@ -249,7 +260,7 @@ nominative use. Every emulator frontend does the same thing. "PS" rather than
 "Sony" is an abbreviation rather than a company name, which is a slightly
 smaller surface; it does not really change the analysis.
 
-What would change the answer: using Sony's stylised, coloured glyphs rather
+What would change the answer: using Sony's stylised, colored glyphs rather
 than generic shapes, putting them on packaging or marketing, or anything that
 implies endorsement. None of which this does.
 

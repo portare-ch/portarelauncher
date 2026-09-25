@@ -1,4 +1,5 @@
 #include "kms.h"
+#include "color.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -241,4 +242,76 @@ void kms_close(struct kms *k)
 	}
 	close(k->fd);
 	k->fd = -1;
+}
+
+/* Property IDs are per object and per driver, so they are looked up by name
+ * every time rather than remembered. */
+static uint32_t crtc_prop(struct kms *k, const char *name)
+{
+	uint32_t id = 0;
+	drmModeObjectProperties *props =
+		drmModeObjectGetProperties(k->fd, k->crtc_id, DRM_MODE_OBJECT_CRTC);
+	if (!props)
+		return 0;
+	for (uint32_t i = 0; i < props->count_props && !id; i++) {
+		drmModePropertyRes *pr = drmModeGetProperty(k->fd, props->props[i]);
+		if (!pr)
+			continue;
+		if (strcmp(pr->name, name) == 0)
+			id = pr->prop_id;
+		drmModeFreeProperty(pr);
+	}
+	drmModeFreeObjectProperties(props);
+	return id;
+}
+
+static int set_blob(struct kms *k, const char *name, const void *data, size_t len)
+{
+	uint32_t prop = crtc_prop(k, name);
+	if (!prop) {
+		fprintf(stderr, "kms: the crtc has no %s property\n", name);
+		return -1;
+	}
+	uint32_t blob = 0;
+	if (data && drmModeCreatePropertyBlob(k->fd, data, len, &blob) < 0) {
+		fprintf(stderr, "kms: %s blob: %s\n", name, strerror(errno));
+		return -1;
+	}
+	int ret = drmModeObjectSetProperty(k->fd, k->crtc_id, DRM_MODE_OBJECT_CRTC,
+	                                   prop, blob);
+	if (ret < 0)
+		fprintf(stderr, "kms: set %s: %s\n", name, strerror(errno));
+	/* The kernel holds its own reference while the property points at
+	 * it; ours can go straight away. */
+	if (blob)
+		drmModeDestroyPropertyBlob(k->fd, blob);
+	return ret < 0 ? -1 : 0;
+}
+
+int kms_color_apply(struct kms *k, const struct color_profile *p)
+{
+	int ret = 0;
+
+	if (p && p->has_ctm) {
+		struct drm_color_ctm ctm;
+		for (int i = 0; i < 9; i++)
+			ctm.matrix[i] = color_ctm_fixed(p->ctm[i]);
+		ret |= set_blob(k, "CTM", &ctm, sizeof(ctm));
+	} else {
+		ret |= set_blob(k, "CTM", NULL, 0);
+	}
+
+	if (p && p->has_lut) {
+		static struct drm_color_lut lut[COLOR_LUT_LEN];
+		for (int i = 0; i < COLOR_LUT_LEN; i++) {
+			lut[i].red = p->lut[i][0];
+			lut[i].green = p->lut[i][1];
+			lut[i].blue = p->lut[i][2];
+			lut[i].reserved = 0;
+		}
+		ret |= set_blob(k, "GAMMA_LUT", lut, sizeof(lut));
+	} else {
+		ret |= set_blob(k, "GAMMA_LUT", NULL, 0);
+	}
+	return ret;
 }
