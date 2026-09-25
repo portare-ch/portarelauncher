@@ -25,7 +25,7 @@ folder - the file manager, the gamepad tester, PortMaster - named and
 described from the folder's gamelist.xml.
 
 Settings: Wi-Fi, SSH, Bluetooth, USB gadget mode, button style, color, color
-profile, time zone, About and Power all work. Power restarts or switches off after a
+profile, charging LED, time zone, About and Power all work. Power restarts or switches off after a
 second press, with the panel switched off first. The time zone is a region, then a city, each city
 shown with the time it is there now. About shows the version, commit, build date, device and IP
 address, and holds Update, which asks GitHub what the chosen channel -
