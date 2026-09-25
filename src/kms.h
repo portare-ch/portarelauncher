@@ -55,4 +55,8 @@ int  kms_set_master(struct kms *k);
 struct color_profile;
 int  kms_color_apply(struct kms *k, const struct color_profile *p);
 
+/* Whether the CRTC has a de-gamma stage (the DEGAMMA_LUT property with
+ * entries): a kernel that drives the display controller's IGC. */
+int  kms_has_degamma(struct kms *k);
+
 #endif

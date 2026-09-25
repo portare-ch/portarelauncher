@@ -288,9 +288,41 @@ static int set_blob(struct kms *k, const char *name, const void *data, size_t le
 	return ret < 0 ? -1 : 0;
 }
 
+int kms_has_degamma(struct kms *k)
+{
+	uint32_t prop = crtc_prop(k, "DEGAMMA_LUT_SIZE");
+	if (!prop)
+		return 0;
+	drmModeObjectProperties *props =
+		drmModeObjectGetProperties(k->fd, k->crtc_id, DRM_MODE_OBJECT_CRTC);
+	if (!props)
+		return 0;
+	uint64_t size = 0;
+	for (uint32_t i = 0; i < props->count_props; i++)
+		if (props->props[i] == prop)
+			size = props->prop_values[i];
+	drmModeFreeObjectProperties(props);
+	return size == COLOR_DEGAMMA_LEN;
+}
+
 int kms_color_apply(struct kms *k, const struct color_profile *p)
 {
 	int ret = 0;
+
+	/* The de-gamma first: it is first in the pipeline, and a controller
+	 * without it has no property to clear. */
+	if (p && p->has_degamma) {
+		static struct drm_color_lut dg[COLOR_DEGAMMA_LEN];
+		for (int i = 0; i < COLOR_DEGAMMA_LEN; i++) {
+			dg[i].red = p->degamma[i][0];
+			dg[i].green = p->degamma[i][1];
+			dg[i].blue = p->degamma[i][2];
+			dg[i].reserved = 0;
+		}
+		ret |= set_blob(k, "DEGAMMA_LUT", dg, sizeof(dg));
+	} else if (crtc_prop(k, "DEGAMMA_LUT")) {
+		ret |= set_blob(k, "DEGAMMA_LUT", NULL, 0);
+	}
 
 	if (p && p->has_ctm) {
 		struct drm_color_ctm ctm;
