@@ -46,6 +46,27 @@ static void test_load(void)
 	CHECK_INT(color_load(path, &p), 0);
 	CHECK(p.has_ctm && !p.has_lut);
 
+	/* A de-gamma table, all 256 lines of it, is carried; a short one is
+	 * refused like a short lut. */
+	{
+		FILE *f = fopen(path, "w");
+		for (int i = 0; i < 256; i++)
+			fprintf(f, "degamma %d %d %d\n", i * 16, i * 16 + 1, 65535);
+		fprintf(f, "ctm 1 0 0 0 1 0 0 0 1\n");
+		fclose(f);
+	}
+	CHECK_INT(color_load(path, &p), 0);
+	CHECK(p.has_degamma && p.has_ctm && !p.has_lut);
+	CHECK_INT(p.degamma[255][0], 255 * 16);
+	CHECK_INT(p.degamma[3][1], 3 * 16 + 1);
+	{
+		FILE *f = fopen(path, "w");
+		for (int i = 0; i < 200; i++)
+			fprintf(f, "degamma %d %d %d\n", i, i, i);
+		fclose(f);
+	}
+	CHECK_INT(color_load(path, &p), -1);
+
 	/* Junk is an error with the line named, not silently skipped. */
 	write_file(path, 1024, "gamma 2.2\n");
 	CHECK_INT(color_load(path, &p), -1);

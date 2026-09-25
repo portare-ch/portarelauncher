@@ -1838,11 +1838,23 @@ int main(void)
 	{
 		char prof[32] = "";
 		u.profile_ok[0] = 1;
+		/* A kernel that drives the de-gamma stage gets the three-stage
+		 * file, <key>-igc.profile, when the image has one; otherwise
+		 * the two-stage <key>.profile. */
+		int igc = kms_has_degamma(&u.kms);
 		for (int i = 1; i < N_PROFILES; i++) {
 			char path[128];
-			snprintf(path, sizeof(path), PROFILE_DIR "/%s.profile",
-			         profile_names[i].key);
-			u.profile_ok[i] = color_load(path, &u.profiles[i]) == 0;
+			u.profile_ok[i] = 0;
+			if (igc) {
+				snprintf(path, sizeof(path), PROFILE_DIR "/%s-igc.profile",
+				         profile_names[i].key);
+				u.profile_ok[i] = color_load(path, &u.profiles[i]) == 0;
+			}
+			if (!u.profile_ok[i]) {
+				snprintf(path, sizeof(path), PROFILE_DIR "/%s.profile",
+				         profile_names[i].key);
+				u.profile_ok[i] = color_load(path, &u.profiles[i]) == 0;
+			}
 		}
 		settings_get(SETTINGS, KEY_PROFILE, prof, sizeof(prof));
 		for (int i = 1; i < N_PROFILES; i++)

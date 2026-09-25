@@ -31,7 +31,7 @@ int color_load(const char *path, struct color_profile *p)
 	}
 
 	char line[256];
-	int lut_n = 0, lineno = 0, bad = 0;
+	int lut_n = 0, dg_n = 0, lineno = 0, bad = 0;
 	while (fgets(line, sizeof(line), f)) {
 		lineno++;
 		char *s = line;
@@ -50,6 +50,18 @@ int color_load(const char *path, struct color_profile *p)
 			}
 			memcpy(p->ctm, m, sizeof(m));
 			p->has_ctm = 1;
+		} else if (strncmp(s, "degamma", 7) == 0) {
+			unsigned r, g, b;
+			if (dg_n >= COLOR_DEGAMMA_LEN ||
+			    sscanf(s + 7, "%u %u %u", &r, &g, &b) != 3 ||
+			    r > 65535 || g > 65535 || b > 65535) {
+				bad = lineno;
+				break;
+			}
+			p->degamma[dg_n][0] = (uint16_t)r;
+			p->degamma[dg_n][1] = (uint16_t)g;
+			p->degamma[dg_n][2] = (uint16_t)b;
+			dg_n++;
 		} else if (strncmp(s, "lut", 3) == 0) {
 			unsigned r, g, b;
 			if (lut_n >= COLOR_LUT_LEN ||
@@ -78,6 +90,13 @@ int color_load(const char *path, struct color_profile *p)
 	else if (lut_n) {
 		fprintf(stderr, "color: %s: %d lut lines, need %d\n", path, lut_n,
 		        COLOR_LUT_LEN);
+		return -1;
+	}
+	if (dg_n == COLOR_DEGAMMA_LEN)
+		p->has_degamma = 1;
+	else if (dg_n) {
+		fprintf(stderr, "color: %s: %d degamma lines, need %d\n", path, dg_n,
+		        COLOR_DEGAMMA_LEN);
 		return -1;
 	}
 	if (!p->has_ctm && !p->has_lut) {
