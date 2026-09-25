@@ -72,6 +72,12 @@ int  net_disconnect(void);
 /* "192.168.1.42", or empty when not connected. */
 void net_address(char *out, size_t osz);
 
+/* The choice among a getifaddrs() list, separated so it can be tested with
+ * a made-up one: the Wi-Fi address if there is one, else any real one,
+ * never loopback, link-local or the USB gadget's. Returns 1 when found. */
+struct ifaddrs;
+int  net_address_pick(const struct ifaddrs *list, char *out, size_t osz);
+
 /* USB gadget: disabled, network, file_transfer. */
 void usb_modes(char out[][24], int *n, int max);
 void usb_mode(char *out, size_t osz);

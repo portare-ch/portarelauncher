@@ -1,6 +1,10 @@
 #include "net.h"
 #include "proc.h"
 
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <net/if.h>
+#include <netinet/in.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -243,27 +247,52 @@ int net_disconnect(void)
 	return proc_run(argv, NULL, NULL);
 }
 
-static void cb_ip4(char *line, void *ctx)
+/* Wi-Fi first, then whatever else is up: a docked device with Ethernet and
+ * Wi-Fi shows the one a person would type. Loopback and the USB gadget's
+ * link-local subnet are not addresses anyone reaches the device on. */
+static int addr_rank(const char *ifname, const struct sockaddr_in *sa)
 {
-	char *out = ctx;
-	/* "IP4.ADDRESS[1]:192.168.1.42/24" */
-	char *colon = strchr(line, ':');
-	if (!colon || out[0])
-		return;
-	char *slash = strchr(colon + 1, '/');
-	if (slash)
-		*slash = '\0';
-	str_copy(out, 40, colon + 1);
+	unsigned a = ntohl(sa->sin_addr.s_addr);
+	if ((a >> 24) == 127 || (a >> 16) == 0xA9FE)   /* 127/8, 169.254/16 */
+		return 0;
+	if (strncmp(ifname, "wlan", 4) == 0)
+		return 3;
+	if (strncmp(ifname, "usb", 3) == 0 || strncmp(ifname, "rndis", 5) == 0 ||
+	    strcmp(ifname, "gadget") == 0)
+		return 1;
+	return 2;
+}
+
+int net_address_pick(const struct ifaddrs *list, char *out, size_t osz)
+{
+	int best = 0;
+	out[0] = '\0';
+	for (const struct ifaddrs *i = list; i; i = i->ifa_next) {
+		if (!i->ifa_addr || i->ifa_addr->sa_family != AF_INET ||
+		    !(i->ifa_flags & IFF_UP) || !i->ifa_name)
+			continue;
+		const struct sockaddr_in *sa = (const struct sockaddr_in *)i->ifa_addr;
+		int rank = addr_rank(i->ifa_name, sa);
+		if (rank > best) {
+			best = rank;
+			inet_ntop(AF_INET, &sa->sin_addr, out, (socklen_t)osz);
+		}
+	}
+	return best > 0;
 }
 
 void net_address(char *out, size_t osz)
 {
-	char v[40] = "";
-	char *const argv[] = { (char *)NMCLI, (char *)"-t", (char *)"-f",
-	                       (char *)"IP4.ADDRESS", (char *)"device",
-	                       (char *)"show", NULL };
-	proc_run(argv, cb_ip4, v);
-	str_copy(out, osz, v);
+	/* The kernel's own list, not nmcli: this is asked every few seconds
+	 * while the launcher waits for the network to come up, and a process
+	 * per ask would be felt. */
+	struct ifaddrs *list = NULL;
+	if (getifaddrs(&list) < 0) {
+		out[0] = '\0';
+		return;
+	}
+	net_address_pick(list, out, osz);
+	freeifaddrs(list);
 }
 
 /* ---- USB gadget ----------------------------------------------------- */

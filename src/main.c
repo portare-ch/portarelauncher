@@ -91,6 +91,8 @@ struct ui {
 
 	struct osinfo os;
 	char addr[40];       /* empty when offline */
+	long long net_next;  /* when to look at the address again, ms      */
+	long long started;   /* ms, for the quick polling after a boot     */
 	int about_sel;
 
 	struct update_info upd;
@@ -357,7 +359,9 @@ static void draw_settings(struct ui *u)
 			for (int k = 0; k < u->nets.n; k++)
 				if (u->nets.e[k].active)
 					ssid = u->nets.e[k].name;
-			value = ssid ? ssid : (net_wifi_enabled() ? "not connected" : "off");
+			/* The list is from the last scan; the address is live. */
+			value = ssid ? ssid : u->addr[0] ? "connected"
+			      : (net_wifi_enabled() ? "not connected" : "off");
 			break;
 		}
 		case SET_SSH:
@@ -1070,11 +1074,37 @@ static void draw_launching(struct ui *u, const char *what, const char *detail)
 #define QUIT_GRACE_MS 1500    /* for a program that quits on the combo itself */
 #define QUIT_TERM_MS  5000    /* between SIGTERM and SIGKILL                  */
 
+/* The network comes up on its own time after a boot: the radio is unblocked,
+ * the firmware loads, iwd scans, NetworkManager joins. Nothing tells this
+ * program when. So the address is looked at every few seconds while there
+ * is none, and once a minute after that, from the kernel's interface list -
+ * no process, no wait - and the screen that shows it is repainted when it
+ * changes. */
+#define NET_POLL_FAST_MS   3000
+#define NET_POLL_SLOW_MS  60000
+#define NET_POLL_FAST_FOR 300000   /* 5 minutes of quick looks after start */
+
 static long long now_ms(void)
 {
 	struct timespec ts;
 	clock_gettime(CLOCK_MONOTONIC, &ts);
 	return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+static void net_poll(struct ui *u)
+{
+	long long now = now_ms();
+	if (now < u->net_next)
+		return;
+	char addr[40];
+	net_address(addr, sizeof(addr));
+	if (strcmp(addr, u->addr) != 0) {
+		snprintf(u->addr, sizeof(u->addr), "%s", addr);
+		if (u->screen == SCR_SETTINGS || u->screen == SCR_ABOUT)
+			redraw(u);
+	}
+	int quick = !u->addr[0] && now - u->started < NET_POLL_FAST_FOR;
+	u->net_next = now + (quick ? NET_POLL_FAST_MS : NET_POLL_SLOW_MS);
 }
 
 static int open_pidfd(pid_t pid)
@@ -1827,6 +1857,9 @@ int main(void)
 	u.screen = SCR_SYSTEMS;
 	u.running = 1;
 	status_read(&u.st);
+	net_address(u.addr, sizeof(u.addr));
+	u.started = now_ms();
+	u.net_next = u.started + NET_POLL_FAST_MS;
 	redraw(&u);
 
 	while (u.running && !stop_requested) {
@@ -1839,8 +1872,12 @@ int main(void)
 		int osd_left = osd_remaining(&u.osd);
 		if (osd_left >= 0 && osd_left < idle)
 			idle = osd_left;
+		long long net_left = u.net_next - now_ms();
+		if (net_left < idle)
+			idle = net_left > 0 ? (int)net_left : 0;
 
 		enum action a = input_wait(&u.in, idle);
+		net_poll(&u);
 
 		if (blank_requested) {
 			int on = blank_requested > 0;

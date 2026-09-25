@@ -2,6 +2,11 @@
 #include "fake_proc.h"
 #include "net.h"
 
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <net/if.h>
+#include <netinet/in.h>
+
 #define SAVED "/usr/bin/nmcli -t -f NAME,TYPE connection show"
 #define VISIBLE "/usr/bin/nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY device wifi list"
 
@@ -103,19 +108,59 @@ static void test_join(void)
 	CHECK_INT(fake_n_calls, 1);
 }
 
+static struct ifaddrs *add_if(struct ifaddrs *next, const char *name,
+                              const char *ip, unsigned flags)
+{
+	struct ifaddrs *i = calloc(1, sizeof(*i));
+	struct sockaddr_in *sa = calloc(1, sizeof(*sa));
+	sa->sin_family = AF_INET;
+	inet_pton(AF_INET, ip, &sa->sin_addr);
+	i->ifa_next = next;
+	i->ifa_name = (char *)name;
+	i->ifa_flags = flags;
+	i->ifa_addr = (struct sockaddr *)sa;
+	return i;
+}
+
+static void free_ifs(struct ifaddrs *i)
+{
+	while (i) {
+		struct ifaddrs *n = i->ifa_next;
+		free(i->ifa_addr);
+		free(i);
+		i = n;
+	}
+}
+
 static void test_address(void)
 {
 	char ip[40];
-	fake_reset();
-	fake_reply("/usr/bin/nmcli -t -f IP4.ADDRESS device show",
-	           "IP4.ADDRESS[1]:192.168.178.81/24\n\nIP4.ADDRESS[1]:127.0.0.1/8\n", 0);
-	net_address(ip, sizeof(ip));
-	CHECK_STR(ip, "192.168.178.81");
 
-	fake_reset();
-	fake_reply("/usr/bin/nmcli -t -f IP4.ADDRESS device show", "", 0);
-	net_address(ip, sizeof(ip));
+	/* Loopback and the gadget are never the answer; Wi-Fi beats Ethernet
+	 * whatever the order. */
+	struct ifaddrs *l = add_if(NULL, "lo", "127.0.0.1", IFF_UP);
+	l = add_if(l, "usb0", "169.254.7.7", IFF_UP);
+	l = add_if(l, "eth0", "10.0.0.5", IFF_UP);
+	l = add_if(l, "wlan0", "192.168.178.81", IFF_UP);
+	CHECK_INT(net_address_pick(l, ip, sizeof(ip)), 1);
+	CHECK_STR(ip, "192.168.178.81");
+	free_ifs(l);
+
+	/* Ethernet alone. */
+	l = add_if(NULL, "eth0", "10.0.0.5", IFF_UP);
+	l = add_if(l, "lo", "127.0.0.1", IFF_UP);
+	CHECK_INT(net_address_pick(l, ip, sizeof(ip)), 1);
+	CHECK_STR(ip, "10.0.0.5");
+	free_ifs(l);
+
+	/* Wi-Fi with an address but the link down does not count. */
+	l = add_if(NULL, "wlan0", "192.168.178.81", 0);
+	l = add_if(l, "lo", "127.0.0.1", IFF_UP);
+	CHECK_INT(net_address_pick(l, ip, sizeof(ip)), 0);
 	CHECK_STR(ip, "");
+	free_ifs(l);
+
+	CHECK_INT(net_address_pick(NULL, ip, sizeof(ip)), 0);
 }
 
 static void test_usb(void)
