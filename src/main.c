@@ -1200,6 +1200,18 @@ static void wait_or_quit(struct ui *u, pid_t pid)
  * EBUSY until it has closed the device. One attempt left the launcher
  * without a display for good; so it retries for a while here, and if that
  * is not enough, marks the panel lost and keeps trying from the main loop. */
+/* Writes the chosen profile into the display controller again. Mesa's
+ * display WSI clears the CRTC's color properties when a Vulkan program takes
+ * the display (PortareOS patches that out), and a disabled CRTC may come
+ * back without them; whenever the panel is ours again, the profile is
+ * written again. Stock needs nothing. */
+static void reapply_profile(struct ui *u)
+{
+	if (u->profile && u->profile_ok[u->profile] &&
+	    kms_color_apply(&u->kms, &u->profiles[u->profile]) < 0)
+		fprintf(stderr, "color: the profile did not take after the panel came back\n");
+}
+
 static int reclaim_panel(struct ui *u, int patience_ms)
 {
 	long long until = now_ms() + patience_ms;
@@ -1218,6 +1230,7 @@ static int reclaim_panel(struct ui *u, int patience_ms)
 		fprintf(stderr, "set master: back\n");
 	u->panel_lost = 0;
 	kms_present(&u->kms);
+	reapply_profile(u);
 	term_invalidate(&u->term);   /* someone else owned the panel */
 	return 0;
 }
@@ -1909,6 +1922,7 @@ int main(void)
 			blank_requested = 0;
 			if (on) {
 				kms_present(&u.kms);
+				reapply_profile(&u);
 				term_invalidate(&u.term);
 				status_read(&u.st);
 				redraw(&u);
