@@ -41,6 +41,9 @@
  * /usr/config/color/<key>.profile. The key is the setting's value and the
  * file's name, so a new profile is a new file and a row here. */
 #define KEY_PROFILE "display.colorprofile"
+/* Yellow thumbsticks while the battery charges; a daemon on the image
+ * reads this every few seconds. */
+#define KEY_CHARGING "led.charging"
 #define PROFILE_DIR "/usr/config/color"
 static const struct { const char *key, *label; } profile_names[] = {
 	{ "stock",   "stock" },
@@ -71,6 +74,7 @@ struct ui {
 	struct color_profile profiles[N_PROFILES];
 	int profile_ok[N_PROFILES];  /* the file loaded; [0], stock, always */
 	int profile;         /* the one applied, an index into profiles[]     */
+	int charging_led;    /* led.charging, 1 unless the file says 0        */
 	struct status st;
 	struct osd osd;
 
@@ -139,7 +143,7 @@ struct ui {
 #define G_SQUARE    0xFE   /* []  */
 
 enum { SET_WIFI = 0, SET_SSH, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_COLOR,
-       SET_PROFILE, SET_TIMEZONE, SET_ABOUT, SET_POWER, N_SETTINGS };
+       SET_PROFILE, SET_CHARGING, SET_TIMEZONE, SET_ABOUT, SET_POWER, N_SETTINGS };
 
 static const char *const settings_labels[N_SETTINGS] = {
 	"Wi-Fi",
@@ -149,6 +153,7 @@ static const char *const settings_labels[N_SETTINGS] = {
 	"Button style",
 	"Color",
 	"Color profile",
+	"Charging LED",
 	"Time zone",
 	"About",
 	"Power",
@@ -395,6 +400,9 @@ static void draw_settings(struct ui *u)
 		case SET_PROFILE:
 			value = profile_names[u->profile].label;
 			break;
+		case SET_CHARGING:
+			value = u->charging_led ? "on" : "off";
+			break;
 		case SET_POWER:
 			value = "";
 			break;
@@ -450,8 +458,7 @@ static void draw_settings(struct ui *u)
 		 * nothing about how it reads on this panel. */
 		term_puts(t, 4, y + 2, "the selected row", ATTR_BRIGHT);
 		term_puts(t, 4, y + 3, "body text", ATTR_TEXT);
-		term_puts(t, 4, y + 4, "counts and hints", ATTR_MID);
-		term_puts(t, 4, y + 5, "rules and separators", ATTR_DIM);
+		term_puts(t, 4, y + 4, "hints, rules and separators", ATTR_DIM);
 		break;
 	case SET_PROFILE:
 		/* The correction is in the display controller, ahead of the
@@ -460,6 +467,9 @@ static void draw_settings(struct ui *u)
 		term_puts(t, 4, y + 2, "sRGB, D65; Gamma 2.2 for consoles.", ATTR_DIM);
 		if (!u->profile_ok[1] && !u->profile_ok[2])
 			term_puts(t, 4, y + 3, "no profile files on this image", ATTR_MID);
+		break;
+	case SET_CHARGING:
+		term_puts(t, 4, y + 2, "Yellow thumbsticks while charging.", ATTR_DIM);
 		break;
 	case SET_BLUETOOTH:
 		term_puts(t, 4, y + 2, "Open to scan and connect.", ATTR_DIM);
@@ -1554,6 +1564,11 @@ static void on_action(struct ui *u, enum action a)
 			}
 		}
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
+		         u->set_sel == SET_CHARGING) {
+			u->charging_led = !u->charging_led;
+			settings_set(SETTINGS, KEY_CHARGING, u->charging_led ? "1" : "0");
+		}
+		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
 		         u->set_sel == SET_BUTTONS) {
 			u->retroid = !u->retroid;
 			/* Written straight away rather than on exit: this program
@@ -1861,6 +1876,9 @@ int main(void)
 			}
 		}
 		settings_get(SETTINGS, KEY_PROFILE, prof, sizeof(prof));
+		char chg[8] = "";
+		settings_get(SETTINGS, KEY_CHARGING, chg, sizeof(chg));
+		u.charging_led = strcmp(chg, "0") != 0;
 		for (int i = 1; i < N_PROFILES; i++)
 			if (u.profile_ok[i] && strcmp(prof, profile_names[i].key) == 0 &&
 			    kms_color_apply(&u.kms, &u.profiles[i]) == 0)

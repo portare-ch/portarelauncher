@@ -58,6 +58,7 @@
         Button style                            Retroid  |
         Color                                      grey  |
         Color profile                         Gamma 2.2  |
+        Charging LED                                 on  |
                                                          |
      ─────────────────────────────────────────────────── |
                                                          |
