@@ -112,13 +112,15 @@ the emulator, fan and GPU and CPU settings, has to run.
 The color ramp is chosen in Settings, where each choice is previewed as
 the four levels it uses.
 
-The color profile: `stock` leaves the display controller's color blocks off; `sRGB 2.2`
-loads `/usr/config/color/srgb22.profile`, a 3x3 matrix and a 1024-entry gamma
-table, into the CRTC's CTM and GAMMA_LUT properties (color.c parses, kms.c
-writes). The controller keeps them across every later modeset, so the
+The color profile: `stock` leaves the display controller's color blocks off;
+`Gamma 2.2` and `sRGB` load `/usr/config/color/gamma22.profile` or
+`srgb.profile`, a 3x3 matrix and a 1024-entry gamma table each, into the
+CRTC's CTM and GAMMA_LUT properties (color.c parses, kms.c writes). Both
+correct to sRGB primaries and a D65 white and differ in the tone curve; gamma
+2.2 is the one CRT-era games were drawn on. The controller keeps them across every later modeset, so the
 correction holds for whatever runs after the launcher has dropped master:
 every emulator, mpv, the launcher itself. It is applied before the first
-frame at start-up when `display.colorprofile=srgb22` is set, and switched
+frame at start-up when `display.colorprofile` names one, and switched
 live from Settings. The profile file is the image's; the launcher only
 carries it to the hardware.
 

@@ -36,6 +36,19 @@
 #define ES_SYSTEMS  "/usr/config/emulationstation/es_systems.cfg"
 #define SETTINGS    "/storage/.config/system/configs/system.cfg"
 
+/* The panel's color profile. "stock" leaves the display controller's color
+ * blocks off; the others load a measured correction shipped with the image,
+ * /usr/config/color/<key>.profile. The key is the setting's value and the
+ * file's name, so a new profile is a new file and a row here. */
+#define KEY_PROFILE "display.colorprofile"
+#define PROFILE_DIR "/usr/config/color"
+static const struct { const char *key, *label; } profile_names[] = {
+	{ "stock",   "stock" },
+	{ "gamma22", "Gamma 2.2" },
+	{ "srgb",    "sRGB" },
+};
+#define N_PROFILES ((int)(sizeof(profile_names) / sizeof(profile_names[0])))
+
 #ifndef PL_VERSION
 #define PL_VERSION "dev"   /* set by the Makefile, from VERSION or git */
 #endif
@@ -55,9 +68,9 @@ struct ui {
 	struct catalog cat;
 
 	const char *pal_name;
-	struct color_profile profile;
-	int profile_ok;      /* the profile file loaded                       */
-	int profile_on;      /* and is applied                                */
+	struct color_profile profiles[N_PROFILES];
+	int profile_ok[N_PROFILES];  /* the file loaded; [0], stock, always */
+	int profile;         /* the one applied, an index into profiles[]     */
 	struct status st;
 	struct osd osd;
 
@@ -118,12 +131,6 @@ struct ui {
 #define KEY_BUTTONS "launcher.buttons"
 #define KEY_PALETTE "launcher.palette"
 
-/* The panel's color profile: "stock" leaves the display controller's color
- * blocks off; "srgb22" loads the measured correction shipped with the image.
- * The name is the file's, so a second profile is a second file. */
-#define KEY_PROFILE  "display.colorprofile"
-#define PROFILE_DIR  "/usr/config/color"
-#define PROFILE_NAME "srgb22"
 
 /* Sony's marks approximated out of CP437, which is all the VGA font has.
  * Close enough to be recognised, and not the real symbols. */
@@ -386,8 +393,7 @@ static void draw_settings(struct ui *u)
 			value = u->pal_name;
 			break;
 		case SET_PROFILE:
-			value = !u->profile_ok ? "unavailable"
-			      : u->profile_on ? "sRGB 2.2" : "stock";
+			value = profile_names[u->profile].label;
 			break;
 		case SET_POWER:
 			value = "";
@@ -454,10 +460,11 @@ static void draw_settings(struct ui *u)
 		 * panel, so it holds for everything drawn after this: games,
 		 * films, the launcher itself. */
 		term_puts(t, 4, y + 2, "The panel measured and corrected to", ATTR_DIM);
-		term_puts(t, 4, y + 3, "sRGB, D65 white, gamma 2.2. Applies", ATTR_DIM);
-		term_puts(t, 4, y + 4, "to everything, games included.", ATTR_DIM);
-		if (!u->profile_ok)
-			term_puts(t, 4, y + 6, "no profile file on this image", ATTR_MID);
+		term_puts(t, 4, y + 3, "sRGB and D65 white. Gamma 2.2 is the", ATTR_DIM);
+		term_puts(t, 4, y + 4, "CRT consoles were drawn on; sRGB lifts", ATTR_DIM);
+		term_puts(t, 4, y + 5, "the shadows. Holds for everything.", ATTR_DIM);
+		if (!u->profile_ok[1] && !u->profile_ok[2])
+			term_puts(t, 4, y + 7, "no profile files on this image", ATTR_MID);
 		break;
 	case SET_BLUETOOTH:
 		term_puts(t, 4, y + 2, "Headphones, controllers. Open to", ATTR_DIM);
@@ -1525,13 +1532,21 @@ static void on_action(struct ui *u, enum action a)
 			settings_set(SETTINGS, KEY_PALETTE, u->pal_name);
 		}
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
-		         u->set_sel == SET_PROFILE && u->profile_ok) {
-			int on = !u->profile_on;
-			if (kms_color_apply(&u->kms, on ? &u->profile : NULL) == 0) {
-				u->profile_on = on;
-				settings_set(SETTINGS, KEY_PROFILE, on ? PROFILE_NAME : "stock");
-			} else {
-				snprintf(u->note, sizeof(u->note), "the display refused the profile");
+		         u->set_sel == SET_PROFILE) {
+			/* Cycle, skipping profiles whose file is missing; stock is
+			 * always there. Left goes the other way round. */
+			int next = u->profile;
+			do {
+				next = (a == ACT_LEFT) ? (next + N_PROFILES - 1) % N_PROFILES
+				                       : (next + 1) % N_PROFILES;
+			} while (!u->profile_ok[next]);
+			if (next != u->profile) {
+				if (kms_color_apply(&u->kms, next ? &u->profiles[next] : NULL) == 0) {
+					u->profile = next;
+					settings_set(SETTINGS, KEY_PROFILE, profile_names[next].key);
+				} else {
+					snprintf(u->note, sizeof(u->note), "the display refused the profile");
+				}
 			}
 		}
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
@@ -1822,11 +1837,18 @@ int main(void)
 	 * the color blocks off, so "stock" needs nothing written. */
 	{
 		char prof[32] = "";
-		u.profile_ok = color_load(PROFILE_DIR "/" PROFILE_NAME ".profile",
-		                           &u.profile) == 0;
+		u.profile_ok[0] = 1;
+		for (int i = 1; i < N_PROFILES; i++) {
+			char path[128];
+			snprintf(path, sizeof(path), PROFILE_DIR "/%s.profile",
+			         profile_names[i].key);
+			u.profile_ok[i] = color_load(path, &u.profiles[i]) == 0;
+		}
 		settings_get(SETTINGS, KEY_PROFILE, prof, sizeof(prof));
-		if (u.profile_ok && strcmp(prof, PROFILE_NAME) == 0)
-			u.profile_on = kms_color_apply(&u.kms, &u.profile) == 0;
+		for (int i = 1; i < N_PROFILES; i++)
+			if (u.profile_ok[i] && strcmp(prof, profile_names[i].key) == 0 &&
+			    kms_color_apply(&u.kms, &u.profiles[i]) == 0)
+				u.profile = i;
 	}
 
 	/* Default to the layout printed on this device rather than to the
