@@ -1,7 +1,6 @@
 #include "color.h"
 
 #include <errno.h>
-#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -16,7 +15,9 @@ uint64_t color_ctm_fixed(double v)
 	 * than wrap if a file is nonsense. */
 	if (v > 2147483647.0)
 		v = 2147483647.0;
-	return sign | (uint64_t)llround(v * 4294967296.0);
+	/* Rounded by hand: llround would pull in libm, and this program links
+	 * against libc and libdrm and nothing else. v is non-negative here. */
+	return sign | (uint64_t)(v * 4294967296.0 + 0.5);
 }
 
 int color_load(const char *path, struct color_profile *p)
