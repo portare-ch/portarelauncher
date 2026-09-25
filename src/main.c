@@ -428,22 +428,20 @@ static void draw_settings(struct ui *u)
 	case SET_WIFI: {
 		char addr[40] = "";
 		net_address(addr, sizeof(addr));
-		term_puts(t, 4, y + 2, "Saved networks reconnect without a", ATTR_DIM);
-		term_puts(t, 4, y + 3, "password. Open to pick one.", ATTR_DIM);
+		term_puts(t, 4, y + 2, "Open to pick a network.", ATTR_DIM);
 		if (addr[0]) {
 			snprintf(val, sizeof(val), "address  %s", addr);
-			term_puts(t, 4, y + 5, val, ATTR_MID);
+			term_puts(t, 4, y + 3, val, ATTR_MID);
 		}
 		break;
 	}
 	case SET_SSH: {
 		char addr[40] = "";
 		net_address(addr, sizeof(addr));
-		term_puts(t, 4, y + 2, "Log in as root over the network.", ATTR_DIM);
-		term_puts(t, 4, y + 3, "The password is under About.", ATTR_DIM);
+		term_puts(t, 4, y + 2, "Root login; the password is under About.", ATTR_DIM);
 		if (u->ssh_on && addr[0]) {
 			snprintf(val, sizeof(val), "ssh root@%s", addr);
-			term_puts(t, 4, y + 5, val, ATTR_MID);
+			term_puts(t, 4, y + 3, val, ATTR_MID);
 		}
 		break;
 	}
@@ -459,36 +457,29 @@ static void draw_settings(struct ui *u)
 		/* The correction is in the display controller, ahead of the
 		 * panel, so it holds for everything drawn after this: games,
 		 * films, the launcher itself. */
-		term_puts(t, 4, y + 2, "The panel measured and corrected to", ATTR_DIM);
-		term_puts(t, 4, y + 3, "sRGB and D65 white. Gamma 2.2 is the", ATTR_DIM);
-		term_puts(t, 4, y + 4, "CRT consoles were drawn on; sRGB lifts", ATTR_DIM);
-		term_puts(t, 4, y + 5, "the shadows. Holds for everything.", ATTR_DIM);
+		term_puts(t, 4, y + 2, "sRGB, D65; Gamma 2.2 for consoles.", ATTR_DIM);
 		if (!u->profile_ok[1] && !u->profile_ok[2])
-			term_puts(t, 4, y + 7, "no profile files on this image", ATTR_MID);
+			term_puts(t, 4, y + 3, "no profile files on this image", ATTR_MID);
 		break;
 	case SET_BLUETOOTH:
-		term_puts(t, 4, y + 2, "Headphones, controllers. Open to", ATTR_DIM);
-		term_puts(t, 4, y + 3, "scan, connect, set auto-connect.", ATTR_DIM);
+		term_puts(t, 4, y + 2, "Open to scan and connect.", ATTR_DIM);
 		break;
 	case SET_TIMEZONE:
-		term_puts(t, 4, y + 2, "The clock in the header. Open to", ATTR_DIM);
-		term_puts(t, 4, y + 3, "pick a region, then a city.", ATTR_DIM);
+		term_puts(t, 4, y + 2, "Open to pick a region, then a city.", ATTR_DIM);
 		break;
 	case SET_POWER:
 		term_puts(t, 4, y + 2, "Restart, or switch the device off.", ATTR_DIM);
 		break;
 	case SET_ABOUT:
-		term_puts(t, 4, y + 2, "The version, for bug reports, the", ATTR_DIM);
-		term_puts(t, 4, y + 3, "address for ssh, and updates.", ATTR_DIM);
+		term_puts(t, 4, y + 2, "Version, address, updates.", ATTR_DIM);
 		break;
 	case SET_USB: {
 		char addr[40] = "";
 		usb_address(addr, sizeof(addr));
-		term_puts(t, 4, y + 2, "network shares the link over USB,", ATTR_DIM);
-		term_puts(t, 4, y + 3, "file_transfer exposes storage.", ATTR_DIM);
+		term_puts(t, 4, y + 2, "USB as a network link, or as file transfer.", ATTR_DIM);
 		if (addr[0] && strcmp(u->usb, "network") == 0) {
 			snprintf(val, sizeof(val), "address  %s", addr);
-			term_puts(t, 4, y + 5, val, ATTR_MID);
+			term_puts(t, 4, y + 3, val, ATTR_MID);
 		}
 		break;
 	}
