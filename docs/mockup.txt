@@ -56,7 +56,7 @@
         Bluetooth                            WH-1000XM4  |
         USB gadget mode                         network  |
       ▸ Button style                            Retroid  |
-        Consoles                           2 on latency  |
+        Consoles                              2 changed  |
         Color                                      grey  |
         Color profile                             stock  |
         Charging LED                                 on  |
@@ -75,20 +75,20 @@
      Settings  ›  Consoles                               |
      ═══════════════════════════════════════════════════ |
                                                          |
-      ▸ SNES                                    latency  |
-        NES                                     visuals  |
+      ▸ SNES                                pre-empt on  |
+        NES                                pre-empt off  |
         PlayStation                             latency  |
-        Game Boy                                visuals  |
-        Game Boy Color                          visuals  |
-        Game Boy Advance                        visuals  |
-        Genesis                                 visuals  |
+        Game Boy                           pre-empt off  |
+        Game Boy Color                     pre-empt off  |
+        Game Boy Advance                   pre-empt off  |
+        Genesis                            pre-empt off  |
      ─────────────────────────────────────────────────── |
         Experimental.                                    |
-        Visuals: The picture as shipped. Pre-emptive     |
-        frames are disabled.                             |
-        Latency: Enables 1 pre-emptive frame for lower   |
-        input latency. This console already renders at   |
-        its native resolution.                           |
+        Pre-empt on: Enables 1 pre-emptive frame for     |
+        lower input latency.                             |
+        Pre-empt off: The picture and timing as shipped. |
+        This console renders at its native resolution    |
+        either way.                                      |
                                                          |
      ─────────────────────────────────────────────────── |
      A CHANGE   B BACK                           ↑↓ MOVE |
@@ -99,13 +99,13 @@
      Settings  ›  Consoles                               |
      ═══════════════════════════════════════════════════ |
                                                          |
-        SNES                                    latency  |
-        NES                                     visuals  |
+        SNES                                pre-empt on  |
+        NES                                pre-empt off  |
       ▸ PlayStation                             latency  |
-        Game Boy                                visuals  |
-        Game Boy Color                          visuals  |
-        Game Boy Advance                        visuals  |
-        Genesis                                 visuals  |
+        Game Boy                           pre-empt off  |
+        Game Boy Color                     pre-empt off  |
+        Game Boy Advance                   pre-empt off  |
+        Genesis                            pre-empt off  |
      ─────────────────────────────────────────────────── |
         Experimental.                                    |
         Visuals: Renders at a higher internal resolution |

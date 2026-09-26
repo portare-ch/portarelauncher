@@ -45,7 +45,7 @@ games += [row("    swanstation", "8 of 112  "), "", THIN,
 
 SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
        ("USB gadget mode", "network"), ("Button style", "Retroid"),
-       ("Consoles", "2 on latency"),
+       ("Consoles", "2 changed"),
        ("Color", "grey"), ("Color profile", "stock"), ("Charging LED", "on"),
        ("Time zone", "Europe/Zurich"), ("About", "v0.2.6 2026-09-26"),
        ("Power", "")]
@@ -60,9 +60,10 @@ settings += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
 
 # Settings > Consoles: latency or visuals per console, and what each means,
 # wrapped at 45 columns as wrap_puts does it on the device.
-CONSOLES = [("SNES", "latency"), ("NES", "visuals"), ("PlayStation", "latency"),
-            ("Game Boy", "visuals"), ("Game Boy Color", "visuals"),
-            ("Game Boy Advance", "visuals"), ("Genesis", "visuals")]
+CONSOLES = [("SNES", "pre-empt on"), ("NES", "pre-empt off"),
+            ("PlayStation", "latency"), ("Game Boy", "pre-empt off"),
+            ("Game Boy Color", "pre-empt off"), ("Game Boy Advance", "pre-empt off"),
+            ("Genesis", "pre-empt off")]
 # The description follows the highlighted console: the PlayStation's core
 # renders above native and gives that up for latency; the 2D cores do not,
 # and their text says only what changes.
@@ -78,11 +79,11 @@ def consoles_screen(sel):
                   "    input latency. Renders at the console's native",
                   "    resolution."]
     else:
-        lines += ["    Visuals: The picture as shipped. Pre-emptive",
-                  "    frames are disabled.",
-                  "    Latency: Enables 1 pre-emptive frame for lower",
-                  "    input latency. This console already renders at",
-                  "    its native resolution."]
+        lines += ["    Pre-empt on: Enables 1 pre-emptive frame for",
+                  "    lower input latency.",
+                  "    Pre-empt off: The picture and timing as shipped.",
+                  "    This console renders at its native resolution",
+                  "    either way."]
     lines += [""] * (ROWS - 2 - len(lines))
     lines += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
     return lines

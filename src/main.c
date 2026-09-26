@@ -59,9 +59,9 @@ static const struct { const char *key, *label; } profile_names[] = {
  *
  * upscales says whether the shipped core renders above the console's own
  * resolution, which is what visuals keeps and latency gives up. Only the
- * PlayStation's does; the 2D cores draw at native either way, so for them
- * the modes differ by the pre-emptive frame alone, and the description
- * under the list says only that. */
+ * PlayStation's does, so only it shows the choice as latency or visuals.
+ * The 2D cores draw at native either way, so for them the same stored
+ * value shows as pre-empt on or off, which is all it changes. */
 static const struct { const char *key, *label; int upscales; } consoles[] = {
 	{ "snes",    "SNES",             0 },
 	{ "nes",     "NES",              0 },
@@ -81,6 +81,14 @@ static int console_latency(const char *sys)
 	snprintf(key, sizeof(key), "%s.profile", sys);
 	return settings_get(SETTINGS, key, val, sizeof(val)) &&
 	       strcmp(val, "latency") == 0;
+}
+
+/* What the stored value is called on screen for this console. */
+static const char *console_mode_name(int i, int latency)
+{
+	if (consoles[i].upscales)
+		return latency ? "latency" : "visuals";
+	return latency ? "pre-empt on" : "pre-empt off";
 }
 
 static void console_set_latency(const char *sys, int latency)
@@ -454,9 +462,9 @@ static void draw_settings(struct ui *u)
 			for (int k = 0; k < N_CONSOLES; k++)
 				n += console_latency(consoles[k].key);
 			if (n == 0)
-				value = "visuals";
+				value = "defaults";
 			else {
-				snprintf(val, sizeof(val), "%d on latency", n);
+				snprintf(val, sizeof(val), "%d changed", n);
 				value = val;
 			}
 			break;
@@ -506,7 +514,7 @@ static void draw_settings(struct ui *u)
 		break;
 	case SET_CONSOLES:
 		wrap_puts(t, 4, y + 1, t->cols - 8, 2,
-		          "Experimental. Latency or visuals, per console.", ATTR_DIM);
+		          "Experimental. Pre-emptive frames, per console.", ATTR_DIM);
 		break;
 	case SET_WIFI: {
 		char addr[40] = "";
@@ -590,7 +598,7 @@ static void draw_consoles(struct ui *u)
 	draw_frame(u, "Settings  >  Consoles");
 	for (int i = 0; i < N_CONSOLES; i++)
 		draw_row(u, (unsigned)(3 + i), i == u->console_sel, consoles[i].label,
-		         console_latency(consoles[i].key) ? "latency" : "visuals");
+		         console_mode_name(i, console_latency(consoles[i].key)));
 
 	unsigned y = 3 + N_CONSOLES;
 	term_hline(t, y, G_HLINE, ATTR_DIM);
@@ -606,11 +614,11 @@ static void draw_consoles(struct ui *u)
 		          "Renders at the console's native resolution.", ATTR_DIM);
 	} else {
 		r += wrap_puts(t, 4, y + 1 + r, width, room - r,
-		               "Visuals: The picture as shipped. Pre-emptive frames are "
-		               "disabled.", ATTR_DIM);
+		               "Pre-empt on: Enables 1 pre-emptive frame for lower input "
+		               "latency.", ATTR_DIM);
 		wrap_puts(t, 4, y + 1 + r, width, room - r,
-		          "Latency: Enables 1 pre-emptive frame for lower input latency. "
-		          "This console already renders at its native resolution.", ATTR_DIM);
+		          "Pre-empt off: The picture and timing as shipped. This console "
+		          "renders at its native resolution either way.", ATTR_DIM);
 	}
 
 	if (u->note[0])
