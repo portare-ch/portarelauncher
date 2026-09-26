@@ -37,9 +37,10 @@ struct osk {
 void osk_init(struct osk *k, int min_len);
 
 /* Feeds one action to the keyboard. Directions move, confirm presses the
- * focused key, and the face buttons are shortcuts that work from anywhere:
- * back deletes (and leaves, on an empty field), the left button types a
- * space, the top one is shift, START is done and SELECT hides or shows. */
+ * focused key, and the other buttons are shortcuts that work from
+ * anywhere: back deletes (and leaves, on an empty field), the settings
+ * button types a space, L1 is shift, START is done and SELECT hides or
+ * shows. */
 enum osk_result osk_action(struct osk *k, enum action a);
 
 /* Draws the field at row `y` and the keys below it. Returns the first row

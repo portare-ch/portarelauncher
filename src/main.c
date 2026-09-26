@@ -237,7 +237,7 @@ static void draw_frame(struct ui *u, const char *crumb)
  * its role, the diagram under the setting shows where it sits. */
 struct face {
 	unsigned char bottom, right, top, left;
-	unsigned char confirm, back, menu, alt;
+	unsigned char confirm, back, menu;
 };
 
 static struct face face_of(int retroid)
@@ -247,12 +247,12 @@ static struct face face_of(int retroid)
 		/* What the printing says: A confirms. */
 		f.bottom = 'B'; f.right = 'A'; f.top = 'X'; f.left = 'Y';
 		f.confirm = f.right; f.back = f.bottom;
-		f.menu = f.top; f.alt = f.left;
+		f.menu = f.top;
 	} else {
 		f.bottom = 'X'; f.right = G_CIRCLE;
 		f.top = G_TRIANGLE; f.left = G_SQUARE;
 		f.confirm = f.bottom; f.back = f.right;
-		f.menu = f.top; f.alt = f.left;
+		f.menu = f.top;
 	}
 	return f;
 }
@@ -722,8 +722,8 @@ static void draw_keyboard(struct ui *u)
 	/* Built from the pad's own printing, like every other hint line, so
 	 * it names the buttons the user is actually holding. */
 	struct face f = face_of(u->retroid);
-	snprintf(buf, sizeof(buf), "%c TYPE  %c DELETE  %c SPACE  %c SHIFT  START JOIN",
-	         f.confirm, f.back, f.menu, f.alt);
+	snprintf(buf, sizeof(buf), "%c TYPE  %c DELETE  %c SPACE  L1 SHIFT  START JOIN",
+	         f.confirm, f.back, f.menu);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 

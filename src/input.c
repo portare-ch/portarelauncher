@@ -163,16 +163,16 @@ void input_set_layout(int retroid)
 static enum action from_key(unsigned code)
 {
 	switch (code) {
-	/* The four face buttons by role. The top one opens settings and the
-	 * left one is the keyboard's shift whatever the style: X and Y on a
-	 * Retroid, triangle and square on a PS pad. The style decides the
-	 * other two. Retroid: A on the right confirms, B at the bottom goes
-	 * back. PS: cross at the bottom confirms, circle on the right goes
-	 * back. */
+	/* The face buttons by role. The top one opens settings whatever the
+	 * style, X on a Retroid, triangle on a PS pad; the left one does
+	 * nothing. The style decides the other two. Retroid: A on the right
+	 * confirms, B at the bottom goes back. PS: cross at the bottom
+	 * confirms, circle on the right goes back. L1 is the keyboard's
+	 * shift. */
 	case BTN_SOUTH:  return retroid_layout ? ACT_BACK    : ACT_CONFIRM;
 	case BTN_EAST:   return retroid_layout ? ACT_CONFIRM : ACT_BACK;
 	case BTN_NORTH:  return ACT_MENU;
-	case BTN_WEST:   return ACT_ALT;
+	case BTN_TL:     return ACT_ALT;
 	/* Their own actions rather than aliases, because the keyboard needs
 	 * START to mean "done" while the left button types a space. Screens
 	 * that have no use for the difference fold START back into MENU. */
