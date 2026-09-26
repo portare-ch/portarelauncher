@@ -63,18 +63,32 @@ settings += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
 CONSOLES = [("SNES", "latency"), ("NES", "visuals"), ("PlayStation", "latency"),
             ("Game Boy", "visuals"), ("Game Boy Color", "visuals"),
             ("Game Boy Advance", "visuals"), ("Genesis", "visuals")]
-consoles = [row(" Settings  \u203a  Consoles", ""), RULE, ""]
-consoles += [item(i == 0, n, v) for i, (n, v) in enumerate(CONSOLES)]
-consoles += [THIN,
-             "    Experimental.",
-             "    Visuals: Renders at a higher internal resolution",
-             "    for the sharpest image. Pre-emptive frames are",
-             "    disabled.",
-             "    Latency: Enables 1 pre-emptive frame for lower",
-             "    input latency. Renders at the console's native",
-             "    resolution."]
-consoles += [""] * (ROWS - 2 - len(consoles))
-consoles += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
+# The description follows the highlighted console: the PlayStation's core
+# renders above native and gives that up for latency; the 2D cores do not,
+# and their text says only what changes.
+def consoles_screen(sel):
+    lines = [row(" Settings  \u203a  Consoles", ""), RULE, ""]
+    lines += [item(i == sel, n, v) for i, (n, v) in enumerate(CONSOLES)]
+    lines += [THIN, "    Experimental."]
+    if CONSOLES[sel][0] == "PlayStation":
+        lines += ["    Visuals: Renders at a higher internal resolution",
+                  "    for the sharpest image. Pre-emptive frames are",
+                  "    disabled.",
+                  "    Latency: Enables 1 pre-emptive frame for lower",
+                  "    input latency. Renders at the console's native",
+                  "    resolution."]
+    else:
+        lines += ["    Visuals: The picture as shipped. Pre-emptive",
+                  "    frames are disabled.",
+                  "    Latency: Enables 1 pre-emptive frame for lower",
+                  "    input latency. This console already renders at",
+                  "    its native resolution."]
+    lines += [""] * (ROWS - 2 - len(lines))
+    lines += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
+    return lines
+
+consoles = consoles_screen(0)
+consoles_psx = consoles_screen(2)
 
 # Two toggles and the devices in one list: switching it on, letting known
 # headphones come back, and picking them when they have not.
@@ -201,6 +215,7 @@ launching += [""] * 7
 if __name__ == "__main__":
     for t, s in (("SYSTEMS", systems), ("GAMES", games),
                  ("SETTINGS", settings), ("SETTINGS - CONSOLES", consoles),
+                 ("SETTINGS - CONSOLES, PlayStation", consoles_psx),
                  ("BLUETOOTH", bluetooth),
                  ("KEYBOARD - letters", kb_lower),
                  ("KEYBOARD - shift, PS button style", kb_upper),

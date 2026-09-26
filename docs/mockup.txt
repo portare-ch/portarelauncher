@@ -84,6 +84,30 @@
         Genesis                                 visuals  |
      ─────────────────────────────────────────────────── |
         Experimental.                                    |
+        Visuals: The picture as shipped. Pre-emptive     |
+        frames are disabled.                             |
+        Latency: Enables 1 pre-emptive frame for lower   |
+        input latency. This console already renders at   |
+        its native resolution.                           |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A CHANGE   B BACK                           ↑↓ MOVE |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    SETTINGS - CONSOLES, PlayStation
+    .....................................................  <- 53 columns
+     Settings  ›  Consoles                               |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+        SNES                                    latency  |
+        NES                                     visuals  |
+      ▸ PlayStation                             latency  |
+        Game Boy                                visuals  |
+        Game Boy Color                          visuals  |
+        Game Boy Advance                        visuals  |
+        Genesis                                 visuals  |
+     ─────────────────────────────────────────────────── |
+        Experimental.                                    |
         Visuals: Renders at a higher internal resolution |
         for the sharpest image. Pre-emptive frames are   |
         disabled.                                        |

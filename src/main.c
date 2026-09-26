@@ -55,15 +55,21 @@ static const struct { const char *key, *label; } profile_names[] = {
 /* Settings > Consoles: one choice per console, latency or visuals, stored
  * as <system>.profile in system.cfg, where setsettings.sh reads it when
  * the game starts. The key is the system's name in es_systems.cfg, which
- * is also how every other per-system setting is keyed. */
-static const struct { const char *key, *label; } consoles[] = {
-	{ "snes",    "SNES" },
-	{ "nes",     "NES" },
-	{ "psx",     "PlayStation" },
-	{ "gb",      "Game Boy" },
-	{ "gbc",     "Game Boy Color" },
-	{ "gba",     "Game Boy Advance" },
-	{ "genesis", "Genesis" },
+ * is also how every other per-system setting is keyed.
+ *
+ * upscales says whether the shipped core renders above the console's own
+ * resolution, which is what visuals keeps and latency gives up. Only the
+ * PlayStation's does; the 2D cores draw at native either way, so for them
+ * the modes differ by the pre-emptive frame alone, and the description
+ * under the list says only that. */
+static const struct { const char *key, *label; int upscales; } consoles[] = {
+	{ "snes",    "SNES",             0 },
+	{ "nes",     "NES",              0 },
+	{ "psx",     "PlayStation",      1 },
+	{ "gb",      "Game Boy",         0 },
+	{ "gbc",     "Game Boy Color",   0 },
+	{ "gba",     "Game Boy Advance", 0 },
+	{ "genesis", "Genesis",          0 },
 };
 #define N_CONSOLES ((int)(sizeof(consoles) / sizeof(consoles[0])))
 
@@ -591,12 +597,21 @@ static void draw_consoles(struct ui *u)
 	/* The rows between the rule and the bottom rule, and no more. */
 	unsigned width = t->cols - 8, room = t->rows - 2 - (y + 1);
 	unsigned r = wrap_puts(t, 4, y + 1, width, room, "Experimental.", ATTR_DIM);
-	r += wrap_puts(t, 4, y + 1 + r, width, room - r,
-	               "Visuals: Renders at a higher internal resolution for the "
-	               "sharpest image. Pre-emptive frames are disabled.", ATTR_DIM);
-	wrap_puts(t, 4, y + 1 + r, width, room - r,
-	          "Latency: Enables 1 pre-emptive frame for lower input latency. "
-	          "Renders at the console's native resolution.", ATTR_DIM);
+	if (consoles[u->console_sel].upscales) {
+		r += wrap_puts(t, 4, y + 1 + r, width, room - r,
+		               "Visuals: Renders at a higher internal resolution for the "
+		               "sharpest image. Pre-emptive frames are disabled.", ATTR_DIM);
+		wrap_puts(t, 4, y + 1 + r, width, room - r,
+		          "Latency: Enables 1 pre-emptive frame for lower input latency. "
+		          "Renders at the console's native resolution.", ATTR_DIM);
+	} else {
+		r += wrap_puts(t, 4, y + 1 + r, width, room - r,
+		               "Visuals: The picture as shipped. Pre-emptive frames are "
+		               "disabled.", ATTR_DIM);
+		wrap_puts(t, 4, y + 1 + r, width, room - r,
+		          "Latency: Enables 1 pre-emptive frame for lower input latency. "
+		          "This console already renders at its native resolution.", ATTR_DIM);
+	}
 
 	if (u->note[0])
 		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
