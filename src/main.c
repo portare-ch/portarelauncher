@@ -52,11 +52,11 @@ static const struct { const char *key, *label; } profile_names[] = {
 };
 #define N_PROFILES ((int)(sizeof(profile_names) / sizeof(profile_names[0])))
 
-/* Settings > Games: one choice per system, latency or visuals, stored as
- * <system>.profile in system.cfg, where setsettings.sh reads it when the
- * game starts. The key is the system's name in es_systems.cfg, which is
- * also how every other per-system setting is keyed. */
-static const struct { const char *key, *label; } game_systems[] = {
+/* Settings > Consoles: one choice per console, latency or visuals, stored
+ * as <system>.profile in system.cfg, where setsettings.sh reads it when
+ * the game starts. The key is the system's name in es_systems.cfg, which
+ * is also how every other per-system setting is keyed. */
+static const struct { const char *key, *label; } consoles[] = {
 	{ "snes",    "SNES" },
 	{ "nes",     "NES" },
 	{ "psx",     "PlayStation" },
@@ -65,11 +65,11 @@ static const struct { const char *key, *label; } game_systems[] = {
 	{ "gba",     "Game Boy Advance" },
 	{ "genesis", "Genesis" },
 };
-#define N_GAME_SYSTEMS ((int)(sizeof(game_systems) / sizeof(game_systems[0])))
+#define N_CONSOLES ((int)(sizeof(consoles) / sizeof(consoles[0])))
 
 /* Absent, empty or anything else reads as visuals: it is the default and
  * what an install from before the setting has. */
-static int game_latency(const char *sys)
+static int console_latency(const char *sys)
 {
 	char key[64], val[16];
 	snprintf(key, sizeof(key), "%s.profile", sys);
@@ -77,7 +77,7 @@ static int game_latency(const char *sys)
 	       strcmp(val, "latency") == 0;
 }
 
-static void game_set_latency(const char *sys, int latency)
+static void console_set_latency(const char *sys, int latency)
 {
 	char key[64];
 	snprintf(key, sizeof(key), "%s.profile", sys);
@@ -94,7 +94,7 @@ static void game_set_latency(const char *sys, int latency)
 
 enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI, SCR_BT,
               SCR_KEYBOARD, SCR_TOOLS, SCR_ABOUT, SCR_UPDATE,
-              SCR_TZ, SCR_POWER, SCR_GAMEPROF };
+              SCR_TZ, SCR_POWER, SCR_CONSOLES };
 
 struct ui {
 	struct term term;
@@ -135,7 +135,7 @@ struct ui {
 
 	int power_sel;
 	int power_armed;     /* the row pressed once, waiting for a second; -1 */
-	int games_sel;       /* Settings > Games                               */
+	int console_sel;     /* Settings > Consoles                            */
 	int going_down;      /* reboot or poweroff accepted, panel off         */
 	int panel_lost;      /* master not yet back after a child; retrying    */
 
@@ -175,7 +175,7 @@ struct ui {
 #define G_TRIANGLE  0x1E   /* /\  */
 #define G_SQUARE    0xFE   /* []  */
 
-enum { SET_WIFI = 0, SET_SSH, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_GAMES,
+enum { SET_WIFI = 0, SET_SSH, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_CONSOLES,
        SET_COLOR, SET_PROFILE, SET_CHARGING, SET_TIMEZONE, SET_ABOUT, SET_POWER,
        N_SETTINGS };
 
@@ -185,7 +185,7 @@ static const char *const settings_labels[N_SETTINGS] = {
 	"Bluetooth",
 	"USB gadget mode",
 	"Button style",
-	"Games",
+	"Consoles",
 	"Color",
 	"Color profile",
 	"Charging LED",
@@ -402,6 +402,9 @@ static void draw_face(struct ui *u, unsigned y, int retroid)
 	term_puts(t, 22, y + 2, "settings", ATTR_MID);
 }
 
+static unsigned wrap_puts(struct term *t, unsigned x, unsigned y, unsigned width,
+                          unsigned lines, const char *text, int attr);
+
 static void draw_settings(struct ui *u)
 {
 	struct term *t = &u->term;
@@ -440,10 +443,10 @@ static void draw_settings(struct ui *u)
 		case SET_BUTTONS:
 			value = u->retroid ? "Retroid" : "PS";
 			break;
-		case SET_GAMES: {
+		case SET_CONSOLES: {
 			int n = 0;
-			for (int k = 0; k < N_GAME_SYSTEMS; k++)
-				n += game_latency(game_systems[k].key);
+			for (int k = 0; k < N_CONSOLES; k++)
+				n += console_latency(consoles[k].key);
 			if (n == 0)
 				value = "visuals";
 			else {
@@ -495,8 +498,9 @@ static void draw_settings(struct ui *u)
 	case SET_BUTTONS:
 		draw_face(u, y, u->retroid);
 		break;
-	case SET_GAMES:
-		term_puts(t, 4, y + 1, "Latency or visuals, per system.", ATTR_DIM);
+	case SET_CONSOLES:
+		wrap_puts(t, 4, y + 1, t->cols - 8, 2,
+		          "Experimental. Latency or visuals, per console.", ATTR_DIM);
 		break;
 	case SET_WIFI: {
 		char addr[40] = "";
@@ -525,12 +529,14 @@ static void draw_settings(struct ui *u)
 		 * films, the launcher itself. */
 		/* Both corrections crush the dark greys on the device today
 		 * (PortareOS BUGS.md), so stock is the standard for now. */
-		term_puts(t, 4, y + 1, "sRGB, D65. Both crush dark greys; stock for now.", ATTR_DIM);
+		wrap_puts(t, 4, y + 1, t->cols - 8, 2,
+		          "Experimental. sRGB, D65; both crush dark greys today.", ATTR_DIM);
 		if (!u->profile_ok[1] && !u->profile_ok[2])
 			term_puts(t, 4, y + 1, "no profile files on this image", ATTR_MID);
 		break;
 	case SET_CHARGING:
-		term_puts(t, 4, y + 1, "Yellow thumbsticks while charging.", ATTR_DIM);
+		wrap_puts(t, 4, y + 1, t->cols - 8, 2,
+		          "Experimental. Yellow thumbsticks while charging.", ATTR_DIM);
 		break;
 	case SET_BLUETOOTH:
 		term_puts(t, 4, y + 1, "Open to scan and connect.", ATTR_DIM);
@@ -567,24 +573,30 @@ static void draw_settings(struct ui *u)
 	}
 }
 
-/* One row per system, latency or visuals. The explanation has fixed room
- * under the list, two sentences, because it is the whole of what the
- * setting means. */
-static void draw_gameprof(struct ui *u)
+/* One row per console, latency or visuals. What each means is written
+ * under the list, wrapped by wrap_puts so it can never run past the
+ * frame; the text is experimental and says so. */
+static void draw_consoles(struct ui *u)
 {
 	struct term *t = &u->term;
 	char buf[64];
 
-	draw_frame(u, "Settings  >  Games");
-	for (int i = 0; i < N_GAME_SYSTEMS; i++)
-		draw_row(u, (unsigned)(3 + i), i == u->games_sel, game_systems[i].label,
-		         game_latency(game_systems[i].key) ? "latency" : "visuals");
+	draw_frame(u, "Settings  >  Consoles");
+	for (int i = 0; i < N_CONSOLES; i++)
+		draw_row(u, (unsigned)(3 + i), i == u->console_sel, consoles[i].label,
+		         console_latency(consoles[i].key) ? "latency" : "visuals");
 
-	unsigned y = 3 + N_GAME_SYSTEMS;
+	unsigned y = 3 + N_CONSOLES;
 	term_hline(t, y, G_HLINE, ATTR_DIM);
-	term_puts(t, 4, y + 1, "Latency runs the game one frame ahead so a press", ATTR_DIM);
-	term_puts(t, 4, y + 2, "shows a frame sooner; the CRT filter stays on.", ATTR_DIM);
-	term_puts(t, 4, y + 3, "Visuals is the picture as shipped.", ATTR_DIM);
+	/* The rows between the rule and the bottom rule, and no more. */
+	unsigned width = t->cols - 8, room = t->rows - 2 - (y + 1);
+	unsigned r = wrap_puts(t, 4, y + 1, width, room, "Experimental.", ATTR_DIM);
+	r += wrap_puts(t, 4, y + 1 + r, width, room - r,
+	               "Visuals: Enables integer upscaling for the sharpest image. "
+	               "Pre-emptive frames are disabled.", ATTR_DIM);
+	wrap_puts(t, 4, y + 1 + r, width, room - r,
+	          "Latency: Enables 1 pre-emptive frame for lower input latency. "
+	          "Integer upscaling is disabled.", ATTR_DIM);
 
 	if (u->note[0])
 		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
@@ -1134,7 +1146,7 @@ static void redraw(struct ui *u)
 	case SCR_ABOUT:    draw_about(u);    break;
 	case SCR_TZ:       draw_tz(u);       break;
 	case SCR_POWER:    draw_power(u);    break;
-	case SCR_GAMEPROF: draw_gameprof(u); break;
+	case SCR_CONSOLES: draw_consoles(u); break;
 	case SCR_UPDATE:   draw_update(u);   break;
 	}
 	term_flush(&u->term);
@@ -1601,9 +1613,9 @@ static void on_action(struct ui *u, enum action a)
 			u->power_armed = -1;
 			u->screen = SCR_POWER;
 		}
-		else if (a == ACT_CONFIRM && u->set_sel == SET_GAMES) {
-			u->games_sel = 0;
-			u->screen = SCR_GAMEPROF;
+		else if (a == ACT_CONFIRM && u->set_sel == SET_CONSOLES) {
+			u->console_sel = 0;
+			u->screen = SCR_CONSOLES;
 		}
 		else if (a == ACT_CONFIRM && u->set_sel == SET_BLUETOOTH) {
 			draw_busy(u, "reading devices...");
@@ -1773,12 +1785,12 @@ static void on_action(struct ui *u, enum action a)
 		else if (a == ACT_QUIT) u->running = 0;
 		break;
 
-	case SCR_GAMEPROF:
-		if (a == ACT_UP && u->games_sel > 0) u->games_sel--;
-		else if (a == ACT_DOWN && u->games_sel < N_GAME_SYSTEMS - 1) u->games_sel++;
+	case SCR_CONSOLES:
+		if (a == ACT_UP && u->console_sel > 0) u->console_sel--;
+		else if (a == ACT_DOWN && u->console_sel < N_CONSOLES - 1) u->console_sel++;
 		else if (a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) {
-			const char *sys = game_systems[u->games_sel].key;
-			game_set_latency(sys, !game_latency(sys));
+			const char *sys = consoles[u->console_sel].key;
+			console_set_latency(sys, !console_latency(sys));
 		}
 		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
 		else if (a == ACT_QUIT) u->running = 0;

@@ -45,7 +45,7 @@ games += [row("    swanstation", "8 of 112  "), "", THIN,
 
 SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
        ("USB gadget mode", "network"), ("Button style", "Retroid"),
-       ("Games", "2 on latency"),
+       ("Consoles", "2 on latency"),
        ("Color", "grey"), ("Color profile", "stock"), ("Charging LED", "on"),
        ("Time zone", "Europe/Zurich"), ("About", "v0.2.6 2026-09-26"),
        ("Power", "")]
@@ -58,19 +58,21 @@ settings += ["         X          X confirm",
              "         B          X settings"]
 settings += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
 
-# Settings > Games: latency or visuals per system, and the two sentences
-# that say what that means.
-GAMEPROF = [("SNES", "latency"), ("NES", "visuals"), ("PlayStation", "latency"),
+# Settings > Consoles: latency or visuals per console, and what each means,
+# wrapped at 45 columns as wrap_puts does it on the device.
+CONSOLES = [("SNES", "latency"), ("NES", "visuals"), ("PlayStation", "latency"),
             ("Game Boy", "visuals"), ("Game Boy Color", "visuals"),
             ("Game Boy Advance", "visuals"), ("Genesis", "visuals")]
-gameprof = [row(" Settings  \u203a  Games", ""), RULE, ""]
-gameprof += [item(i == 0, n, v) for i, (n, v) in enumerate(GAMEPROF)]
-gameprof += [THIN,
-             "    Latency runs the game one frame ahead so a press",
-             "    shows a frame sooner; the CRT filter stays on.",
-             "    Visuals is the picture as shipped."]
-gameprof += [""] * (ROWS - 2 - len(gameprof))
-gameprof += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
+consoles = [row(" Settings  \u203a  Consoles", ""), RULE, ""]
+consoles += [item(i == 0, n, v) for i, (n, v) in enumerate(CONSOLES)]
+consoles += [THIN,
+             "    Experimental.",
+             "    Visuals: Enables integer upscaling for the",
+             "    sharpest image. Pre-emptive frames are disabled.",
+             "    Latency: Enables 1 pre-emptive frame for lower",
+             "    input latency. Integer upscaling is disabled."]
+consoles += [""] * (ROWS - 2 - len(consoles))
+consoles += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
 
 # Two toggles and the devices in one list: switching it on, letting known
 # headphones come back, and picking them when they have not.
@@ -196,7 +198,7 @@ launching += [""] * 7
 
 if __name__ == "__main__":
     for t, s in (("SYSTEMS", systems), ("GAMES", games),
-                 ("SETTINGS", settings), ("SETTINGS - GAMES", gameprof),
+                 ("SETTINGS", settings), ("SETTINGS - CONSOLES", consoles),
                  ("BLUETOOTH", bluetooth),
                  ("KEYBOARD - letters", kb_lower),
                  ("KEYBOARD - shift, PS button style", kb_upper),
