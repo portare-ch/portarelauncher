@@ -56,16 +56,40 @@
         Bluetooth                            WH-1000XM4  |
         USB gadget mode                         network  |
       ▸ Button style                            Retroid  |
+        Games                              2 on latency  |
         Color                                      grey  |
-        Color profile                         Gamma 2.2  |
+        Color profile                             stock  |
         Charging LED                                 on  |
         Time zone                         Europe/Zurich  |
         About                         v0.2.6 2026-09-26  |
         Power                                            |
-     ─────────────────────────────────────────────────── |
              X          X confirm                        |
           Y     A       A back                           |
              B          X settings                       |
+     ─────────────────────────────────────────────────── |
+     A CHANGE   B BACK                           ↑↓ MOVE |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    SETTINGS - GAMES
+    .....................................................  <- 53 columns
+     Settings  ›  Games                                  |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+      ▸ SNES                                    latency  |
+        NES                                     visuals  |
+        PlayStation                             latency  |
+        Game Boy                                visuals  |
+        Game Boy Color                          visuals  |
+        Game Boy Advance                        visuals  |
+        Genesis                                 visuals  |
+     ─────────────────────────────────────────────────── |
+        Latency runs the game one frame ahead so a press |
+        shows a frame sooner; the CRT filter stays on.   |
+        Visuals is the picture as shipped.               |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
      ─────────────────────────────────────────────────── |
      A CHANGE   B BACK                           ↑↓ MOVE |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows

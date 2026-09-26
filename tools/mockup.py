@@ -45,18 +45,32 @@ games += [row("    swanstation", "8 of 112  "), "", THIN,
 
 SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
        ("USB gadget mode", "network"), ("Button style", "Retroid"),
-       ("Color", "grey"), ("Color profile", "Gamma 2.2"), ("Charging LED", "on"),
+       ("Games", "2 on latency"),
+       ("Color", "grey"), ("Color profile", "stock"), ("Charging LED", "on"),
        ("Time zone", "Europe/Zurich"), ("About", "v0.2.6 2026-09-26"),
        ("Power", "")]
-# Eleven settings leave three rows between the rules: the button diagram
-# fills them, every other setting uses one or two.
+# Twelve settings leave two rows between the rules; the button diagram needs
+# three and takes the upper rule's row, every other setting uses one or two.
 settings = [row(" Settings", ""), RULE, ""]
 settings += [item(i == 4, n, v) for i, (n, v) in enumerate(SET)]
-settings += [THIN,
-             "         X          X confirm",
+settings += ["         X          X confirm",
              "      Y     A       A back",
              "         B          X settings"]
 settings += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
+
+# Settings > Games: latency or visuals per system, and the two sentences
+# that say what that means.
+GAMEPROF = [("SNES", "latency"), ("NES", "visuals"), ("PlayStation", "latency"),
+            ("Game Boy", "visuals"), ("Game Boy Color", "visuals"),
+            ("Game Boy Advance", "visuals"), ("Genesis", "visuals")]
+gameprof = [row(" Settings  \u203a  Games", ""), RULE, ""]
+gameprof += [item(i == 0, n, v) for i, (n, v) in enumerate(GAMEPROF)]
+gameprof += [THIN,
+             "    Latency runs the game one frame ahead so a press",
+             "    shows a frame sooner; the CRT filter stays on.",
+             "    Visuals is the picture as shipped."]
+gameprof += [""] * (ROWS - 2 - len(gameprof))
+gameprof += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
 
 # Two toggles and the devices in one list: switching it on, letting known
 # headphones come back, and picking them when they have not.
@@ -182,7 +196,8 @@ launching += [""] * 7
 
 if __name__ == "__main__":
     for t, s in (("SYSTEMS", systems), ("GAMES", games),
-                 ("SETTINGS", settings), ("BLUETOOTH", bluetooth),
+                 ("SETTINGS", settings), ("SETTINGS - GAMES", gameprof),
+                 ("BLUETOOTH", bluetooth),
                  ("KEYBOARD - letters", kb_lower),
                  ("KEYBOARD - shift, PS button style", kb_upper),
                  ("KEYBOARD - symbols, password hidden, DONE selected", kb_syms),
