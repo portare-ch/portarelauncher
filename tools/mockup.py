@@ -45,13 +45,17 @@ games += [row("    swanstation", "8 of 112  "), "", THIN,
 
 SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
        ("USB gadget mode", "network"), ("Button style", "Retroid"),
-       ("Color", "grey"), ("Color profile", "Gamma 2.2"), ("Charging LED", "on")]
+       ("Color", "grey"), ("Color profile", "Gamma 2.2"), ("Charging LED", "on"),
+       ("Time zone", "Europe/Zurich"), ("About", "v0.2.6 2026-09-26"),
+       ("Power", "")]
+# Eleven settings leave three rows between the rules: the button diagram
+# fills them, every other setting uses one or two.
 settings = [row(" Settings", ""), RULE, ""]
-settings += [item(i == 2, n, v) for i, (n, v) in enumerate(SET)]
-settings += ["", THIN, "",
-             "    Headphones, controllers. Open to",
-             "    scan, connect, set auto-connect."]
-settings += [""] * 4
+settings += [item(i == 4, n, v) for i, (n, v) in enumerate(SET)]
+settings += [THIN,
+             "         X          X confirm",
+             "      Y     A       A back",
+             "         B          X settings"]
 settings += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
 
 # Two toggles and the devices in one list: switching it on, letting known
