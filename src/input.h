@@ -20,7 +20,8 @@ enum action {
 	ACT_CONFIRM,
 	ACT_BACK,
 	ACT_MENU,     /* the settings key            */
-	ACT_ALT,      /* the top face button; each screen gives it a meaning */
+	ACT_ALT,      /* L1: shift on the keyboard, nothing elsewhere */
+	ACT_HOME,     /* Home: the consoles list, from anywhere */
 	ACT_START,    /* START: "open settings" everywhere except the keyboard */
 	ACT_SELECT,   /* SELECT: only the keyboard uses it, to hide the text */
 	ACT_TICK,     /* the idle timeout expired; nothing was pressed */
@@ -60,6 +61,12 @@ int  input_fill_poll(struct input *in, struct pollfd *pfd);
 int  input_refresh(struct input *in, const struct pollfd *pfd, int n);
 void input_set_aux(struct input *in, int fd);
 void input_close(struct input *in);
+
+/* Which face button does what. The top button opens settings in both
+ * styles. retroid=1: the right button confirms and the bottom one goes
+ * back. retroid=0, the PS style: bottom confirms, right goes back. Takes
+ * effect on the next press. */
+void input_set_layout(int retroid);
 
 /* Throws away everything the devices buffered while something else had the
  * panel. The launcher's descriptors stay open while an emulator or a tool

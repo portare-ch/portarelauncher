@@ -153,23 +153,35 @@ void input_close(struct input *in)
 	in->notify_fd = -1;
 }
 
+static int retroid_layout = 1;
+
+void input_set_layout(int retroid)
+{
+	retroid_layout = retroid;
+}
+
 static enum action from_key(unsigned code)
 {
 	switch (code) {
-	/* By position, always. The bottom button confirms and the right one
-	 * goes back on every pad this will see - B and A on a Retroid, cross
-	 * and circle on a Sony. What changes between them is the printing, so
-	 * the button style setting changes the labels the UI shows and not
-	 * what any button does. */
-	case BTN_SOUTH:  return ACT_CONFIRM;
-	case BTN_EAST:   return ACT_BACK;
-	case BTN_NORTH:  return ACT_ALT;
-	case BTN_WEST:   return ACT_MENU;
+	/* The face buttons by role. The top one opens settings whatever the
+	 * style, X on a Retroid, triangle on a PS pad; the left one does
+	 * nothing. The style decides the other two. Retroid: A on the right
+	 * confirms, B at the bottom goes back. PS: cross at the bottom
+	 * confirms, circle on the right goes back. L1 is the keyboard's
+	 * shift. */
+	case BTN_SOUTH:  return retroid_layout ? ACT_BACK    : ACT_CONFIRM;
+	case BTN_EAST:   return retroid_layout ? ACT_CONFIRM : ACT_BACK;
+	case BTN_NORTH:  return ACT_MENU;
+	case BTN_TL:     return ACT_ALT;
 	/* Their own actions rather than aliases, because the keyboard needs
 	 * START to mean "done" while the left button types a space. Screens
 	 * that have no use for the difference fold START back into MENU. */
 	case BTN_START:  return ACT_START;
 	case BTN_SELECT: return ACT_SELECT;
+	/* Home on its own, while this program has the panel. With START it
+	 * is the quit combo, which only matters while something else does
+	 * (quit.h); here the START that may follow just opens settings. */
+	case BTN_MODE:   return ACT_HOME;
 
 	case BTN_DPAD_UP:    return ACT_UP;
 	case BTN_DPAD_DOWN:  return ACT_DOWN;

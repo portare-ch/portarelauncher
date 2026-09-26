@@ -17,7 +17,7 @@
         Arcade                                       47  |
                                                          |
      ─────────────────────────────────────────────────── |
-     A SELECT   Y SETTINGS                       ↑↓ MOVE |
+     A SELECT   X SETTINGS                       ↑↓ MOVE |
                                                          |
                                                          |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
@@ -117,7 +117,7 @@
                                                          |
                                                          |
      ─────────────────────────────────────────────────── |
-     B TYPE  A DELETE  Y SPACE  X SHIFT  START JOIN      |
+     A TYPE  B DELETE  X SPACE  L1 SHIFT  START JOIN     |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     KEYBOARD - shift, PS button style
@@ -141,7 +141,7 @@
                                                          |
                                                          |
      ─────────────────────────────────────────────────── |
-     X TYPE  ○ DELETE  ■ SPACE  ▲ SHIFT  START JOIN      |
+     X TYPE  ○ DELETE  ▲ SPACE  L1 SHIFT  START JOIN     |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     KEYBOARD - symbols, password hidden, DONE selected
@@ -165,7 +165,7 @@
                                                          |
                                                          |
      ─────────────────────────────────────────────────── |
-     B TYPE  A DELETE  Y SPACE  X SHIFT  START JOIN      |
+     A TYPE  B DELETE  X SPACE  L1 SHIFT  START JOIN     |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     KEYBOARD - join failed
@@ -189,7 +189,7 @@
                                                          |
                                                          |
      ─────────────────────────────────────────────────── |
-     B TYPE  A DELETE  Y SPACE  X SHIFT  START JOIN      |
+     A TYPE  B DELETE  X SPACE  L1 SHIFT  START JOIN     |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     TOOLS

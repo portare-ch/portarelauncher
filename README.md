@@ -87,20 +87,23 @@ PortareOS builds a release, not a commit. To publish one, tag `main` and push th
 
 ## Controls
 
-The bottom button confirms and the
-right one goes back, on any pad. The button style setting changes what the UI
-calls them — `B`/`A` on a Retroid, cross and circle on a PS pad — and nothing
-else.
+The four face buttons are assigned by role, and the button style setting
+decides which button has which role. Retroid, the default: A confirms, B
+goes back, X opens settings. PS: cross confirms, circle goes back, triangle
+opens settings. L1 is the keyboard's shift in both. The diagram
+under the setting shows where the confirming button sits, and every hint
+line names the buttons of the style in use.
 
-| position | does | on the keyboard |
-|---|---|---|
-| bottom | confirm, launch | type the focused key |
-| right | back | delete; leave when empty |
-| left | settings | space |
-| top | — | shift: once for a letter, twice to lock |
-| START | settings | join |
-| SELECT | — | show or hide the password |
-| Home + START | quit the running game, film or tool | — |
+| role | Retroid | PS | does | on the keyboard |
+|---|---|---|---|---|
+| confirm | A, right | cross, bottom | confirm, launch | type the focused key |
+| back | B, bottom | circle, right | back | delete; leave when empty |
+| settings | X, top | triangle, top | settings | space |
+| L1 | | | — | shift: once for a letter, twice to lock |
+| START | | | settings | join |
+| SELECT | | | — | show or hide the password |
+| Home | | | the consoles list, from anywhere | leave the field |
+| Home + START | | | quit the running game, film or tool | — |
 
 Home + START is the way out of everything the launcher starts, whatever
 its own controls are. The launcher watches for it while the game has the
