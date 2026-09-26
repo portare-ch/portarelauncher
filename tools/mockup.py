@@ -45,18 +45,48 @@ games += [row("    swanstation", "8 of 112  "), "", THIN,
 
 SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
        ("USB gadget mode", "network"), ("Button style", "Retroid"),
-       ("Color", "grey"), ("Color profile", "Gamma 2.2"), ("Charging LED", "on"),
+       ("Consoles", "2 changed"),
+       ("Color", "grey"), ("Color profile", "stock"), ("Charging LED", "on"),
        ("Time zone", "Europe/Zurich"), ("About", "v0.2.6 2026-09-26"),
        ("Power", "")]
-# Eleven settings leave three rows between the rules: the button diagram
-# fills them, every other setting uses one or two.
+# Twelve settings leave two rows between the rules; the button diagram needs
+# three and takes the upper rule's row, every other setting uses one or two.
 settings = [row(" Settings", ""), RULE, ""]
 settings += [item(i == 4, n, v) for i, (n, v) in enumerate(SET)]
-settings += [THIN,
-             "         X          X confirm",
+settings += ["         X          X confirm",
              "      Y     A       A back",
              "         B          X settings"]
 settings += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
+
+# Settings > Consoles: latency or visuals per console, and what each means,
+# wrapped at 45 columns as wrap_puts does it on the device.
+CONSOLES = [("SNES", "PRMPT on"), ("NES", "PRMPT off"),
+            ("PlayStation", "latency"), ("Game Boy", "PRMPT off"),
+            ("Game Boy Color", "PRMPT off"), ("Game Boy Advance", "PRMPT off"),
+            ("Genesis", "PRMPT off")]
+# The description follows the highlighted console: the PlayStation's core
+# renders above native and gives that up for latency; the 2D cores do not,
+# and their text says only what changes.
+def consoles_screen(sel):
+    lines = [row(" Settings  \u203a  Consoles", ""), RULE, ""]
+    lines += [item(i == sel, n, v) for i, (n, v) in enumerate(CONSOLES)]
+    lines += [THIN, "    Experimental."]
+    if CONSOLES[sel][0] == "PlayStation":
+        lines += ["    Visuals: Renders at a higher internal resolution",
+                  "    for the sharpest image. Pre-emptive frames are",
+                  "    disabled.",
+                  "    Latency: Enables 1 pre-emptive frame for lower",
+                  "    input latency. Renders at the console's native",
+                  "    resolution."]
+    else:
+        lines += ["    PRMPT: Enables or disables 1 pre-emptive frame",
+                  "    for lower input latency."]
+    lines += [""] * (ROWS - 2 - len(lines))
+    lines += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
+    return lines
+
+consoles = consoles_screen(0)
+consoles_psx = consoles_screen(2)
 
 # Two toggles and the devices in one list: switching it on, letting known
 # headphones come back, and picking them when they have not.
@@ -182,7 +212,9 @@ launching += [""] * 7
 
 if __name__ == "__main__":
     for t, s in (("SYSTEMS", systems), ("GAMES", games),
-                 ("SETTINGS", settings), ("BLUETOOTH", bluetooth),
+                 ("SETTINGS", settings), ("SETTINGS - CONSOLES", consoles),
+                 ("SETTINGS - CONSOLES, PlayStation", consoles_psx),
+                 ("BLUETOOTH", bluetooth),
                  ("KEYBOARD - letters", kb_lower),
                  ("KEYBOARD - shift, PS button style", kb_upper),
                  ("KEYBOARD - symbols, password hidden, DONE selected", kb_syms),

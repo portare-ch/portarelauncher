@@ -52,6 +52,52 @@ static const struct { const char *key, *label; } profile_names[] = {
 };
 #define N_PROFILES ((int)(sizeof(profile_names) / sizeof(profile_names[0])))
 
+/* Settings > Consoles: one choice per console, latency or visuals, stored
+ * as <system>.profile in system.cfg, where setsettings.sh reads it when
+ * the game starts. The key is the system's name in es_systems.cfg, which
+ * is also how every other per-system setting is keyed.
+ *
+ * upscales says whether the shipped core renders above the console's own
+ * resolution, which is what visuals keeps and latency gives up. Only the
+ * PlayStation's does, so only it shows the choice as latency or visuals.
+ * The 2D cores draw at native either way, so for them the same stored
+ * value shows as PRMPT on or off, BIOS-style, which is all it changes. */
+static const struct { const char *key, *label; int upscales; } consoles[] = {
+	{ "snes",    "SNES",             0 },
+	{ "nes",     "NES",              0 },
+	{ "psx",     "PlayStation",      1 },
+	{ "gb",      "Game Boy",         0 },
+	{ "gbc",     "Game Boy Color",   0 },
+	{ "gba",     "Game Boy Advance", 0 },
+	{ "genesis", "Genesis",          0 },
+};
+#define N_CONSOLES ((int)(sizeof(consoles) / sizeof(consoles[0])))
+
+/* Absent, empty or anything else reads as visuals: it is the default and
+ * what an install from before the setting has. */
+static int console_latency(const char *sys)
+{
+	char key[64], val[16];
+	snprintf(key, sizeof(key), "%s.profile", sys);
+	return settings_get(SETTINGS, key, val, sizeof(val)) &&
+	       strcmp(val, "latency") == 0;
+}
+
+/* What the stored value is called on screen for this console. */
+static const char *console_mode_name(int i, int latency)
+{
+	if (consoles[i].upscales)
+		return latency ? "latency" : "visuals";
+	return latency ? "PRMPT on" : "PRMPT off";
+}
+
+static void console_set_latency(const char *sys, int latency)
+{
+	char key[64];
+	snprintf(key, sizeof(key), "%s.profile", sys);
+	settings_set(SETTINGS, key, latency ? "latency" : "visuals");
+}
+
 #ifndef PL_VERSION
 #define PL_VERSION "dev"   /* set by the Makefile, from VERSION or git */
 #endif
@@ -62,7 +108,7 @@ static const struct { const char *key, *label; } profile_names[] = {
 
 enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI, SCR_BT,
               SCR_KEYBOARD, SCR_TOOLS, SCR_ABOUT, SCR_UPDATE,
-              SCR_TZ, SCR_POWER };
+              SCR_TZ, SCR_POWER, SCR_CONSOLES };
 
 struct ui {
 	struct term term;
@@ -103,6 +149,7 @@ struct ui {
 
 	int power_sel;
 	int power_armed;     /* the row pressed once, waiting for a second; -1 */
+	int console_sel;     /* Settings > Consoles                            */
 	int going_down;      /* reboot or poweroff accepted, panel off         */
 	int panel_lost;      /* master not yet back after a child; retrying    */
 
@@ -142,8 +189,9 @@ struct ui {
 #define G_TRIANGLE  0x1E   /* /\  */
 #define G_SQUARE    0xFE   /* []  */
 
-enum { SET_WIFI = 0, SET_SSH, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_COLOR,
-       SET_PROFILE, SET_CHARGING, SET_TIMEZONE, SET_ABOUT, SET_POWER, N_SETTINGS };
+enum { SET_WIFI = 0, SET_SSH, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_CONSOLES,
+       SET_COLOR, SET_PROFILE, SET_CHARGING, SET_TIMEZONE, SET_ABOUT, SET_POWER,
+       N_SETTINGS };
 
 static const char *const settings_labels[N_SETTINGS] = {
 	"Wi-Fi",
@@ -151,6 +199,7 @@ static const char *const settings_labels[N_SETTINGS] = {
 	"Bluetooth",
 	"USB gadget mode",
 	"Button style",
+	"Consoles",
 	"Color",
 	"Color profile",
 	"Charging LED",
@@ -367,6 +416,9 @@ static void draw_face(struct ui *u, unsigned y, int retroid)
 	term_puts(t, 22, y + 2, "settings", ATTR_MID);
 }
 
+static unsigned wrap_puts(struct term *t, unsigned x, unsigned y, unsigned width,
+                          unsigned lines, const char *text, int attr);
+
 static void draw_settings(struct ui *u)
 {
 	struct term *t = &u->term;
@@ -405,6 +457,18 @@ static void draw_settings(struct ui *u)
 		case SET_BUTTONS:
 			value = u->retroid ? "Retroid" : "PS";
 			break;
+		case SET_CONSOLES: {
+			int n = 0;
+			for (int k = 0; k < N_CONSOLES; k++)
+				n += console_latency(consoles[k].key);
+			if (n == 0)
+				value = "defaults";
+			else {
+				snprintf(val, sizeof(val), "%d changed", n);
+				value = val;
+			}
+			break;
+		}
 		case SET_COLOR:
 			value = u->pal_name;
 			break;
@@ -437,15 +501,20 @@ static void draw_settings(struct ui *u)
 		         settings_labels[i], value);
 	}
 
-	/* Eleven rows of settings leave three under the rule before the
-	 * bottom rule and the hint line: y + 1 to y + 3, and the button
-	 * diagram needs all of them. */
+	/* Twelve rows of settings leave two under the rule before the
+	 * bottom rule and the hint line: y + 1 and y + 2. The button
+	 * diagram needs three, so it takes the rule's row as well. */
 	unsigned y = 3 + N_SETTINGS;
-	term_hline(t, y, G_HLINE, ATTR_DIM);
+	if (u->set_sel != SET_BUTTONS)
+		term_hline(t, y, G_HLINE, ATTR_DIM);
 
 	switch (u->set_sel) {
 	case SET_BUTTONS:
-		draw_face(u, y + 1, u->retroid);
+		draw_face(u, y, u->retroid);
+		break;
+	case SET_CONSOLES:
+		wrap_puts(t, 4, y + 1, t->cols - 8, 2,
+		          "Experimental. Pre-emptive frames, per console.", ATTR_DIM);
 		break;
 	case SET_WIFI: {
 		char addr[40] = "";
@@ -472,12 +541,16 @@ static void draw_settings(struct ui *u)
 		/* The correction is in the display controller, ahead of the
 		 * panel, so it holds for everything drawn after this: games,
 		 * films, the launcher itself. */
-		term_puts(t, 4, y + 1, "sRGB, D65; Gamma 2.2 for consoles.", ATTR_DIM);
+		/* Both corrections crush the dark greys on the device today
+		 * (PortareOS BUGS.md), so stock is the standard for now. */
+		wrap_puts(t, 4, y + 1, t->cols - 8, 2,
+		          "Experimental. sRGB, D65; both crush dark greys today.", ATTR_DIM);
 		if (!u->profile_ok[1] && !u->profile_ok[2])
 			term_puts(t, 4, y + 1, "no profile files on this image", ATTR_MID);
 		break;
 	case SET_CHARGING:
-		term_puts(t, 4, y + 1, "Yellow thumbsticks while charging.", ATTR_DIM);
+		wrap_puts(t, 4, y + 1, t->cols - 8, 2,
+		          "Experimental. Yellow thumbsticks while charging.", ATTR_DIM);
 		break;
 	case SET_BLUETOOTH:
 		term_puts(t, 4, y + 1, "Open to scan and connect.", ATTR_DIM);
@@ -512,6 +585,45 @@ static void draw_settings(struct ui *u)
 		snprintf(hint, sizeof(hint), "%c CHANGE   %c BACK", f.confirm, f.back);
 		term_puts(t, 1, t->rows - 1, hint, ATTR_MID);
 	}
+}
+
+/* One row per console, latency or visuals. What each means is written
+ * under the list, wrapped by wrap_puts so it can never run past the
+ * frame; the text is experimental and says so. */
+static void draw_consoles(struct ui *u)
+{
+	struct term *t = &u->term;
+	char buf[64];
+
+	draw_frame(u, "Settings  >  Consoles");
+	for (int i = 0; i < N_CONSOLES; i++)
+		draw_row(u, (unsigned)(3 + i), i == u->console_sel, consoles[i].label,
+		         console_mode_name(i, console_latency(consoles[i].key)));
+
+	unsigned y = 3 + N_CONSOLES;
+	term_hline(t, y, G_HLINE, ATTR_DIM);
+	/* The rows between the rule and the bottom rule, and no more. */
+	unsigned width = t->cols - 8, room = t->rows - 2 - (y + 1);
+	unsigned r = wrap_puts(t, 4, y + 1, width, room, "Experimental.", ATTR_DIM);
+	if (consoles[u->console_sel].upscales) {
+		r += wrap_puts(t, 4, y + 1 + r, width, room - r,
+		               "Visuals: Renders at a higher internal resolution for the "
+		               "sharpest image. Pre-emptive frames are disabled.", ATTR_DIM);
+		wrap_puts(t, 4, y + 1 + r, width, room - r,
+		          "Latency: Enables 1 pre-emptive frame for lower input latency. "
+		          "Renders at the console's native resolution.", ATTR_DIM);
+	} else {
+		wrap_puts(t, 4, y + 1 + r, width, room - r,
+		          "PRMPT: Enables or disables 1 pre-emptive frame for lower "
+		          "input latency.", ATTR_DIM);
+	}
+
+	if (u->note[0])
+		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
+
+	struct face f = face_of(u->retroid);
+	snprintf(buf, sizeof(buf), "%c CHANGE   %c BACK", f.confirm, f.back);
+	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
 /* Saved networks first, then whatever else is in range. The distinction is
@@ -1054,6 +1166,7 @@ static void redraw(struct ui *u)
 	case SCR_ABOUT:    draw_about(u);    break;
 	case SCR_TZ:       draw_tz(u);       break;
 	case SCR_POWER:    draw_power(u);    break;
+	case SCR_CONSOLES: draw_consoles(u); break;
 	case SCR_UPDATE:   draw_update(u);   break;
 	}
 	term_flush(&u->term);
@@ -1520,6 +1633,10 @@ static void on_action(struct ui *u, enum action a)
 			u->power_armed = -1;
 			u->screen = SCR_POWER;
 		}
+		else if (a == ACT_CONFIRM && u->set_sel == SET_CONSOLES) {
+			u->console_sel = 0;
+			u->screen = SCR_CONSOLES;
+		}
 		else if (a == ACT_CONFIRM && u->set_sel == SET_BLUETOOTH) {
 			draw_busy(u, "reading devices...");
 			u->bt_on = bt_powered();
@@ -1684,6 +1801,17 @@ static void on_action(struct ui *u, enum action a)
 		if (a == ACT_UP && u->power_sel > 0) u->power_sel--;
 		else if (a == ACT_DOWN && u->power_sel < 1) u->power_sel++;
 		else if (a == ACT_CONFIRM) u->power_armed = u->power_sel;
+		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
+		else if (a == ACT_QUIT) u->running = 0;
+		break;
+
+	case SCR_CONSOLES:
+		if (a == ACT_UP && u->console_sel > 0) u->console_sel--;
+		else if (a == ACT_DOWN && u->console_sel < N_CONSOLES - 1) u->console_sel++;
+		else if (a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) {
+			const char *sys = consoles[u->console_sel].key;
+			console_set_latency(sys, !console_latency(sys));
+		}
 		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
 		else if (a == ACT_QUIT) u->running = 0;
 		break;

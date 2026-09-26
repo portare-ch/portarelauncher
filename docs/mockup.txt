@@ -56,16 +56,64 @@
         Bluetooth                            WH-1000XM4  |
         USB gadget mode                         network  |
       ▸ Button style                            Retroid  |
+        Consoles                              2 changed  |
         Color                                      grey  |
-        Color profile                         Gamma 2.2  |
+        Color profile                             stock  |
         Charging LED                                 on  |
         Time zone                         Europe/Zurich  |
         About                         v0.2.6 2026-09-26  |
         Power                                            |
-     ─────────────────────────────────────────────────── |
              X          X confirm                        |
           Y     A       A back                           |
              B          X settings                       |
+     ─────────────────────────────────────────────────── |
+     A CHANGE   B BACK                           ↑↓ MOVE |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    SETTINGS - CONSOLES
+    .....................................................  <- 53 columns
+     Settings  ›  Consoles                               |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+      ▸ SNES                                   PRMPT on  |
+        NES                                   PRMPT off  |
+        PlayStation                             latency  |
+        Game Boy                              PRMPT off  |
+        Game Boy Color                        PRMPT off  |
+        Game Boy Advance                      PRMPT off  |
+        Genesis                               PRMPT off  |
+     ─────────────────────────────────────────────────── |
+        Experimental.                                    |
+        PRMPT: Enables or disables 1 pre-emptive frame   |
+        for lower input latency.                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A CHANGE   B BACK                           ↑↓ MOVE |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    SETTINGS - CONSOLES, PlayStation
+    .....................................................  <- 53 columns
+     Settings  ›  Consoles                               |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+        SNES                                   PRMPT on  |
+        NES                                   PRMPT off  |
+      ▸ PlayStation                             latency  |
+        Game Boy                              PRMPT off  |
+        Game Boy Color                        PRMPT off  |
+        Game Boy Advance                      PRMPT off  |
+        Genesis                               PRMPT off  |
+     ─────────────────────────────────────────────────── |
+        Experimental.                                    |
+        Visuals: Renders at a higher internal resolution |
+        for the sharpest image. Pre-emptive frames are   |
+        disabled.                                        |
+        Latency: Enables 1 pre-emptive frame for lower   |
+        input latency. Renders at the console's native   |
+        resolution.                                      |
      ─────────────────────────────────────────────────── |
      A CHANGE   B BACK                           ↑↓ MOVE |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
