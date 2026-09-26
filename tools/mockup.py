@@ -67,10 +67,12 @@ consoles = [row(" Settings  \u203a  Consoles", ""), RULE, ""]
 consoles += [item(i == 0, n, v) for i, (n, v) in enumerate(CONSOLES)]
 consoles += [THIN,
              "    Experimental.",
-             "    Visuals: Enables integer upscaling for the",
-             "    sharpest image. Pre-emptive frames are disabled.",
+             "    Visuals: Renders at a higher internal resolution",
+             "    for the sharpest image. Pre-emptive frames are",
+             "    disabled.",
              "    Latency: Enables 1 pre-emptive frame for lower",
-             "    input latency. Integer upscaling is disabled."]
+             "    input latency. Renders at the console's native",
+             "    resolution."]
 consoles += [""] * (ROWS - 2 - len(consoles))
 consoles += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
 

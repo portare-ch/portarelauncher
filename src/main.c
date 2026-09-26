@@ -592,11 +592,11 @@ static void draw_consoles(struct ui *u)
 	unsigned width = t->cols - 8, room = t->rows - 2 - (y + 1);
 	unsigned r = wrap_puts(t, 4, y + 1, width, room, "Experimental.", ATTR_DIM);
 	r += wrap_puts(t, 4, y + 1 + r, width, room - r,
-	               "Visuals: Enables integer upscaling for the sharpest image. "
-	               "Pre-emptive frames are disabled.", ATTR_DIM);
+	               "Visuals: Renders at a higher internal resolution for the "
+	               "sharpest image. Pre-emptive frames are disabled.", ATTR_DIM);
 	wrap_puts(t, 4, y + 1 + r, width, room - r,
 	          "Latency: Enables 1 pre-emptive frame for lower input latency. "
-	          "Integer upscaling is disabled.", ATTR_DIM);
+	          "Renders at the console's native resolution.", ATTR_DIM);
 
 	if (u->note[0])
 		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
