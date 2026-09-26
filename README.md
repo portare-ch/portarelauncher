@@ -102,6 +102,7 @@ line names the buttons of the style in use.
 | L1 | | | — | shift: once for a letter, twice to lock |
 | START | | | settings | join |
 | SELECT | | | — | show or hide the password |
+| Home | | | the consoles list, from anywhere | leave the field |
 | Home + START | | | quit the running game, film or tool | — |
 
 Home + START is the way out of everything the launcher starts, whatever

@@ -21,6 +21,7 @@ enum action {
 	ACT_BACK,
 	ACT_MENU,     /* the settings key            */
 	ACT_ALT,      /* L1: shift on the keyboard, nothing elsewhere */
+	ACT_HOME,     /* Home: the consoles list, from anywhere */
 	ACT_START,    /* START: "open settings" everywhere except the keyboard */
 	ACT_SELECT,   /* SELECT: only the keyboard uses it, to hide the text */
 	ACT_TICK,     /* the idle timeout expired; nothing was pressed */

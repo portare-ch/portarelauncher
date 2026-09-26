@@ -178,6 +178,10 @@ static enum action from_key(unsigned code)
 	 * that have no use for the difference fold START back into MENU. */
 	case BTN_START:  return ACT_START;
 	case BTN_SELECT: return ACT_SELECT;
+	/* Home on its own, while this program has the panel. With START it
+	 * is the quit combo, which only matters while something else does
+	 * (quit.h); here the START that may follow just opens settings. */
+	case BTN_MODE:   return ACT_HOME;
 
 	case BTN_DPAD_UP:    return ACT_UP;
 	case BTN_DPAD_DOWN:  return ACT_DOWN;

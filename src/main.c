@@ -1439,6 +1439,16 @@ static void on_action(struct ui *u, enum action a)
 		return;
 	}
 
+	/* Home is the way back to the consoles list from anywhere: a
+	 * settings page, the keyboard with half a password in it, a power
+	 * choice waiting for its second press. Whatever was pending is
+	 * dropped, not applied. */
+	if (a == ACT_HOME) {
+		u->power_armed = -1;
+		show_systems(u);
+		return;
+	}
+
 	/* Only the keyboard tells START from the settings button. */
 	if (a == ACT_START && u->screen != SCR_KEYBOARD)
 		a = ACT_MENU;
