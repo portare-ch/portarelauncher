@@ -437,75 +437,72 @@ static void draw_settings(struct ui *u)
 		         settings_labels[i], value);
 	}
 
-	unsigned y = 3 + N_SETTINGS + 1;
+	/* Eleven rows of settings leave three under the rule before the
+	 * bottom rule and the hint line: y + 1 to y + 3, and the button
+	 * diagram needs all of them. */
+	unsigned y = 3 + N_SETTINGS;
 	term_hline(t, y, G_HLINE, ATTR_DIM);
 
 	switch (u->set_sel) {
 	case SET_BUTTONS:
-		draw_face(u, y + 2, u->retroid);
+		draw_face(u, y + 1, u->retroid);
 		break;
 	case SET_WIFI: {
 		char addr[40] = "";
 		net_address(addr, sizeof(addr));
-		term_puts(t, 4, y + 2, "Open to pick a network.", ATTR_DIM);
 		if (addr[0]) {
 			snprintf(val, sizeof(val), "address  %s", addr);
-			term_puts(t, 4, y + 3, val, ATTR_MID);
+			term_puts(t, 4, y + 1, val, ATTR_MID);
 		}
 		break;
 	}
 	case SET_SSH: {
 		char addr[40] = "";
 		net_address(addr, sizeof(addr));
-		term_puts(t, 4, y + 2, "Root login; the password is under About.", ATTR_DIM);
 		if (u->ssh_on && addr[0]) {
 			snprintf(val, sizeof(val), "ssh root@%s", addr);
-			term_puts(t, 4, y + 3, val, ATTR_MID);
+			term_puts(t, 4, y + 1, val, ATTR_MID);
 		}
 		break;
 	}
 	case SET_COLOR:
-		/* The ramp itself, in the color being chosen: a name says
-		 * nothing about how it reads on this panel. */
-		term_puts(t, 4, y + 2, "the selected row", ATTR_BRIGHT);
-		term_puts(t, 4, y + 3, "body text", ATTR_TEXT);
-		term_puts(t, 4, y + 4, "hints, rules and separators", ATTR_DIM);
+		/* The whole screen is already the preview. */
 		break;
 	case SET_PROFILE:
 		/* The correction is in the display controller, ahead of the
 		 * panel, so it holds for everything drawn after this: games,
 		 * films, the launcher itself. */
-		term_puts(t, 4, y + 2, "sRGB, D65; Gamma 2.2 for consoles.", ATTR_DIM);
+		term_puts(t, 4, y + 1, "sRGB, D65; Gamma 2.2 for consoles.", ATTR_DIM);
 		if (!u->profile_ok[1] && !u->profile_ok[2])
-			term_puts(t, 4, y + 3, "no profile files on this image", ATTR_MID);
+			term_puts(t, 4, y + 1, "no profile files on this image", ATTR_MID);
 		break;
 	case SET_CHARGING:
-		term_puts(t, 4, y + 2, "Yellow thumbsticks while charging.", ATTR_DIM);
+		term_puts(t, 4, y + 1, "Yellow thumbsticks while charging.", ATTR_DIM);
 		break;
 	case SET_BLUETOOTH:
-		term_puts(t, 4, y + 2, "Open to scan and connect.", ATTR_DIM);
+		term_puts(t, 4, y + 1, "Open to scan and connect.", ATTR_DIM);
 		break;
 	case SET_TIMEZONE:
-		term_puts(t, 4, y + 2, "Open to pick a region, then a city.", ATTR_DIM);
+		term_puts(t, 4, y + 1, "Open to pick a region, then a city.", ATTR_DIM);
 		break;
 	case SET_POWER:
-		term_puts(t, 4, y + 2, "Restart, or switch the device off.", ATTR_DIM);
+		term_puts(t, 4, y + 1, "Restart, or switch the device off.", ATTR_DIM);
 		break;
 	case SET_ABOUT:
-		term_puts(t, 4, y + 2, "Version, address, updates.", ATTR_DIM);
+		term_puts(t, 4, y + 1, "Version, address, updates.", ATTR_DIM);
 		break;
 	case SET_USB: {
 		char addr[40] = "";
 		usb_address(addr, sizeof(addr));
-		term_puts(t, 4, y + 2, "USB as a network link, or as file transfer.", ATTR_DIM);
+		term_puts(t, 4, y + 1, "USB as a network link, or as file transfer.", ATTR_DIM);
 		if (addr[0] && strcmp(u->usb, "network") == 0) {
 			snprintf(val, sizeof(val), "address  %s", addr);
-			term_puts(t, 4, y + 3, val, ATTR_MID);
+			term_puts(t, 4, y + 2, val, ATTR_MID);
 		}
 		break;
 	}
 	default:
-		term_puts(t, 4, y + 2, "Not implemented yet.", ATTR_DIM);
+		term_puts(t, 4, y + 1, "Not implemented yet.", ATTR_DIM);
 		break;
 	}
 

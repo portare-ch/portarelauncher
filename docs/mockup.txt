@@ -53,21 +53,19 @@
                                                          |
         Wi-Fi                                Hofmann-5G  |
         SSH                                          on  |
-      ▸ Bluetooth                            WH-1000XM4  |
+        Bluetooth                            WH-1000XM4  |
         USB gadget mode                         network  |
-        Button style                            Retroid  |
+      ▸ Button style                            Retroid  |
         Color                                      grey  |
         Color profile                         Gamma 2.2  |
         Charging LED                                 on  |
-                                                         |
+        Time zone                         Europe/Zurich  |
+        About                         v0.2.6 2026-09-26  |
+        Power                                            |
      ─────────────────────────────────────────────────── |
-                                                         |
-        Headphones, controllers. Open to                 |
-        scan, connect, set auto-connect.                 |
-                                                         |
-                                                         |
-                                                         |
-                                                         |
+             X          X confirm                        |
+          Y     A       A back                           |
+             B          X settings                       |
      ─────────────────────────────────────────────────── |
      A CHANGE   B BACK                           ↑↓ MOVE |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
