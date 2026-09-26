@@ -52,16 +52,16 @@ static const struct { const char *key, *label; } profile_names[] = {
 };
 #define N_PROFILES ((int)(sizeof(profile_names) / sizeof(profile_names[0])))
 
-/* Settings > Consoles: one choice per console, latency or visuals, stored
- * as <system>.profile in system.cfg, where setsettings.sh reads it when
- * the game starts. The key is the system's name in es_systems.cfg, which
- * is also how every other per-system setting is keyed.
+/* Settings > Consoles: one switch per console, read by setsettings.sh
+ * when the game starts. The key is the system's name in es_systems.cfg,
+ * which is also how every other per-system setting is keyed.
  *
  * upscales says whether the shipped core renders above the console's own
- * resolution, which is what visuals keeps and latency gives up. Only the
- * PlayStation's does, so only it shows the choice as latency or visuals.
- * The 2D cores draw at native either way, so for them the same stored
- * value shows as PRMPT on or off, BIOS-style, which is all it changes. */
+ * resolution. Only the PlayStation's does, and its latency mode gives
+ * that up as well as adding the pre-emptive frame, so it stores
+ * <system>.profile as latency or visuals. The 2D cores draw at native
+ * either way, so their switch is the pre-emptive frame alone: stored as
+ * <system>.preempt, 1 or 0, shown as PRMPT on or off, BIOS-style. */
 static const struct { const char *key, *label; int upscales; } consoles[] = {
 	{ "snes",    "SNES",             0 },
 	{ "nes",     "NES",              0 },
@@ -73,14 +73,19 @@ static const struct { const char *key, *label; int upscales; } consoles[] = {
 };
 #define N_CONSOLES ((int)(sizeof(consoles) / sizeof(consoles[0])))
 
-/* Absent, empty or anything else reads as visuals: it is the default and
+/* Absent, empty or anything else reads as off: it is the default and
  * what an install from before the setting has. */
-static int console_latency(const char *sys)
+static int console_latency(int i)
 {
 	char key[64], val[16];
-	snprintf(key, sizeof(key), "%s.profile", sys);
+	if (consoles[i].upscales) {
+		snprintf(key, sizeof(key), "%s.profile", consoles[i].key);
+		return settings_get(SETTINGS, key, val, sizeof(val)) &&
+		       strcmp(val, "latency") == 0;
+	}
+	snprintf(key, sizeof(key), "%s.preempt", consoles[i].key);
 	return settings_get(SETTINGS, key, val, sizeof(val)) &&
-	       strcmp(val, "latency") == 0;
+	       strcmp(val, "1") == 0;
 }
 
 /* What the stored value is called on screen for this console. */
@@ -91,11 +96,16 @@ static const char *console_mode_name(int i, int latency)
 	return latency ? "PRMPT on" : "PRMPT off";
 }
 
-static void console_set_latency(const char *sys, int latency)
+static void console_set_latency(int i, int latency)
 {
 	char key[64];
-	snprintf(key, sizeof(key), "%s.profile", sys);
-	settings_set(SETTINGS, key, latency ? "latency" : "visuals");
+	if (consoles[i].upscales) {
+		snprintf(key, sizeof(key), "%s.profile", consoles[i].key);
+		settings_set(SETTINGS, key, latency ? "latency" : "visuals");
+	} else {
+		snprintf(key, sizeof(key), "%s.preempt", consoles[i].key);
+		settings_set(SETTINGS, key, latency ? "1" : "0");
+	}
 }
 
 #ifndef PL_VERSION
@@ -460,7 +470,7 @@ static void draw_settings(struct ui *u)
 		case SET_CONSOLES: {
 			int n = 0;
 			for (int k = 0; k < N_CONSOLES; k++)
-				n += console_latency(consoles[k].key);
+				n += console_latency(k);
 			if (n == 0)
 				value = "defaults";
 			else {
@@ -598,7 +608,7 @@ static void draw_consoles(struct ui *u)
 	draw_frame(u, "Settings  >  Consoles");
 	for (int i = 0; i < N_CONSOLES; i++)
 		draw_row(u, (unsigned)(3 + i), i == u->console_sel, consoles[i].label,
-		         console_mode_name(i, console_latency(consoles[i].key)));
+		         console_mode_name(i, console_latency(i)));
 
 	unsigned y = 3 + N_CONSOLES;
 	term_hline(t, y, G_HLINE, ATTR_DIM);
@@ -1809,8 +1819,8 @@ static void on_action(struct ui *u, enum action a)
 		if (a == ACT_UP && u->console_sel > 0) u->console_sel--;
 		else if (a == ACT_DOWN && u->console_sel < N_CONSOLES - 1) u->console_sel++;
 		else if (a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) {
-			const char *sys = consoles[u->console_sel].key;
-			console_set_latency(sys, !console_latency(sys));
+			int i = u->console_sel;
+			console_set_latency(i, !console_latency(i));
 		}
 		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
 		else if (a == ACT_QUIT) u->running = 0;
