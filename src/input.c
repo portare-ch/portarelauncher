@@ -153,18 +153,26 @@ void input_close(struct input *in)
 	in->notify_fd = -1;
 }
 
+static int retroid_layout = 1;
+
+void input_set_layout(int retroid)
+{
+	retroid_layout = retroid;
+}
+
 static enum action from_key(unsigned code)
 {
 	switch (code) {
-	/* By position, always. The bottom button confirms and the right one
-	 * goes back on every pad this will see - B and A on a Retroid, cross
-	 * and circle on a Sony. What changes between them is the printing, so
-	 * the button style setting changes the labels the UI shows and not
-	 * what any button does. */
-	case BTN_SOUTH:  return ACT_CONFIRM;
-	case BTN_EAST:   return ACT_BACK;
-	case BTN_NORTH:  return ACT_ALT;
-	case BTN_WEST:   return ACT_MENU;
+	/* The four face buttons by role, and the button style decides which
+	 * position has which role. Retroid: A on the right confirms, B at the
+	 * bottom goes back, X on top opens settings and Y on the left is the
+	 * keyboard's shift. PS: cross at the bottom confirms, circle on the
+	 * right goes back, square on the left opens settings and triangle is
+	 * shift. */
+	case BTN_SOUTH:  return retroid_layout ? ACT_BACK    : ACT_CONFIRM;
+	case BTN_EAST:   return retroid_layout ? ACT_CONFIRM : ACT_BACK;
+	case BTN_NORTH:  return retroid_layout ? ACT_MENU    : ACT_ALT;
+	case BTN_WEST:   return retroid_layout ? ACT_ALT     : ACT_MENU;
 	/* Their own actions rather than aliases, because the keyboard needs
 	 * START to mean "done" while the left button types a space. Screens
 	 * that have no use for the difference fold START back into MENU. */

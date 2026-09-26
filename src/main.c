@@ -136,7 +136,7 @@ struct ui {
 #define KEY_PALETTE "launcher.palette"
 
 
-/* Sony's marks approximated out of CP437, which is all the VGA font has.
+/* The PS marks approximated out of CP437, which is all the VGA font has.
  * Close enough to be recognised, and not the real symbols. */
 #define G_CIRCLE    0x09   /* O   */
 #define G_TRIANGLE  0x1E   /* /\  */
@@ -232,20 +232,27 @@ static void draw_frame(struct ui *u, const char *crumb)
 	term_hline(t, t->rows - 2, G_HLINE, ATTR_DIM);
 }
 
-/* What the four face buttons are called on the pad in the user's hands.
- * Position is fixed; only the printing differs. */
+/* What the four face buttons are called on the pad in the user's hands,
+ * by position, and which of them does what: the hints name the button by
+ * its role, the diagram under the setting shows where it sits. */
 struct face {
 	unsigned char bottom, right, top, left;
+	unsigned char confirm, back, menu, alt;
 };
 
 static struct face face_of(int retroid)
 {
 	struct face f;
 	if (retroid) {
+		/* What the printing says: A confirms. */
 		f.bottom = 'B'; f.right = 'A'; f.top = 'X'; f.left = 'Y';
+		f.confirm = f.right; f.back = f.bottom;
+		f.menu = f.top; f.alt = f.left;
 	} else {
 		f.bottom = 'X'; f.right = G_CIRCLE;
 		f.top = G_TRIANGLE; f.left = G_SQUARE;
+		f.confirm = f.bottom; f.back = f.right;
+		f.menu = f.left; f.alt = f.top;
 	}
 	return f;
 }
@@ -305,7 +312,7 @@ static void draw_systems(struct ui *u)
 	}
 
 	struct face f = face_of(u->retroid);
-	snprintf(buf, sizeof(buf), "%c SELECT   %c SETTINGS", f.bottom, f.left);
+	snprintf(buf, sizeof(buf), "%c SELECT   %c SETTINGS", f.confirm, f.menu);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -332,7 +339,7 @@ static void draw_games(struct ui *u)
 	term_puts_right(t, t->cols - 2, t->rows - 4, buf, ATTR_MID);
 
 	struct face f = face_of(u->retroid);
-	snprintf(buf, sizeof(buf), "%c LAUNCH   %c BACK", f.bottom, f.right);
+	snprintf(buf, sizeof(buf), "%c LAUNCH   %c BACK", f.confirm, f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -343,17 +350,21 @@ static void draw_face(struct ui *u, unsigned y, int retroid)
 	struct term *t = &u->term;
 	struct face f = face_of(retroid);
 
-	/* The bottom button confirms whichever pad this is, so it is the
-	 * bright one in both diagrams. Only its name changes. */
-	term_putc(t, 9,  y,     f.top,    ATTR_TEXT);
-	term_putc(t, 6,  y + 1, f.left,   ATTR_TEXT);
-	term_putc(t, 12, y + 1, f.right,  ATTR_TEXT);
-	term_putc(t, 9,  y + 2, f.bottom, ATTR_BRIGHT);
+	/* The button that confirms is the bright one, wherever it sits: on
+	 * the right of a Retroid, at the bottom of a PS pad. */
+#define FACE_ATTR(g) ((g) == f.confirm ? ATTR_BRIGHT : ATTR_TEXT)
+	term_putc(t, 9,  y,     f.top,    FACE_ATTR(f.top));
+	term_putc(t, 6,  y + 1, f.left,   FACE_ATTR(f.left));
+	term_putc(t, 12, y + 1, f.right,  FACE_ATTR(f.right));
+	term_putc(t, 9,  y + 2, f.bottom, FACE_ATTR(f.bottom));
+#undef FACE_ATTR
 
-	term_putc(t, 20, y,     f.bottom, ATTR_BRIGHT);
+	term_putc(t, 20, y,     f.confirm, ATTR_BRIGHT);
 	term_puts(t, 22, y,     "confirm", ATTR_MID);
-	term_putc(t, 20, y + 1, f.right,  ATTR_TEXT);
+	term_putc(t, 20, y + 1, f.back,    ATTR_TEXT);
 	term_puts(t, 22, y + 1, "back", ATTR_MID);
+	term_putc(t, 20, y + 2, f.menu,    ATTR_TEXT);
+	term_puts(t, 22, y + 2, "settings", ATTR_MID);
 }
 
 static void draw_settings(struct ui *u)
@@ -501,7 +512,7 @@ static void draw_settings(struct ui *u)
 	{
 		struct face f = face_of(u->retroid);
 		char hint[64];
-		snprintf(hint, sizeof(hint), "%c CHANGE   %c BACK", f.bottom, f.right);
+		snprintf(hint, sizeof(hint), "%c CHANGE   %c BACK", f.confirm, f.back);
 		term_puts(t, 1, t->rows - 1, hint, ATTR_MID);
 	}
 }
@@ -553,10 +564,10 @@ static void draw_wifi(struct ui *u)
 
 	struct face f = face_of(u->retroid);
 	if (u->wifi_sel == 0)
-		snprintf(buf, sizeof(buf), "%c SWITCH   %c BACK", f.bottom, f.right);
+		snprintf(buf, sizeof(buf), "%c SWITCH   %c BACK", f.confirm, f.back);
 	else
 		snprintf(buf, sizeof(buf), "%c CONNECT   %c BACK   %c RESCAN",
-		         f.bottom, f.right, f.left);
+		         f.confirm, f.back, f.menu);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -617,7 +628,7 @@ static void draw_bt(struct ui *u)
 	if (sel >= 0 && sel < u->bt.n)
 		verb = u->bt.d[sel].connected ? "DISCONNECT" : "CONNECT";
 	snprintf(buf, sizeof(buf), "%c %s   %c BACK   %c SCAN",
-	         f.bottom, verb, f.right, f.left);
+	         f.confirm, verb, f.back, f.menu);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -678,7 +689,7 @@ static void draw_tools(struct ui *u)
 		          u->tools.t[u->tool_sel].desc, ATTR_TEXT);
 
 	struct face f = face_of(u->retroid);
-	snprintf(buf, sizeof(buf), "%c RUN   %c BACK", f.bottom, f.right);
+	snprintf(buf, sizeof(buf), "%c RUN   %c BACK", f.confirm, f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -712,7 +723,7 @@ static void draw_keyboard(struct ui *u)
 	 * it names the buttons the user is actually holding. */
 	struct face f = face_of(u->retroid);
 	snprintf(buf, sizeof(buf), "%c TYPE  %c DELETE  %c SPACE  %c SHIFT  START JOIN",
-	         f.bottom, f.right, f.left, f.top);
+	         f.confirm, f.back, f.menu, f.alt);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -755,14 +766,14 @@ static void draw_power(struct ui *u)
 	/* One press arms it and says so; the second does it. Anything else
 	 * disarms, so a stray press on the way through never switches off. */
 	if (u->power_armed >= 0) {
-		snprintf(buf, sizeof(buf), "Press %c again to %s.", f.bottom,
+		snprintf(buf, sizeof(buf), "Press %c again to %s.", f.confirm,
 		         u->power_armed == 0 ? "restart" : "switch off");
 		term_puts(t, 4, 8, buf, ATTR_BRIGHT);
 	}
 	if (u->note[0])
 		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
 
-	snprintf(buf, sizeof(buf), "%c SELECT   %c BACK", f.bottom, f.right);
+	snprintf(buf, sizeof(buf), "%c SELECT   %c BACK", f.confirm, f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -813,8 +824,8 @@ static void draw_tz(struct ui *u)
 		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
 
 	struct face f = face_of(u->retroid);
-	snprintf(buf, sizeof(buf), "%c %s   %c BACK", f.bottom,
-	         u->tz_level ? "SET" : "OPEN", f.right);
+	snprintf(buf, sizeof(buf), "%c %s   %c BACK", f.confirm,
+	         u->tz_level ? "SET" : "OPEN", f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -917,7 +928,7 @@ static void draw_about(struct ui *u)
 	term_puts(t, 15, 13, PL_VERSION, ATTR_TEXT);
 
 	struct face f = face_of(u->retroid);
-	snprintf(buf, sizeof(buf), "%c OPEN   %c BACK", f.bottom, f.right);
+	snprintf(buf, sizeof(buf), "%c OPEN   %c BACK", f.confirm, f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -971,7 +982,7 @@ static void draw_update(struct ui *u)
 		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
 
 	struct face f = face_of(u->retroid);
-	snprintf(buf, sizeof(buf), "%c SELECT   %c BACK", f.bottom, f.right);
+	snprintf(buf, sizeof(buf), "%c SELECT   %c BACK", f.confirm, f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -1571,6 +1582,7 @@ static void on_action(struct ui *u, enum action a)
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
 		         u->set_sel == SET_BUTTONS) {
 			u->retroid = !u->retroid;
+			input_set_layout(u->retroid);
 			/* Written straight away rather than on exit: this program
 			 * can be killed from the outside and the setting that
 			 * decides how to leave it should not be the one that is
@@ -1894,6 +1906,7 @@ int main(void)
 	 * spare string comparison. */
 	u.retroid = !(settings_get(SETTINGS, KEY_BUTTONS, style, sizeof(style)) &&
 	              (strcmp(style, "ps") == 0 || strcmp(style, "sony") == 0));
+	input_set_layout(u.retroid);
 	/* Read what is cheap now and leave the scan until the Wi-Fi screen is
 	 * opened: a rescan takes seconds and nothing on the first screen shows
 	 * it. */

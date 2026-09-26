@@ -33,7 +33,7 @@ SYS = [("GameCube", 24), ("Nintendo 64", 9), ("PlayStation", 112),
 systems = [row(" PortareOS", "23:59  BAT 87% "), RULE, "",
            row("  SYSTEMS", "12 found  "), ""]
 systems += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(SYS)]
-systems += ["", THIN, row(" A SELECT   Y SETTINGS", "\u2191\u2193 MOVE ")]
+systems += ["", THIN, row(" A SELECT   X SETTINGS", "\u2191\u2193 MOVE ")]
 
 GAMES = ["Tekken 2", "Tekken 3", "Tomb Raider", "Tony Hawk's Pro Skater 2",
          "Vagrant Story", "Wipeout XL", "Xenogears"]
@@ -123,7 +123,7 @@ def field(text, hidden=False, cursor=True):
             "  │ " + shown.ljust(FIELD_W - 4) + " │",
             "  └" + "─" * (FIELD_W - 2) + "┘"]
 
-RETROID_HINTS = " B TYPE  A DELETE  Y SPACE  X SHIFT  START JOIN"
+RETROID_HINTS = " A TYPE  B DELETE  X SPACE  Y SHIFT  START JOIN"
 # The PS printing, approximated out of CP437 as the launcher draws it.
 PS_HINTS      = " X TYPE  ○ DELETE  ■ SPACE  ▲ SHIFT  START JOIN"
 
