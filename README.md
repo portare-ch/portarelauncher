@@ -90,7 +90,7 @@ PortareOS builds a release, not a commit. To publish one, tag `main` and push th
 The four face buttons are assigned by role, and the button style setting
 decides which button has which role. Retroid, the default: A confirms, B
 goes back, X opens settings, Y is the keyboard's shift. PS: cross confirms,
-circle goes back, square opens settings, triangle is shift. The diagram
+circle goes back, triangle opens settings, square is shift. The diagram
 under the setting shows where the confirming button sits, and every hint
 line names the buttons of the style in use.
 
@@ -98,8 +98,8 @@ line names the buttons of the style in use.
 |---|---|---|---|---|
 | confirm | A, right | cross, bottom | confirm, launch | type the focused key |
 | back | B, bottom | circle, right | back | delete; leave when empty |
-| settings | X, top | square, left | settings | space |
-| shift | Y, left | triangle, top | — | shift: once for a letter, twice to lock |
+| settings | X, top | triangle, top | settings | space |
+| shift | Y, left | square, left | — | shift: once for a letter, twice to lock |
 | START | | | settings | join |
 | SELECT | | | — | show or hide the password |
 | Home + START | | | quit the running game, film or tool | — |

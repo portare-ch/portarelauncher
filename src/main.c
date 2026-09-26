@@ -252,7 +252,7 @@ static struct face face_of(int retroid)
 		f.bottom = 'X'; f.right = G_CIRCLE;
 		f.top = G_TRIANGLE; f.left = G_SQUARE;
 		f.confirm = f.bottom; f.back = f.right;
-		f.menu = f.left; f.alt = f.top;
+		f.menu = f.top; f.alt = f.left;
 	}
 	return f;
 }

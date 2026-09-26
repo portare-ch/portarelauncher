@@ -125,7 +125,7 @@ def field(text, hidden=False, cursor=True):
 
 RETROID_HINTS = " A TYPE  B DELETE  X SPACE  Y SHIFT  START JOIN"
 # The PS printing, approximated out of CP437 as the launcher draws it.
-PS_HINTS      = " X TYPE  ○ DELETE  ■ SPACE  ▲ SHIFT  START JOIN"
+PS_HINTS      = " X TYPE  ○ DELETE  ▲ SPACE  ■ SHIFT  START JOIN"
 
 def kb_screen(ssid, text, layer, sel=None, bottom_sel=None, hidden=False,
               note="SELECT shows or hides the password", labels=None,

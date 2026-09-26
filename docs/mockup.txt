@@ -141,7 +141,7 @@
                                                          |
                                                          |
      ─────────────────────────────────────────────────── |
-     X TYPE  ○ DELETE  ■ SPACE  ▲ SHIFT  START JOIN      |
+     X TYPE  ○ DELETE  ▲ SPACE  ■ SHIFT  START JOIN      |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     KEYBOARD - symbols, password hidden, DONE selected

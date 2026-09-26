@@ -61,11 +61,10 @@ int  input_refresh(struct input *in, const struct pollfd *pfd, int n);
 void input_set_aux(struct input *in, int fd);
 void input_close(struct input *in);
 
-/* Which face button does what. retroid=1: the right button confirms, the
- * bottom one goes back, the top one opens settings and the left one is
- * the keyboard's shift. retroid=0, the PS style: bottom confirms, right
- * goes back, left opens settings, top is shift. Takes effect on the next
- * press. */
+/* Which face button does what. The top button opens settings and the left
+ * one is the keyboard's shift in both styles. retroid=1: the right button
+ * confirms and the bottom one goes back. retroid=0, the PS style: bottom
+ * confirms, right goes back. Takes effect on the next press. */
 void input_set_layout(int retroid);
 
 /* Throws away everything the devices buffered while something else had the
