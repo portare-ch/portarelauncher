@@ -61,7 +61,7 @@ static const struct { const char *key, *label; } profile_names[] = {
  * resolution, which is what visuals keeps and latency gives up. Only the
  * PlayStation's does, so only it shows the choice as latency or visuals.
  * The 2D cores draw at native either way, so for them the same stored
- * value shows as pre-empt on or off, which is all it changes. */
+ * value shows as PRMPT on or off, BIOS-style, which is all it changes. */
 static const struct { const char *key, *label; int upscales; } consoles[] = {
 	{ "snes",    "SNES",             0 },
 	{ "nes",     "NES",              0 },
@@ -88,7 +88,7 @@ static const char *console_mode_name(int i, int latency)
 {
 	if (consoles[i].upscales)
 		return latency ? "latency" : "visuals";
-	return latency ? "pre-empt on" : "pre-empt off";
+	return latency ? "PRMPT on" : "PRMPT off";
 }
 
 static void console_set_latency(const char *sys, int latency)
@@ -613,12 +613,9 @@ static void draw_consoles(struct ui *u)
 		          "Latency: Enables 1 pre-emptive frame for lower input latency. "
 		          "Renders at the console's native resolution.", ATTR_DIM);
 	} else {
-		r += wrap_puts(t, 4, y + 1 + r, width, room - r,
-		               "Pre-empt on: Enables 1 pre-emptive frame for lower input "
-		               "latency.", ATTR_DIM);
 		wrap_puts(t, 4, y + 1 + r, width, room - r,
-		          "Pre-empt off: The picture and timing as shipped. This console "
-		          "renders at its native resolution either way.", ATTR_DIM);
+		          "PRMPT: Enables or disables 1 pre-emptive frame for lower "
+		          "input latency.", ATTR_DIM);
 	}
 
 	if (u->note[0])

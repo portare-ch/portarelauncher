@@ -60,10 +60,10 @@ settings += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
 
 # Settings > Consoles: latency or visuals per console, and what each means,
 # wrapped at 45 columns as wrap_puts does it on the device.
-CONSOLES = [("SNES", "pre-empt on"), ("NES", "pre-empt off"),
-            ("PlayStation", "latency"), ("Game Boy", "pre-empt off"),
-            ("Game Boy Color", "pre-empt off"), ("Game Boy Advance", "pre-empt off"),
-            ("Genesis", "pre-empt off")]
+CONSOLES = [("SNES", "PRMPT on"), ("NES", "PRMPT off"),
+            ("PlayStation", "latency"), ("Game Boy", "PRMPT off"),
+            ("Game Boy Color", "PRMPT off"), ("Game Boy Advance", "PRMPT off"),
+            ("Genesis", "PRMPT off")]
 # The description follows the highlighted console: the PlayStation's core
 # renders above native and gives that up for latency; the 2D cores do not,
 # and their text says only what changes.
@@ -79,11 +79,8 @@ def consoles_screen(sel):
                   "    input latency. Renders at the console's native",
                   "    resolution."]
     else:
-        lines += ["    Pre-empt on: Enables 1 pre-emptive frame for",
-                  "    lower input latency.",
-                  "    Pre-empt off: The picture and timing as shipped.",
-                  "    This console renders at its native resolution",
-                  "    either way."]
+        lines += ["    PRMPT: Enables or disables 1 pre-emptive frame",
+                  "    for lower input latency."]
     lines += [""] * (ROWS - 2 - len(lines))
     lines += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
     return lines

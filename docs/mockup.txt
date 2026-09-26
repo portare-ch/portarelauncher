@@ -75,20 +75,20 @@
      Settings  ›  Consoles                               |
      ═══════════════════════════════════════════════════ |
                                                          |
-      ▸ SNES                                pre-empt on  |
-        NES                                pre-empt off  |
+      ▸ SNES                                   PRMPT on  |
+        NES                                   PRMPT off  |
         PlayStation                             latency  |
-        Game Boy                           pre-empt off  |
-        Game Boy Color                     pre-empt off  |
-        Game Boy Advance                   pre-empt off  |
-        Genesis                            pre-empt off  |
+        Game Boy                              PRMPT off  |
+        Game Boy Color                        PRMPT off  |
+        Game Boy Advance                      PRMPT off  |
+        Genesis                               PRMPT off  |
      ─────────────────────────────────────────────────── |
         Experimental.                                    |
-        Pre-empt on: Enables 1 pre-emptive frame for     |
-        lower input latency.                             |
-        Pre-empt off: The picture and timing as shipped. |
-        This console renders at its native resolution    |
-        either way.                                      |
+        PRMPT: Enables or disables 1 pre-emptive frame   |
+        for lower input latency.                         |
+                                                         |
+                                                         |
+                                                         |
                                                          |
      ─────────────────────────────────────────────────── |
      A CHANGE   B BACK                           ↑↓ MOVE |
@@ -99,13 +99,13 @@
      Settings  ›  Consoles                               |
      ═══════════════════════════════════════════════════ |
                                                          |
-        SNES                                pre-empt on  |
-        NES                                pre-empt off  |
+        SNES                                   PRMPT on  |
+        NES                                   PRMPT off  |
       ▸ PlayStation                             latency  |
-        Game Boy                           pre-empt off  |
-        Game Boy Color                     pre-empt off  |
-        Game Boy Advance                   pre-empt off  |
-        Genesis                            pre-empt off  |
+        Game Boy                              PRMPT off  |
+        Game Boy Color                        PRMPT off  |
+        Game Boy Advance                      PRMPT off  |
+        Genesis                               PRMPT off  |
      ─────────────────────────────────────────────────── |
         Experimental.                                    |
         Visuals: Renders at a higher internal resolution |
