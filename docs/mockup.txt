@@ -77,7 +77,6 @@
                                                          |
       ▸ SNES                                   PRMPT on  |
         NES                                   PRMPT off  |
-        PlayStation                             latency  |
         Game Boy                              PRMPT off  |
         Game Boy Color                        PRMPT off  |
         Game Boy Advance                      PRMPT off  |
@@ -90,30 +89,7 @@
                                                          |
                                                          |
                                                          |
-     ─────────────────────────────────────────────────── |
-     A CHANGE   B BACK                           ↑↓ MOVE |
-    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
-
-    SETTINGS - CONSOLES, PlayStation
-    .....................................................  <- 53 columns
-     Settings  ›  Consoles                               |
-     ═══════════════════════════════════════════════════ |
                                                          |
-        SNES                                   PRMPT on  |
-        NES                                   PRMPT off  |
-      ▸ PlayStation                             latency  |
-        Game Boy                              PRMPT off  |
-        Game Boy Color                        PRMPT off  |
-        Game Boy Advance                      PRMPT off  |
-        Genesis                               PRMPT off  |
-     ─────────────────────────────────────────────────── |
-        Experimental.                                    |
-        Visuals: Renders at a higher internal resolution |
-        for the sharpest image. Pre-emptive frames are   |
-        disabled.                                        |
-        Latency: Enables 1 pre-emptive frame for lower   |
-        input latency. Renders at the console's native   |
-        resolution.                                      |
      ─────────────────────────────────────────────────── |
      A CHANGE   B BACK                           ↑↓ MOVE |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
