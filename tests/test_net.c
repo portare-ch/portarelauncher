@@ -7,39 +7,36 @@
 #include <net/if.h>
 #include <netinet/in.h>
 
-#define SAVED "/usr/bin/nmcli -t -f NAME,TYPE connection show"
-#define VISIBLE "/usr/bin/nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY device wifi list"
+#define LIST "/usr/bin/portnet list"
+#define SCAN "/usr/bin/portnet list --rescan"
 
-/* The shape of the device's own output, names replaced. Terse mode escapes
- * ':' in values, an SSID can be hidden, and an open network's security is
- * empty. */
+/* The shape of portnet's own output, names replaced: one tab-separated
+ * line per network, SSID first, then known, connected, signal and the key
+ * type. A network iwd knows but cannot see reports -1 for signal. */
 static void test_scan(void)
 {
 	fake_reset();
-	fake_reply(SAVED,
-		"Home:802-11-wireless\n"
-		"lo:loopback\n"
-		"Cafe\\:Guest:802-11-wireless\n", 0);
-	fake_reply(VISIBLE,
-		"*:Home:59:WPA2\n"
-		" :Neighbour:45:WPA2\n"
-		" :Cafe\\:Guest:40:\n"
-		" :Open Net:37:\n"
-		" ::30:WPA2\n"
-		" :Far Away:12:WPA1 WPA2\n", 0);
+	fake_reply(LIST,
+		"Home\t1\t1\t59\tpsk\n"
+		"Cafe:Guest\t1\t0\t40\topen\n"
+		"Neighbour\t0\t0\t45\tpsk\n"
+		"Open Net\t0\t0\t37\topen\n"
+		"Far Away\t0\t0\t12\tpsk\n", 0);
 
 	struct net_list l;
 	net_scan(&l, 0);
-	CHECK(!fake_called("/usr/bin/nmcli device wifi rescan"));
+	CHECK(!fake_called(SCAN));
 
-	/* Connected, then saved, then the rest by signal. */
+	/* Connected, then known, then the rest by signal. */
 	CHECK_INT(l.n, 5);
 	if (l.n == 5) {
 		CHECK_STR(l.e[0].name, "Home");
 		CHECK(l.e[0].active && l.e[0].saved);
 		CHECK_INT(l.e[0].signal, 59);
-		CHECK_STR(l.e[0].security, "WPA2");
+		CHECK_STR(l.e[0].security, "psk");
 
+		/* An SSID with a colon needs no unescaping now: the fields are
+		 * split on tabs, which an SSID cannot contain. */
 		CHECK_STR(l.e[1].name, "Cafe:Guest");
 		CHECK(l.e[1].saved && !l.e[1].active);
 		CHECK_INT(l.e[1].signal, 40);
@@ -49,22 +46,20 @@ static void test_scan(void)
 		CHECK(!l.e[2].saved);
 		CHECK_STR(l.e[3].name, "Open Net");
 		CHECK_STR(l.e[4].name, "Far Away");
-		CHECK_STR(l.e[4].security, "WPA1 WPA2");
+		CHECK_STR(l.e[4].security, "psk");
 	}
 
 	fake_reset();
-	fake_reply(SAVED, "", 0);
-	fake_reply(VISIBLE, "", 0);
+	fake_reply(SCAN, "", 0);
 	net_scan(&l, 1);
-	CHECK(fake_called("/usr/bin/nmcli device wifi rescan"));
+	CHECK(fake_called(SCAN));
 	CHECK_INT(l.n, 0);
 }
 
 static void test_saved_out_of_range(void)
 {
 	fake_reset();
-	fake_reply(SAVED, "Holiday Flat:802-11-wireless\n", 0);
-	fake_reply(VISIBLE, "", 0);
+	fake_reply(LIST, "Holiday Flat\t1\t0\t-1\tpsk\n", 0);
 
 	struct net_list l;
 	net_scan(&l, 0);
@@ -77,33 +72,38 @@ static void test_min_password(void)
 {
 	CHECK_INT(net_min_password(NULL), 0);
 	CHECK_INT(net_min_password(""), 0);
-	CHECK_INT(net_min_password("WPA2"), 8);
-	CHECK_INT(net_min_password("WPA1 WPA2"), 8);
-	CHECK_INT(net_min_password("WPA3"), 1);
-	CHECK_INT(net_min_password("WPA2 802.1X"), -1);
+	/* iwd names the key type, not the protocol. psk covers WPA, WPA2 and
+	 * WPA3; wep has its own shorter keys; 8021x needs a username too. */
+	CHECK_INT(net_min_password("psk"), 8);
+	CHECK_INT(net_min_password("wep"), 1);
+	CHECK_INT(net_min_password("8021x"), -1);
 }
 
 static void test_join(void)
 {
-	/* Wrong password: nmcli fails with 4 and the profile it saved on the
-	 * way is deleted, so it does not sit in the list looking joinable. */
+	/* A refused passphrase is portnet's 4, and nothing has to be undone:
+	 * iwd writes credentials only once the association succeeds, so there
+	 * is no half-saved network to delete. */
 	fake_reset();
-	fake_reply("/usr/bin/nmcli --wait 30 device wifi connect Neighbour password hunter22",
-	           "", 4);
-	fake_reply("/usr/bin/nmcli connection delete id Neighbour", "", 0);
+	fake_reply("/usr/bin/portnet join Neighbour hunter22", "", 4);
 	CHECK_INT(net_join("Neighbour", "hunter22"), 4);
-	CHECK(fake_called("/usr/bin/nmcli connection delete id Neighbour"));
+	CHECK_INT(fake_n_calls, 1);
 
-	/* Success keeps it. */
+	/* Success. */
 	fake_reset();
-	fake_reply("/usr/bin/nmcli --wait 30 device wifi connect Neighbour password hunter22",
-	           "", 0);
+	fake_reply("/usr/bin/portnet join Neighbour hunter22", "", 0);
 	CHECK_INT(net_join("Neighbour", "hunter22"), 0);
-	CHECK(!fake_called("/usr/bin/nmcli connection delete id Neighbour"));
+	CHECK_INT(fake_n_calls, 1);
 
-	/* An open network gets no password argument at all. */
+	/* A network that has gone is 10, which the caller shows differently
+	 * from a wrong password. */
 	fake_reset();
-	fake_reply("/usr/bin/nmcli --wait 30 device wifi connect Open Net", "", 0);
+	fake_reply("/usr/bin/portnet join Neighbour hunter22", "", 10);
+	CHECK_INT(net_join("Neighbour", "hunter22"), 10);
+
+	/* An open network is a connect, with no passphrase argument. */
+	fake_reset();
+	fake_reply("/usr/bin/portnet connect Open Net", "", 0);
 	CHECK_INT(net_join("Open Net", ""), 0);
 	CHECK_INT(fake_n_calls, 1);
 }
@@ -184,25 +184,26 @@ static void test_usb(void)
 static void test_wifi_switch(void)
 {
 	/* Both switches, the rfkill block first: the boot's wifictl disable is
-	 * what an official image starts with, and nmcli alone does not lift it. */
+	 * what an official image starts with, and powering the adapter does
+	 * not lift it. That was true of NetworkManager and is true of iwd. */
 	fake_reset();
 	fake_reply("/usr/bin/wifictl enable", "", 0);
-	fake_reply("/usr/bin/nmcli radio wifi on", "", 0);
+	fake_reply("/usr/bin/portnet radio on", "", 0);
 	net_wifi_set(1);
 	CHECK_INT(fake_n_calls, 2);
 	CHECK_STR(fake_calls[0], "/usr/bin/wifictl enable");
-	CHECK_STR(fake_calls[1], "/usr/bin/nmcli radio wifi on");
+	CHECK_STR(fake_calls[1], "/usr/bin/portnet radio on");
 
 	fake_reset();
 	net_wifi_set(0);
 	CHECK_STR(fake_calls[0], "/usr/bin/wifictl disable");
-	CHECK_STR(fake_calls[1], "/usr/bin/nmcli radio wifi off");
+	CHECK_STR(fake_calls[1], "/usr/bin/portnet radio off");
 
 	fake_reset();
-	fake_reply("/usr/bin/nmcli -t radio wifi", "enabled\n", 0);
+	fake_reply("/usr/bin/portnet radio", "on\n", 0);
 	CHECK(net_wifi_enabled());
 	fake_reset();
-	fake_reply("/usr/bin/nmcli -t radio wifi", "disabled\n", 0);
+	fake_reply("/usr/bin/portnet radio", "off\n", 0);
 	CHECK(!net_wifi_enabled());
 }
 

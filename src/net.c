@@ -8,94 +8,44 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define NMCLI "/usr/bin/nmcli"
+#define PORTNET "/usr/bin/portnet"
 #define USBGADGET "/usr/bin/usbgadget"
 #define WIFICTL "/usr/bin/wifictl"
 #define SYSTEMCTL "/usr/bin/systemctl"
 #define SSHD_CONF "/storage/.cache/services/sshd.conf"
 
-/* nmcli -t escapes ':' and '\' in values. Splits one terse line into fields,
- * unescaping as it goes. Returns how many it found. */
-static int terse_split(const char *line, char out[][80], int max)
-{
-	int n = 0;
-	size_t w = 0;
-	if (max <= 0)
-		return 0;
-	out[0][0] = '\0';
-
-	for (const char *p = line; *p; p++) {
-		if (*p == '\\' && p[1]) {
-			p++;
-			if (w + 1 < 80)
-				out[n][w++] = *p;
-		} else if (*p == ':') {
-			out[n][w] = '\0';
-			if (++n >= max)
-				return n;
-			w = 0;
-			out[n][0] = '\0';
-		} else if (w + 1 < 80) {
-			out[n][w++] = *p;
-		}
-	}
-	out[n][w] = '\0';
-	return n + 1;
-}
-
 /* ---- Wi-Fi ---------------------------------------------------------- */
 
-static void cb_saved(char *line, void *ctx)
+/* portnet prints one tab-separated line per network:
+ *
+ *   SSID \t known \t connected \t signal \t type
+ *
+ * which is both of the nmcli passes this used to make. "known" is iwd
+ * having a passphrase for it, which is what "saved" meant here. A network
+ * iwd knows but cannot see has no entry in the scan, so its signal comes
+ * back -1, the same as a saved profile out of range did before. */
+static void cb_net(char *line, void *ctx)
 {
 	struct net_list *l = ctx;
-	char f[4][80];
-	if (terse_split(line, f, 4) < 2)
-		return;
-	if (strcmp(f[1], "802-11-wireless") != 0)
-		return;
-	if (l->n >= NET_MAX || !f[0][0])
+	char *f[5] = { line, NULL, NULL, NULL, NULL };
+	int n = 1;
+	for (char *p = line; *p && n < 5; p++)
+		if (*p == '\t') {
+			*p = '\0';
+			f[n++] = p + 1;
+		}
+	if (n < 5 || !f[0][0] || l->n >= NET_MAX)
 		return;
 
 	struct net_entry *e = &l->e[l->n++];
 	memset(e, 0, sizeof(*e));
 	str_copy(e->name, sizeof(e->name), f[0]);
-	e->saved = 1;
-	e->signal = -1;
-}
-
-static void cb_visible(char *line, void *ctx)
-{
-	struct net_list *l = ctx;
-	char f[4][80] = { { 0 } };   /* a line without SECURITY leaves f[3] */
-	if (terse_split(line, f, 4) < 3 || !f[1][0])
-		return;
-
-	int active = f[0][0] == '*';
-	int sig = atoi(f[2]);
-	/* Open networks report "" in terse mode and "--" in the tabular one;
-	 * accept both rather than depend on which this nmcli does. */
-	const char *sec = strcmp(f[3], "--") == 0 ? "" : f[3];
-
-	/* Already listed as a saved profile: fill in what the scan knows. */
-	for (int i = 0; i < l->n; i++) {
-		if (strcmp(l->e[i].name, f[1]) == 0) {
-			if (sig > l->e[i].signal)
-				l->e[i].signal = sig;
-			if (active)
-				l->e[i].active = 1;
-			str_copy(l->e[i].security, sizeof(l->e[i].security), sec);
-			return;
-		}
-	}
-
-	if (l->n >= NET_MAX)
-		return;
-	struct net_entry *e = &l->e[l->n++];
-	memset(e, 0, sizeof(*e));
-	str_copy(e->name, sizeof(e->name), f[1]);
-	str_copy(e->security, sizeof(e->security), sec);
-	e->signal = sig;
-	e->active = active;
+	e->saved  = atoi(f[1]);
+	e->active = atoi(f[2]);
+	e->signal = atoi(f[3]);
+	/* iwd names the security by key type - psk, open, 8021x, wep - where
+	 * NetworkManager named the protocol. net_min_password reads both. */
+	str_copy(e->security, sizeof(e->security), strcmp(f[4], "open") ? f[4] : "");
 }
 
 static int by_rank(const void *a, const void *b)
@@ -110,21 +60,11 @@ void net_scan(struct net_list *l, int rescan)
 {
 	memset(l, 0, sizeof(*l));
 
-	char *const saved[] = { (char *)NMCLI, (char *)"-t", (char *)"-f",
-	                        (char *)"NAME,TYPE", (char *)"connection",
-	                        (char *)"show", NULL };
-	proc_run(saved, cb_saved, l);
-
-	if (rescan) {
-		char *const rs[] = { (char *)NMCLI, (char *)"device", (char *)"wifi",
-		                     (char *)"rescan", NULL };
-		proc_run(rs, NULL, NULL);
-	}
-
-	char *const vis[] = { (char *)NMCLI, (char *)"-t", (char *)"-f",
-	                      (char *)"IN-USE,SSID,SIGNAL,SECURITY", (char *)"device",
-	                      (char *)"wifi", (char *)"list", NULL };
-	proc_run(vis, cb_visible, l);
+	/* One call. portnet waits for the scan to finish when asked to
+	 * rescan, so there is nothing to sleep on here. */
+	char *const scan[]  = { (char *)PORTNET, (char *)"list", (char *)"--rescan", NULL };
+	char *const cache[] = { (char *)PORTNET, (char *)"list", NULL };
+	proc_run_for(rescan ? scan : cache, cb_net, l, 20000);
 
 	qsort(l->e, (size_t)l->n, sizeof(l->e[0]), by_rank);
 }
@@ -139,23 +79,24 @@ static void cb_first(char *line, void *ctx)
 int net_wifi_enabled(void)
 {
 	char v[80] = "";
-	char *const argv[] = { (char *)NMCLI, (char *)"-t", (char *)"radio",
-	                       (char *)"wifi", NULL };
+	char *const argv[] = { (char *)PORTNET, (char *)"radio", NULL };
 	proc_run(argv, cb_first, v);
-	return strcmp(v, "enabled") == 0;
+	return strcmp(v, "on") == 0;
 }
 
 void net_wifi_set(int on)
 {
-	/* Both switches. The boot turns Wi-Fi off with wifictl, which is an
-	 * rfkill block, and NetworkManager's own radio switch does not lift
-	 * that - so "on" through nmcli alone left the radio blocked. */
+	/* Both switches, and in this order. The boot turns Wi-Fi off with
+	 * wifictl, which is an rfkill block, and powering the adapter does
+	 * not lift that - so "on" through the adapter alone left the radio
+	 * blocked. That was true of NetworkManager's switch and is true of
+	 * iwd's: rfkill sits underneath both. */
 	char *const rf[] = { (char *)WIFICTL, (char *)(on ? "enable" : "disable"),
 	                     NULL };
-	char *const nm[] = { (char *)NMCLI, (char *)"radio", (char *)"wifi",
-	                     (char *)(on ? "on" : "off"), NULL };
+	char *const radio[] = { (char *)PORTNET, (char *)"radio",
+	                        (char *)(on ? "on" : "off"), NULL };
 	proc_run(rf, NULL, NULL);
-	proc_run(nm, NULL, NULL);
+	proc_run(radio, NULL, NULL);
 }
 
 /* ---- SSH ------------------------------------------------------------ */
@@ -187,63 +128,56 @@ void net_ssh_set(int on)
 
 int net_connect(const char *name)
 {
-	char *const argv[] = { (char *)NMCLI, (char *)"connection", (char *)"up",
-	                       (char *)"id", (char *)name, NULL };
-	return proc_run(argv, NULL, NULL);
+	char *const argv[] = { (char *)PORTNET, (char *)"connect", (char *)name,
+	                       NULL };
+	return proc_run_for(argv, NULL, NULL, 40000);
 }
 
 int net_join(const char *ssid, const char *password)
 {
-	/* The password goes on nmcli's command line, where anything running
-	 * as root can read it for the second or two nmcli takes. That is
-	 * accepted rather than engineered around: NetworkManager stores the
-	 * same password in plain text in its profile the moment this
+	/* The password goes on portnet's command line, where anything running
+	 * as root can read it for the second or two the join takes. That is
+	 * accepted rather than engineered around: iwd stores the same
+	 * passphrase in plain text under /var/lib/iwd the moment this
 	 * succeeds, and everything on this device runs as root. What would
 	 * not be acceptable is a long-lived process holding it there, which
 	 * is the problem with the file server in portareos#239.
 	 *
-	 * nmcli's own --wait comes in under our ceiling, so a slow join is
-	 * reported by nmcli as a timeout rather than killed by us. */
-	char *const argv_pw[] = { (char *)NMCLI, (char *)"--wait", (char *)"30",
-	                          (char *)"device", (char *)"wifi", (char *)"connect",
-	                          (char *)ssid, (char *)"password",
+	 * Nothing has to be undone when this fails. iwd is told the
+	 * passphrase through an agent and only writes it once the association
+	 * succeeds, so a wrong one leaves no saved network behind - which is
+	 * what the NetworkManager path needed an explicit delete for.
+	 *
+	 * portnet's exit codes are this function's: 0, 4 for a refused
+	 * passphrase, 10 for a network that is no longer there. */
+	char *const argv_pw[] = { (char *)PORTNET, (char *)"join", (char *)ssid,
 	                          (char *)password, NULL };
-	char *const argv_open[] = { (char *)NMCLI, (char *)"--wait", (char *)"30",
-	                            (char *)"device", (char *)"wifi",
-	                            (char *)"connect", (char *)ssid, NULL };
-	int rc = proc_run_for(password && password[0] ? argv_pw : argv_open,
-	                      NULL, NULL, 40000);
-
-	if (rc != 0) {
-		/* Only ever called for a network with no saved profile, so a
-		 * profile by this name now is the one this attempt created. */
-		char *const del[] = { (char *)NMCLI, (char *)"connection",
-		                      (char *)"delete", (char *)"id", (char *)ssid,
-		                      NULL };
-		proc_run(del, NULL, NULL);
-	}
-	return rc;
+	char *const argv_open[] = { (char *)PORTNET, (char *)"connect",
+	                            (char *)ssid, NULL };
+	return proc_run_for(password && password[0] ? argv_pw : argv_open,
+	                    NULL, NULL, 40000);
 }
 
 int net_min_password(const char *security)
 {
 	if (!security || !security[0])
 		return 0;
-	if (strstr(security, "802.1X"))
+	/* iwd names these by key type rather than by protocol. 8021x wants a
+	 * username as well, which this cannot ask for. */
+	if (!strcmp(security, "8021x"))
 		return -1;
-	/* WPA and WPA2 personal: an 8 to 63 character passphrase. WPA3's SAE
-	 * has no such floor in the standard, and WEP keys are 5 or 13
-	 * characters; nmcli rejects what is wrong for either, so 1 is enough
-	 * to stop an empty submit. */
-	if (strstr(security, "WPA1") || strstr(security, "WPA2"))
+	/* psk covers WPA and WPA2 personal, an 8 to 63 character passphrase,
+	 * and WPA3 as well - SAE has no floor in the standard. WEP keys are 5
+	 * or 13 characters. iwd refuses what is wrong for either, so 1 is
+	 * enough here to stop an empty submit. */
+	if (!strcmp(security, "psk"))
 		return 8;
 	return 1;
 }
 
 int net_disconnect(void)
 {
-	char *const argv[] = { (char *)NMCLI, (char *)"radio", (char *)"wifi",
-	                       (char *)"off", NULL };
+	char *const argv[] = { (char *)PORTNET, (char *)"disconnect", NULL };
 	return proc_run(argv, NULL, NULL);
 }
 

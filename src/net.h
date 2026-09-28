@@ -1,14 +1,15 @@
 /* Networking, through the tools the system already has.
  *
- * Wi-Fi is NetworkManager with an iwd backend, and NetworkManager already
- * keeps a profile per network with its credentials. Multiple saved SSIDs are
- * not a feature to add - they exist, there has simply been nothing able to
- * pick between them. wifictl is built around a single "wifi.ssid" setting,
- * which is the limitation rather than the interface, so this talks to nmcli.
+ * Wi-Fi is iwd, reached through portnet - a small command that talks to it
+ * on sd-bus. NetworkManager used to sit in between, owning Ethernet and
+ * doing DHCP while iwd did the 802.11; this device has one interface and
+ * no Ethernet, so that layer went. portnet keeps the exit codes this file
+ * documents, and iwd keeps a passphrase per network, so multiple saved
+ * SSIDs still work the way they did.
  *
- * USB gadget goes through /usr/bin/usbgadget, which already has the interface
- * a menu wants: --options lists the modes, no argument reports the current
- * one, and a mode name sets it.
+ * USB gadget goes through /usr/bin/usbgadget, which already has the
+ * interface a menu wants: --options lists the modes, no argument reports
+ * the current one, and a mode name sets it.
  *
  * Both are run through proc_run, which never involves a shell. See proc.h.
  */
@@ -21,11 +22,11 @@
 
 struct net_entry {
 	char name[80];    /* SSID, or the connection profile's name */
-	int  saved;       /* NetworkManager has credentials for it  */
+	int  saved;       /* iwd has a passphrase for it            */
 	int  active;      /* currently connected                    */
 	int  signal;      /* 0-100, or -1 when not seen in a scan   */
-	char security[32];/* "WPA2", "WPA2 WPA3", "" when open or
-	                     not seen in a scan                     */
+	char security[32];/* iwd's key type: "psk", "8021x", "wep",
+	                     "" when open or not seen in a scan     */
 };
 
 struct net_list {
@@ -33,8 +34,8 @@ struct net_list {
 	int n;
 };
 
-/* Saved profiles first, then anything else in range, strongest first. A
- * network that is both saved and visible appears once, marked saved. */
+/* Known networks first, then anything else in range, strongest first. A
+ * network that is both known and visible appears once, marked saved. */
 void net_scan(struct net_list *l, int rescan);
 
 int  net_wifi_enabled(void);
@@ -55,12 +56,13 @@ int  net_connect(const char *name);
 
 /* Joins a network that has no saved profile, saving one if it works.
  * password may be empty for an open network. Returns 0 on success, or
- * nmcli's exit status: 4 when activation failed (almost always the
- * password), 10 when the network is no longer there, or PROC_TIMEOUT.
+ * portnet's exit status: 4 when the passphrase was refused, 10 when the
+ * network is no longer there, or PROC_TIMEOUT.
  *
- * A failed join leaves nothing behind. NetworkManager saves the profile
- * before it knows whether the password was right, so a wrong one would
- * otherwise sit in the saved list looking like a network you can join. */
+ * A failed join leaves nothing behind, and now for free: iwd is told the
+ * passphrase through an agent and writes it only once the association
+ * succeeds. NetworkManager saved its profile before it knew whether the
+ * password was right, which is why this used to delete one. */
 int  net_join(const char *ssid, const char *password);
 
 /* The shortest password the network's security allows, or -1 when it needs
