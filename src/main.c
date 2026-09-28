@@ -54,22 +54,23 @@ static const struct { const char *key, *label; } profile_names[] = {
 
 /* Settings > Consoles: one switch per console, read by setsettings.sh
  * when the game starts. The key is the system's name in es_systems.cfg,
- * which is also how every other per-system setting is keyed.
+ * which is also how every other per-system setting is keyed. The switch
+ * is the pre-emptive frame: stored as <system>.preempt, 1 or 0, shown as
+ * PRMPT on or off, BIOS-style.
  *
- * upscales says whether the shipped core renders above the console's own
- * resolution. Only the PlayStation's does, and its latency mode gives
- * that up as well as adding the pre-emptive frame, so it stores
- * <system>.profile as latency or visuals. The 2D cores draw at native
- * either way, so their switch is the pre-emptive frame alone: stored as
- * <system>.preempt, 1 or 0, shown as PRMPT on or off, BIOS-style. */
-static const struct { const char *key, *label; int upscales; } consoles[] = {
-	{ "snes",    "SNES",             0 },
-	{ "nes",     "NES",              0 },
-	{ "psx",     "PlayStation",      1 },
-	{ "gb",      "Game Boy",         0 },
-	{ "gbc",     "Game Boy Color",   0 },
-	{ "gba",     "Game Boy Advance", 0 },
-	{ "genesis", "Genesis",          0 },
+ * The PlayStation is not here. It had a latency mode that added the
+ * pre-emptive frame and dropped the renderer to the console's own
+ * resolution to pay for it; measured, it cost 12 fps on Tekken 3 and the
+ * shipped configuration runs every frame on time, so the choice was
+ * removed rather than kept as a way to make it worse. BUGS.md has the
+ * numbers. */
+static const struct { const char *key, *label; } consoles[] = {
+	{ "snes",    "SNES"             },
+	{ "nes",     "NES"              },
+	{ "gb",      "Game Boy"         },
+	{ "gbc",     "Game Boy Color"   },
+	{ "gba",     "Game Boy Advance" },
+	{ "genesis", "Genesis"          },
 };
 #define N_CONSOLES ((int)(sizeof(consoles) / sizeof(consoles[0])))
 
@@ -78,11 +79,6 @@ static const struct { const char *key, *label; int upscales; } consoles[] = {
 static int console_latency(int i)
 {
 	char key[64], val[16];
-	if (consoles[i].upscales) {
-		snprintf(key, sizeof(key), "%s.profile", consoles[i].key);
-		return settings_get(SETTINGS, key, val, sizeof(val)) &&
-		       strcmp(val, "latency") == 0;
-	}
 	snprintf(key, sizeof(key), "%s.preempt", consoles[i].key);
 	return settings_get(SETTINGS, key, val, sizeof(val)) &&
 	       strcmp(val, "1") == 0;
@@ -91,21 +87,15 @@ static int console_latency(int i)
 /* What the stored value is called on screen for this console. */
 static const char *console_mode_name(int i, int latency)
 {
-	if (consoles[i].upscales)
-		return latency ? "latency" : "visuals";
+	(void)i;
 	return latency ? "PRMPT on" : "PRMPT off";
 }
 
 static void console_set_latency(int i, int latency)
 {
 	char key[64];
-	if (consoles[i].upscales) {
-		snprintf(key, sizeof(key), "%s.profile", consoles[i].key);
-		settings_set(SETTINGS, key, latency ? "latency" : "visuals");
-	} else {
-		snprintf(key, sizeof(key), "%s.preempt", consoles[i].key);
-		settings_set(SETTINGS, key, latency ? "1" : "0");
-	}
+	snprintf(key, sizeof(key), "%s.preempt", consoles[i].key);
+	settings_set(SETTINGS, key, latency ? "1" : "0");
 }
 
 #ifndef PL_VERSION
@@ -597,9 +587,9 @@ static void draw_settings(struct ui *u)
 	}
 }
 
-/* One row per console, latency or visuals. What each means is written
- * under the list, wrapped by wrap_puts so it can never run past the
- * frame; the text is experimental and says so. */
+/* One row per console, the pre-emptive frame on or off. What it means is
+ * written under the list, wrapped by wrap_puts so it can never run past
+ * the frame; the text is experimental and says so. */
 static void draw_consoles(struct ui *u)
 {
 	struct term *t = &u->term;
@@ -615,18 +605,9 @@ static void draw_consoles(struct ui *u)
 	/* The rows between the rule and the bottom rule, and no more. */
 	unsigned width = t->cols - 8, room = t->rows - 2 - (y + 1);
 	unsigned r = wrap_puts(t, 4, y + 1, width, room, "Experimental.", ATTR_DIM);
-	if (consoles[u->console_sel].upscales) {
-		r += wrap_puts(t, 4, y + 1 + r, width, room - r,
-		               "Visuals: Renders at a higher internal resolution for the "
-		               "sharpest image. Pre-emptive frames are disabled.", ATTR_DIM);
-		wrap_puts(t, 4, y + 1 + r, width, room - r,
-		          "Latency: Enables 1 pre-emptive frame for lower input latency. "
-		          "Renders at the console's native resolution.", ATTR_DIM);
-	} else {
-		wrap_puts(t, 4, y + 1 + r, width, room - r,
-		          "PRMPT: Enables or disables 1 pre-emptive frame for lower "
-		          "input latency.", ATTR_DIM);
-	}
+	wrap_puts(t, 4, y + 1 + r, width, room - r,
+	          "PRMPT: Enables or disables 1 pre-emptive frame for lower "
+	          "input latency.", ATTR_DIM);
 
 	if (u->note[0])
 		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
