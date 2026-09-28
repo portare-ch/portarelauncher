@@ -44,6 +44,13 @@
 /* Yellow thumbsticks while the battery charges; a daemon on the image
  * reads this every few seconds. */
 #define KEY_CHARGING "led.charging"
+/* How long the menu may sit untouched before the panel goes off, in
+ * minutes. The panel is OLED, so a menu left up all night is not merely
+ * wasted power. Only ever reached while this program holds the panel: a
+ * running game owns it instead, and blanking under one is not ours to do. */
+#define KEY_BLANK "display.blankminutes"
+static const int blank_minutes[] = { 5, 10, 15 };
+#define N_BLANK ((int)(sizeof(blank_minutes) / sizeof(blank_minutes[0])))
 #define PROFILE_DIR "/usr/config/color"
 static const struct { const char *key, *label; } profile_names[] = {
 	{ "stock",   "stock" },
@@ -121,6 +128,9 @@ struct ui {
 	int profile_ok[N_PROFILES];  /* the file loaded; [0], stock, always */
 	int profile;         /* the one applied, an index into profiles[]     */
 	int charging_led;    /* led.charging, 1 unless the file says 0        */
+	int blank_idx;       /* into blank_minutes[]                          */
+	long long last_act;  /* when the last press came in, ms               */
+	int blanked;         /* the CRTC is off, by idle or by SIGUSR1        */
 	struct status st;
 	struct osd osd;
 
@@ -189,6 +199,9 @@ struct ui {
 #define G_TRIANGLE  0x1E   /* /\  */
 #define G_SQUARE    0xFE   /* []  */
 
+/* Thirteen rows do not fit: twelve fill 3..14, leaving the rule, two lines
+ * of description, the bottom rule and the hint. A new setting goes in a
+ * submenu, not here. */
 enum { SET_WIFI = 0, SET_SSH, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_CONSOLES,
        SET_COLOR, SET_PROFILE, SET_CHARGING, SET_TIMEZONE, SET_ABOUT, SET_POWER,
        N_SETTINGS };
@@ -849,7 +862,13 @@ static void power(struct ui *u, const char *verb)
 	         strcmp(verb, "reboot") == 0 ? "restart" : "switch off", rc);
 }
 
-static const char *const power_rows[] = { "Restart", "Power off" };
+/* Row 0 is a setting and cycles; rows 1 and 2 are the armed actions, and
+ * power_verbs is indexed from row 1. */
+#define POW_BLANK   0
+#define POW_RESTART 1
+#define POW_OFF     2
+#define N_POWER_ROWS 3
+static const char *const power_rows[] = { "Screen off", "Restart", "Power off" };
 static const char *const power_verbs[] = { "reboot", "poweroff" };
 
 static void draw_power(struct ui *u)
@@ -859,16 +878,29 @@ static void draw_power(struct ui *u)
 	char buf[64];
 
 	draw_frame(u, "Settings  >  Power");
-	for (int i = 0; i < 2; i++)
-		draw_row(u, (unsigned)(3 + i), i == u->power_sel, power_rows[i], NULL);
-	term_hline(t, 6, G_HLINE, ATTR_DIM);
+	for (int i = 0; i < N_POWER_ROWS; i++) {
+		char v[16];
+		const char *value = NULL;
+		if (i == POW_BLANK) {
+			snprintf(v, sizeof(v), "%d min", blank_minutes[u->blank_idx]);
+			value = v;
+		}
+		draw_row(u, (unsigned)(3 + i), i == u->power_sel, power_rows[i], value);
+	}
+	term_hline(t, 3 + N_POWER_ROWS, G_HLINE, ATTR_DIM);
+
+	if (u->power_sel == POW_BLANK)
+		wrap_puts(t, 4, 3 + N_POWER_ROWS + 1, t->cols - 8, 3,
+		          "How long the menu may sit untouched before the panel "
+		          "goes off. Any button wakes it. A running game owns the "
+		          "panel and is not covered.", ATTR_DIM);
 
 	/* One press arms it and says so; the second does it. Anything else
 	 * disarms, so a stray press on the way through never switches off. */
 	if (u->power_armed >= 0) {
 		snprintf(buf, sizeof(buf), "Press %c again to %s.", f.confirm,
-		         u->power_armed == 0 ? "restart" : "switch off");
-		term_puts(t, 4, 8, buf, ATTR_BRIGHT);
+		         u->power_armed == POW_RESTART ? "restart" : "switch off");
+		term_puts(t, 4, 3 + N_POWER_ROWS + 2, buf, ATTR_BRIGHT);
 	}
 	if (u->note[0])
 		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
@@ -1354,6 +1386,11 @@ static int reclaim_panel(struct ui *u, int patience_ms)
 	kms_present(&u->kms);
 	reapply_profile(u);
 	term_invalidate(&u->term);   /* someone else owned the panel */
+	/* Coming back from a game is the panel becoming ours again, and the
+	 * player was busy the whole time it was not. Start the idle clock
+	 * here or a long session blanks the menu the moment it returns. */
+	u->last_act = now_ms();
+	u->blanked = 0;
 	return 0;
 }
 
@@ -1783,14 +1820,24 @@ static void on_action(struct ui *u, enum action a)
 		break;
 
 	case SCR_POWER:
-		if (a == ACT_CONFIRM && u->power_armed == u->power_sel) {
+		if (a == ACT_CONFIRM && u->power_sel != POW_BLANK &&
+		    u->power_armed == u->power_sel) {
 			u->power_armed = -1;
-			power(u, power_verbs[u->power_sel]);
+			power(u, power_verbs[u->power_sel - POW_RESTART]);
 			break;
 		}
 		u->power_armed = -1;
 		if (a == ACT_UP && u->power_sel > 0) u->power_sel--;
-		else if (a == ACT_DOWN && u->power_sel < 1) u->power_sel++;
+		else if (a == ACT_DOWN && u->power_sel < N_POWER_ROWS - 1) u->power_sel++;
+		else if (u->power_sel == POW_BLANK &&
+		         (a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT)) {
+			char buf[8];
+			u->blank_idx = (a == ACT_LEFT)
+			             ? (u->blank_idx + N_BLANK - 1) % N_BLANK
+			             : (u->blank_idx + 1) % N_BLANK;
+			snprintf(buf, sizeof(buf), "%d", blank_minutes[u->blank_idx]);
+			settings_set(SETTINGS, KEY_BLANK, buf);
+		}
 		else if (a == ACT_CONFIRM) u->power_armed = u->power_sel;
 		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
 		else if (a == ACT_QUIT) u->running = 0;
@@ -2017,6 +2064,17 @@ int main(void)
 		char chg[8] = "";
 		settings_get(SETTINGS, KEY_CHARGING, chg, sizeof(chg));
 		u.charging_led = strcmp(chg, "0") != 0;
+		/* Absent, empty or not one of the offered values reads as the
+		 * first, the shortest: an OLED left lit is the thing this is
+		 * for, so an unreadable setting errs towards off sooner. */
+		char blk[8] = "";
+		settings_get(SETTINGS, KEY_BLANK, blk, sizeof(blk));
+		for (int i = 0; i < N_BLANK; i++) {
+			char want[8];
+			snprintf(want, sizeof(want), "%d", blank_minutes[i]);
+			if (strcmp(blk, want) == 0)
+				u.blank_idx = i;
+		}
 		for (int i = 1; i < N_PROFILES; i++)
 			if (u.profile_ok[i] && strcmp(prof, profile_names[i].key) == 0 &&
 			    kms_color_apply(&u.kms, &u.profiles[i]) == 0)
@@ -2054,6 +2112,7 @@ int main(void)
 	status_read(&u.st);
 	net_address(u.addr, sizeof(u.addr));
 	u.started = now_ms();
+	u.last_act = u.started;
 	u.net_next = u.started + NET_POLL_FAST_MS;
 	redraw(&u);
 
@@ -2070,6 +2129,18 @@ int main(void)
 		long long net_left = u.net_next - now_ms();
 		if (net_left < idle)
 			idle = net_left > 0 ? (int)net_left : 0;
+		/* Dark already: nothing drawn needs refreshing, so sleep until
+		 * a button, or a signal, says otherwise. Not while the panel
+		 * is someone else's - that retry has to keep ticking. */
+		if (u.blanked && !u.panel_lost)
+			idle = -1;
+		else if (!u.blanked) {
+			long long blank_left = u.last_act
+			                     + blank_minutes[u.blank_idx] * 60000LL
+			                     - now_ms();
+			if (blank_left < idle)
+				idle = blank_left > 0 ? (int)blank_left : 0;
+		}
 
 		enum action a = input_wait(&u.in, idle);
 		net_poll(&u);
@@ -2083,17 +2154,54 @@ int main(void)
 				term_invalidate(&u.term);
 				status_read(&u.st);
 				redraw(&u);
+				u.blanked = 0;
+				u.last_act = now_ms();
 			} else {
 				kms_blank(&u.kms);
+				u.blanked = 1;
 			}
 			continue;
 		}
 
+		/* A press while dark is the press that brings the panel back
+		 * and nothing else: waking is not a menu action, and coming
+		 * back to a moved cursor is how a sleeping device loses a
+		 * game. Releases arrive as ACT_NONE and are ignored here, so
+		 * the button that woke it does not act on release either. */
+		/* Losing the panel outranks being dark: reclaim_panel clears
+		 * the blank when it succeeds, and taking this branch first is
+		 * what keeps a blank from parking the retry. */
 		if (u.panel_lost) {
 			if (reclaim_panel(&u, 0) == 0)
 				redraw(&u);
 			if (a == ACT_TICK || u.panel_lost)
 				continue;
+		}
+
+		if (u.blanked) {
+			if (a == ACT_NONE || a == ACT_TICK)
+				continue;
+			kms_present(&u.kms);
+			reapply_profile(&u);
+			term_invalidate(&u.term);
+			status_read(&u.st);
+			redraw(&u);
+			u.blanked = 0;
+			u.last_act = now_ms();
+			continue;
+		}
+
+		if (a != ACT_NONE && a != ACT_TICK)
+			u.last_act = now_ms();
+
+		/* Not while a game holds the panel: the CRTC is not ours to
+		 * disable then, and the idle clock starts again when it
+		 * comes back. */
+		if (!u.going_down &&
+		    now_ms() - u.last_act >= blank_minutes[u.blank_idx] * 60000LL) {
+			kms_blank(&u.kms);
+			u.blanked = 1;
+			continue;
 		}
 
 		if (a == ACT_NONE)

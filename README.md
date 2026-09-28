@@ -26,7 +26,11 @@ described from the folder's gamelist.xml.
 
 Settings: Wi-Fi, SSH, Bluetooth, USB gadget mode, button style, color, color
 profile, charging LED, time zone, About and Power all work. Power restarts or switches off after a
-second press, with the panel switched off first. The time zone is a region, then a city, each city
+second press, with the panel switched off first, and holds Screen off: how
+long the menu may sit untouched before the panel is blanked, 5, 10 or 15
+minutes, 5 by default. Any button wakes it and does nothing else. The panel
+is OLED, so a menu left up overnight is not only wasted power. A running
+game owns the panel and is not covered by this. The time zone is a region, then a city, each city
 shown with the time it is there now. About shows the version, commit, build date, device and IP
 address, and holds Update, which asks GitHub what the chosen channel -
 nightly or release - has for this device, downloads it over Wi-Fi with a
