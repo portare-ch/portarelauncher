@@ -15,6 +15,11 @@ A game made of several files is listed once: a .cue and its tracks, a .gdi
 and its tracks, an .m3u and its discs, a CloneCD .ccd and its image. Every
 file a sheet names is left out, and the sheet is what launches.
 
+A system with a lone `/` among its extensions also lists each folder that
+holds something it plays, as `name/`, ahead of the files, and launching one
+hands the player the folder. Music does, so an album plays whole; its tracks
+are still listed one by one.
+
 ## Status
 
 Runs on the device. It finds the systems that have games, lists them, lists

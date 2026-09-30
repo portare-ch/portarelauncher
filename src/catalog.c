@@ -109,6 +109,55 @@ static int ext_matches(const char *file, const char *exts)
 	return 0;
 }
 
+/* A lone "/" in the extensions: a folder holding something this system
+ * plays is listed as well, and launching it hands the player the folder.
+ * An album is a folder; so is a series. */
+static int folders_play(const char *exts)
+{
+	for (const char *p = exts; *p; ) {
+		while (*p == ' ')
+			p++;
+		const char *q = p;
+		while (*q && *q != ' ')
+			q++;
+		if (q - p == 1 && *p == '/')
+			return 1;
+		p = q;
+	}
+	return 0;
+}
+
+static int holds_games(const char *dir, const char *exts)
+{
+	DIR *d = opendir(dir);
+	if (!d)
+		return 0;
+	struct dirent *e;
+	int found = 0;
+	while (!found && (e = readdir(d)))
+		found = e->d_name[0] != '.' && ext_matches(e->d_name, exts);
+	closedir(d);
+	return found;
+}
+
+static void add_folder(struct psystem *s, const char *full, const char *name)
+{
+	struct game *g = realloc(s->games, (size_t)(s->ngames + 1) * sizeof(*g));
+	if (!g)
+		return;
+	s->games = g;
+	g = &s->games[s->ngames];
+
+	copy_str(g->path, sizeof(g->path), full);
+	/* One short, to leave room for the slash that says it is a folder. */
+	copy_str(g->name, sizeof(g->name) - 1, name);
+	size_t n = strlen(g->name);
+	g->name[n] = '/';
+	g->name[n + 1] = '\0';
+	g->folder = 1;
+	s->ngames++;
+}
+
 static void add_game(struct psystem *s, const char *path, const char *file)
 {
 	struct game *g = realloc(s->games, (size_t)(s->ngames + 1) * sizeof(*g));
@@ -119,6 +168,7 @@ static void add_game(struct psystem *s, const char *path, const char *file)
 
 	snprintf(g->path, sizeof(g->path), "%s/%s", path, file);
 	copy_str(g->name, sizeof(g->name), file);
+	g->folder = 0;
 	char *dot = strrchr(g->name, '.');
 	if (dot)
 		*dot = '\0';
@@ -148,6 +198,9 @@ static void scan(struct psystem *s, const char *dir, int depth)
 			continue;
 
 		if (S_ISDIR(st.st_mode)) {
+			if (depth > 0 && folders_play(s->exts) &&
+			    holds_games(full, s->exts))
+				add_folder(s, full, e->d_name);
 			/* PS2 and Dreamcast titles arrive as a directory holding
 			 * the disc image, so one level down is worth looking at. */
 			if (depth > 0)
@@ -204,10 +257,13 @@ static void hide_referenced(struct psystem *s)
 	free(refs);
 }
 
+/* Folders first, then by name. */
 static int by_name(const void *a, const void *b)
 {
-	return strcasecmp(((const struct game *)a)->name,
-	                  ((const struct game *)b)->name);
+	const struct game *ga = a, *gb = b;
+	if (ga->folder != gb->folder)
+		return gb->folder - ga->folder;
+	return strcasecmp(ga->name, gb->name);
 }
 
 static int by_fullname(const void *a, const void *b)

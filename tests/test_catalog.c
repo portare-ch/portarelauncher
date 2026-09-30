@@ -60,6 +60,14 @@ static const char *es_systems =
 	"\t\t<extension>.bin .cue .img .ccd .m3u .chd</extension>\n"
 	"\t\t<command>/usr/bin/runemu.sh %%ROM%%</command>\n"
 	"\t</system>\n"
+	/* A system whose folders play: the lone / in its extensions. */
+	"\t<system>\n"
+	"\t\t<name>music</name>\n"
+	"\t\t<fullname>Zz Music</fullname>\n"
+	"\t\t<path>%1$s/roms/music</path>\n"
+	"\t\t<extension>.flac .mp3 /</extension>\n"
+	"\t\t<command>/usr/bin/runemu.sh %%ROM%%</command>\n"
+	"\t</system>\n"
 	"</systemList>\n";
 
 static void touch(const char *rel)
@@ -136,6 +144,17 @@ static void build_fixture(void)
 	/* A .bin no sheet names is a game of its own and stays. */
 	touch("roms/multi/Orphan.bin");
 
+	dir("roms/music");
+	dir("roms/music/album1");
+	touch("roms/music/album1/01 Intro.flac");
+	touch("roms/music/album1/02 Theme.MP3");
+	touch("roms/music/loose.mp3");
+	dir("roms/music/art");
+	touch("roms/music/art/cover.jpg");           /* nothing to play: no row */
+	dir("roms/music/empty");
+	dir("roms/music/images");
+	touch("roms/music/images/x.mp3");            /* artwork folder, as ever */
+
 	dir("modules");
 	touch("modules/commander.sh");
 }
@@ -153,8 +172,9 @@ static void test_systems(void)
 	struct catalog c;
 	CHECK_INT(catalog_load(&c, cfg, sys_cfg), 0);
 
-	/* psx, ps2 and multi; tools and the empty snes are gone. By full name. */
-	CHECK_INT(c.n, 3);
+	/* psx, ps2, multi and music; tools and the empty snes are gone. By
+	 * full name. */
+	CHECK_INT(c.n, 4);
 	CHECK_STR(c.sys[0].fullname, "PlayStation");
 	CHECK_STR(c.sys[1].fullname, "PlayStation 2 & Friends");
 	CHECK(find(&c, "tools") == NULL);
@@ -233,6 +253,41 @@ static void test_multi_file(void)
 	catalog_free(&c);
 }
 
+static void test_folders(void)
+{
+	struct catalog c;
+	CHECK_INT(catalog_load(&c, cfg, sys_cfg), 0);
+
+	/* A folder holding something the system plays is a row of its own,
+	 * named with a slash and listed before the files; its tracks stay. A
+	 * folder with nothing playable in it is not a row. */
+	const struct psystem *m = find(&c, "music");
+	CHECK(m != NULL);
+	if (m) {
+		CHECK_INT(m->ngames, 4);
+		if (m->ngames == 4) {
+			char want[128];
+			CHECK_STR(m->games[0].name, "album1/");
+			snprintf(want, sizeof(want), "%s/roms/music/album1", root);
+			CHECK_STR(m->games[0].path, want);
+			CHECK_STR(m->games[1].name, "01 Intro");
+			CHECK_STR(m->games[2].name, "02 Theme");
+			CHECK_STR(m->games[3].name, "loose");
+		}
+	}
+
+	/* Without the slash a folder is only somewhere to look: ps2's
+	 * "Game A" gives its disc, not a row of its own. */
+	const struct psystem *ps2 = find(&c, "ps2");
+	CHECK(ps2 != NULL);
+	if (ps2) {
+		CHECK_INT(ps2->ngames, 1);
+		if (ps2->ngames == 1)
+			CHECK_STR(ps2->games[0].name, "Game A");
+	}
+	catalog_free(&c);
+}
+
 static void test_overrides(void)
 {
 	/* system.cfg picks the core and emulator over es_systems.cfg. */
@@ -272,6 +327,7 @@ int main(void)
 	test_systems();
 	test_games();
 	test_multi_file();
+	test_folders();
 	test_overrides();
 	test_failures();
 

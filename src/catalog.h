@@ -18,13 +18,15 @@
 struct game {
 	char name[192];   /* shown in the list, extension stripped */
 	char path[512];
+	int folder;       /* a folder that plays as a whole, "name/" */
 };
 
 struct psystem {
 	char name[32];      /* "psx"                            */
 	char fullname[72];  /* "Sony PlayStation"               */
 	char path[256];     /* /storage/roms/psx                */
-	char exts[256];     /* ".cue .chd .pbp"                 */
+	char exts[256];     /* ".cue .chd .pbp"; a lone "/" says
+	                     * a folder of those plays too    */
 	char launcher[256]; /* the binary out of <command>      */
 	char core[64];
 	char emulator[64];
