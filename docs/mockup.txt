@@ -77,6 +77,7 @@
                                                          |
       ▸ SNES                                   PRMPT on  |
         NES                                   PRMPT off  |
+        PlayStation                           PRMPT off  |
         Game Boy                              PRMPT off  |
         Game Boy Color                        PRMPT off  |
         Game Boy Advance                      PRMPT off  |
@@ -85,7 +86,6 @@
         Experimental.                                    |
         PRMPT: Enables or disables 1 pre-emptive frame   |
         for lower input latency.                         |
-                                                         |
                                                          |
                                                          |
                                                          |
