@@ -65,15 +65,13 @@ static const struct { const char *key, *label; } profile_names[] = {
  * is the pre-emptive frame: stored as <system>.preempt, 1 or 0, shown as
  * PRMPT on or off, BIOS-style.
  *
- * The PlayStation is not here. It had a latency mode that added the
- * pre-emptive frame and dropped the renderer to the console's own
- * resolution to pay for it; measured, it cost 12 fps on Tekken 3 and the
- * shipped configuration runs every frame on time, so the choice was
- * removed rather than kept as a way to make it worse. BUGS.md has the
- * numbers. */
+ * The PlayStation keeps its Vulkan renderer at 4x with the frame on. Its
+ * old latency mode also dropped to software at 1x; that renderer was
+ * never what cost the frame rate, so the switch is the same as here. */
 static const struct { const char *key, *label; } consoles[] = {
 	{ "snes",    "SNES"             },
 	{ "nes",     "NES"              },
+	{ "psx",     "PlayStation"      },
 	{ "gb",      "Game Boy"         },
 	{ "gbc",     "Game Boy Color"   },
 	{ "gba",     "Game Boy Advance" },

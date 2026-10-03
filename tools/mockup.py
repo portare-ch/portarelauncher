@@ -59,10 +59,9 @@ settings += ["         X          X confirm",
 settings += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
 
 # Settings > Consoles: the pre-emptive frame per console, and what it
-# means, wrapped at 45 columns as wrap_puts does it on the device. The
-# PlayStation is not listed; its shipped configuration is the measured
-# best one and there is nothing to choose.
+# means, wrapped at 45 columns as wrap_puts does it on the device.
 CONSOLES = [("SNES", "PRMPT on"), ("NES", "PRMPT off"),
+            ("PlayStation", "PRMPT off"),
             ("Game Boy", "PRMPT off"),
             ("Game Boy Color", "PRMPT off"), ("Game Boy Advance", "PRMPT off"),
             ("Genesis", "PRMPT off")]
