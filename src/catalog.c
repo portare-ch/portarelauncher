@@ -368,11 +368,10 @@ int catalog_load(struct catalog *c, const char *es_systems, const char *settings
 
 	fclose(f);
 
-	if (c->n == 0) {
-		fprintf(stderr, "no systems with games found\n");
-		return -1;
-	}
-	qsort(c->sys, (size_t)c->n, sizeof(*c->sys), by_fullname);
+	/* No games anywhere is a fresh install, not an error: the launcher
+	 * still has to come up, or Settings and Tools are out of reach too. */
+	if (c->n > 0)
+		qsort(c->sys, (size_t)c->n, sizeof(*c->sys), by_fullname);
 	return 0;
 }
 

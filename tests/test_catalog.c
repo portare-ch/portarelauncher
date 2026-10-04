@@ -309,11 +309,31 @@ static void test_failures(void)
 	snprintf(missing, sizeof(missing), "%s/nope.cfg", root);
 	CHECK_INT(catalog_load(&c, missing, sys_cfg), -1);
 
-	/* A catalogue with nothing playable is an error, not an empty list. */
-	char empty[96];
+	catalog_free(&c);
+}
+
+/* A fresh install: systems defined, nothing copied yet. The launcher has to
+ * start on that, so it is an empty catalogue rather than a failure. */
+static void test_empty(void)
+{
+	struct catalog c;
+	char empty[96], cfg_empty[96], romdir[128];
 	snprintf(empty, sizeof(empty), "%s/empty.cfg", root);
 	fixture_write(empty, "<systemList>\n</systemList>\n");
-	CHECK_INT(catalog_load(&c, empty, sys_cfg), -1);
+	CHECK_INT(catalog_load(&c, empty, sys_cfg), 0);
+	CHECK_INT(c.n, 0);
+	catalog_free(&c);
+
+	snprintf(romdir, sizeof(romdir), "%s/emptyroms", root);
+	mkdir(romdir, 0755);
+	snprintf(cfg_empty, sizeof(cfg_empty), "%s/es_empty.cfg", root);
+	char xml[512];
+	snprintf(xml, sizeof(xml),
+	         "<systemList>\n<system>\n<name>psx</name>\n<path>%s</path>\n"
+	         "<extension>.cue .chd</extension>\n</system>\n</systemList>\n", romdir);
+	fixture_write(cfg_empty, xml);
+	CHECK_INT(catalog_load(&c, cfg_empty, sys_cfg), 0);
+	CHECK_INT(c.n, 0);
 	catalog_free(&c);
 }
 
@@ -328,6 +348,7 @@ int main(void)
 	test_games();
 	test_multi_file();
 	test_folders();
+	test_empty();
 	test_overrides();
 	test_failures();
 

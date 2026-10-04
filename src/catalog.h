@@ -40,7 +40,8 @@ struct catalog {
 };
 
 /* Systems with no games are dropped, so the list only shows what can be
- * played. */
+ * played; with no games at all the catalogue is empty, not an error. -1
+ * only when es_systems.cfg cannot be read. */
 int  catalog_load(struct catalog *c, const char *es_systems, const char *settings);
 void catalog_free(struct catalog *c);
 
