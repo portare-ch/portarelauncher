@@ -371,6 +371,13 @@ static void draw_systems(struct ui *u)
 		         s->fullname[0] ? s->fullname : s->name, buf);
 	}
 
+	if (u->cat.n == 0) {
+		unsigned y = (unsigned)(LIST_TOP + (u->tools.n > 0 ? 2 : 0));
+		term_puts(t, 4, y, "No games found.", ATTR_BRIGHT);
+		term_puts(t, 4, y + 2, "Copy them into roms/<system>", ATTR_MID);
+		term_puts(t, 4, y + 3, "and press A to look again.", ATTR_MID);
+	}
+
 	struct face f = face_of(u->retroid);
 	snprintf(buf, sizeof(buf), "%c SELECT   %c SETTINGS", f.confirm, f.menu);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
@@ -1515,8 +1522,7 @@ static void join(struct ui *u, const char *password)
  * start: a film copied over ssh while the launcher ran stayed invisible
  * until a restart. A full reload measured 5-7 ms on the device, so it is
  * simply done whenever a list is about to be shown. If the reload fails -
- * no system with games any more - the old catalogue stays rather than
- * leaving nothing to show. */
+ * es_systems.cfg unreadable - the old catalogue stays. */
 static void refresh_catalog(struct ui *u)
 {
 	char keep[64] = "";
