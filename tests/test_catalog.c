@@ -259,20 +259,19 @@ static void test_folders(void)
 	CHECK_INT(catalog_load(&c, cfg, sys_cfg), 0);
 
 	/* A folder holding something the system plays is a row of its own,
-	 * named with a slash and listed before the files; its tracks stay. A
-	 * folder with nothing playable in it is not a row. */
+	 * named with a slash and listed before the files. Its tracks are not
+	 * rows: launching the folder plays them. A folder with nothing
+	 * playable in it is not a row. */
 	const struct psystem *m = find(&c, "music");
 	CHECK(m != NULL);
 	if (m) {
-		CHECK_INT(m->ngames, 4);
-		if (m->ngames == 4) {
+		CHECK_INT(m->ngames, 2);
+		if (m->ngames == 2) {
 			char want[128];
 			CHECK_STR(m->games[0].name, "album1/");
 			snprintf(want, sizeof(want), "%s/roms/music/album1", root);
 			CHECK_STR(m->games[0].path, want);
-			CHECK_STR(m->games[1].name, "01 Intro");
-			CHECK_STR(m->games[2].name, "02 Theme");
-			CHECK_STR(m->games[3].name, "loose");
+			CHECK_STR(m->games[1].name, "loose");
 		}
 	}
 

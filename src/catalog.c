@@ -198,9 +198,13 @@ static void scan(struct psystem *s, const char *dir, int depth)
 			continue;
 
 		if (S_ISDIR(st.st_mode)) {
+			/* A folder that plays as a whole is its row; its tracks
+			 * are what launching it plays, not rows beside it. */
 			if (depth > 0 && folders_play(s->exts) &&
-			    holds_games(full, s->exts))
+			    holds_games(full, s->exts)) {
 				add_folder(s, full, e->d_name);
+				continue;
+			}
 			/* PS2 and Dreamcast titles arrive as a directory holding
 			 * the disc image, so one level down is worth looking at. */
 			if (depth > 0)
