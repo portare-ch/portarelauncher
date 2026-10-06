@@ -413,7 +413,7 @@ static void draw_games(struct ui *u)
 	struct face f = face_of(u->retroid);
 	snprintf(buf, sizeof(buf), "%c LAUNCH   %c BACK", f.confirm, f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
-	snprintf(buf, sizeof(buf), "%d of %d", u->game_sel + 1, s->ngames);
+	snprintf(buf, sizeof(buf), "%d / %d", u->game_sel + 1, s->ngames);
 	term_puts_right(t, t->cols - 2, t->rows - 1, buf, ATTR_MID);
 }
 
