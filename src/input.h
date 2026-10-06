@@ -24,6 +24,7 @@ enum action {
 	ACT_HOME,     /* Home: the consoles list, from anywhere */
 	ACT_START,    /* START: "open settings" everywhere except the keyboard */
 	ACT_SELECT,   /* SELECT: only the keyboard uses it, to hide the text */
+	ACT_FAV,      /* the left face button: favourite on and off, in any list of games */
 	ACT_TICK,     /* the idle timeout expired; nothing was pressed */
 	ACT_AUX,      /* the auxiliary fd has something to read */
 	ACT_QUIT,     /* only bound to a keyboard escape hatch */

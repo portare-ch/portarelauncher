@@ -5,6 +5,7 @@
  */
 #include "bt.h"
 #include "catalog.h"
+#include "lists.h"
 #include "color.h"
 #include "input.h"
 #include "kms.h"
@@ -111,9 +112,23 @@ static void console_set_latency(int i, int latency)
 #define LIST_TOP    5
 #define LIST_MARGIN 3          /* rows kept below the list for the footer  */
 
+/* Quick Access: two rows above the systems, the cross-system lists. Their
+ * files live beside nothing else of ours, in a directory of their own. */
+#define QUICK_ROWS  2
+enum { QUICK_RECENT = 0, QUICK_FAVS = 1 };
+#define LISTS_DIR   "/storage/.config/portarelauncher"
+#define RECENT_FILE LISTS_DIR "/recent"
+#define FAVS_FILE   LISTS_DIR "/favourites"
+
+/* A title wider than its column scrolls while selected: still, then one
+ * column every step to the end, a pause there, back to the start. */
+#define MARQUEE_WAIT_MS 1000
+#define MARQUEE_STEP_MS 150
+#define MARQUEE_END_MS  1500
+
 enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI, SCR_BT,
               SCR_KEYBOARD, SCR_TOOLS, SCR_ABOUT, SCR_UPDATE,
-              SCR_TZ, SCR_POWER, SCR_CONSOLES };
+              SCR_TZ, SCR_POWER, SCR_CONSOLES, SCR_RECENT, SCR_FAVS };
 
 struct ui {
 	struct term term;
@@ -179,11 +194,21 @@ struct ui {
 	int n_usb;
 	int retroid;         /* which printing the pad carries */
 	enum screen screen;
-	int sys_sel, sys_top;
+	int sys_sel, sys_top;    /* rows 0 and 1 are Quick Access, then systems */
 	int game_sel, game_top;
 	int set_sel;
 	int running;
+
+	struct recents recent;
+	struct favs favs;
+	int list_sel, list_top;  /* Recently played and Favourites: the game,
+	                          * counting games only, and the top row      */
+	int mq_phase;            /* 0 still, 1 scrolling, 2 at the end        */
+	int mq_off;              /* columns scrolled                          */
+	long long mq_at;         /* when the phase began, ms                  */
 };
+
+static long long now_ms(void);
 
 /* Which face button confirms. Stored in system.cfg like everything else,
  * so it survives a restart and is visible to the rest of the system. */
@@ -303,7 +328,7 @@ static void draw_frame(struct ui *u, const char *crumb)
  * its role, the diagram under the setting shows where it sits. */
 struct face {
 	unsigned char bottom, right, top, left;
-	unsigned char confirm, back, menu;
+	unsigned char confirm, back, menu, fav;
 };
 
 static struct face face_of(int retroid)
@@ -313,14 +338,262 @@ static struct face face_of(int retroid)
 		/* What the printing says: A confirms. */
 		f.bottom = 'B'; f.right = 'A'; f.top = 'X'; f.left = 'Y';
 		f.confirm = f.right; f.back = f.bottom;
-		f.menu = f.top;
+		f.menu = f.top; f.fav = f.left;
 	} else {
 		f.bottom = 'X'; f.right = G_CIRCLE;
 		f.top = G_TRIANGLE; f.left = G_SQUARE;
 		f.confirm = f.bottom; f.back = f.right;
-		f.menu = f.top;
+		f.menu = f.top; f.fav = f.left;
 	}
 	return f;
+}
+
+/* The label as a row shows it: cut to the column with "..." unless it is
+ * the selected row, which scrolls instead, `off` columns in. */
+static void row_label(const char *name, int width, int selected, int off,
+                      char *buf, size_t bsz)
+{
+	int len = (int)strlen(name);
+	if (width < 4)
+		width = 4;
+	if (len <= width) {
+		str_copy(buf, bsz, name);
+		return;
+	}
+	if (!selected) {
+		snprintf(buf, bsz, "%.*s...", width - 3, name);
+		return;
+	}
+	if (off > len - width)
+		off = len - width;
+	if (off < 0)
+		off = 0;
+	snprintf(buf, bsz, "%.*s", width, name + off);
+}
+
+/* ---- the cross-system lists -------------------------------------------- */
+
+/* A row of Recently played or Favourites: a day heading, or a game with the
+ * system it belongs to. Built at each draw from the file and the catalog,
+ * which is where the title comes from; a path the catalog does not know
+ * is named after its file. */
+struct xrow {
+	int heading;
+	char label[192];
+	char right[8];
+	const struct psystem *sys;
+	const struct game *game;      /* NULL when the catalog lacks it */
+	const char *path;
+	const char *sysname;
+};
+
+#define XROWS_MAX 512
+struct xlist {
+	struct xrow r[XROWS_MAX];
+	int n, ngames;
+};
+static struct xlist xl;
+
+static int path_exists(const char *path)
+{
+	return access(path, F_OK) == 0;
+}
+
+static const struct psystem *system_named(const struct catalog *c, const char *name)
+{
+	for (int i = 0; i < c->n; i++)
+		if (strcmp(c->sys[i].name, name) == 0)
+			return &c->sys[i];
+	return NULL;
+}
+
+/* The system whose folder the path is in: the longest matching one, so
+ * roms/snes and roms/snesh tell apart. */
+static const struct psystem *system_of_path(const struct catalog *c, const char *path)
+{
+	const struct psystem *best = NULL;
+	size_t bestlen = 0;
+	for (int i = 0; i < c->n; i++) {
+		size_t n = strlen(c->sys[i].path);
+		if (n > bestlen && strncmp(path, c->sys[i].path, n) == 0 &&
+		    path[n] == '/') {
+			best = &c->sys[i];
+			bestlen = n;
+		}
+	}
+	return best;
+}
+
+static const struct game *game_at(const struct psystem *s, const char *path)
+{
+	for (int i = 0; s && i < s->ngames; i++)
+		if (strcmp(s->games[i].path, path) == 0)
+			return &s->games[i];
+	return NULL;
+}
+
+static void name_from_path(const char *path, char *out, size_t osz)
+{
+	const char *slash = strrchr(path, '/');
+	str_copy(out, osz, slash ? slash + 1 : path);
+	char *dot = strrchr(out, '.');
+	if (dot && dot != out)
+		*dot = '\0';
+}
+
+static struct xrow *add_game_row(struct xlist *l, const struct ui *u,
+                                 const char *sysname, const char *path)
+{
+	if (l->n >= XROWS_MAX)
+		return NULL;
+	struct xrow *x = &l->r[l->n++];
+	memset(x, 0, sizeof(*x));
+	x->sys = sysname ? system_named(&u->cat, sysname)
+	                 : system_of_path(&u->cat, path);
+	x->game = game_at(x->sys, path);
+	x->path = path;
+	x->sysname = x->sys ? x->sys->name : (sysname ? sysname : "");
+	if (x->game)
+		str_copy(x->label, sizeof(x->label), x->game->name);
+	else
+		name_from_path(path, x->label, sizeof(x->label));
+	short_system(x->sysname, x->right, sizeof(x->right));
+	l->ngames++;
+	return x;
+}
+
+static void build_list(const struct ui *u, enum screen which, struct xlist *l)
+{
+	l->n = l->ngames = 0;
+	if (which == SCR_RECENT) {
+		long long now = (long long)time(NULL);
+		char last[16] = "";
+		for (int i = 0; i < u->recent.n; i++) {
+			const struct recent *e = &u->recent.e[i];
+			char day[16];
+			day_label(e->when, now, day, sizeof(day));
+			if (strcmp(day, last) != 0 && l->n < XROWS_MAX) {
+				struct xrow *h = &l->r[l->n++];
+				memset(h, 0, sizeof(*h));
+				h->heading = 1;
+				str_copy(h->label, sizeof(h->label), day);
+				str_copy(last, sizeof(last), day);
+			}
+			add_game_row(l, u, e->sys, e->path);
+		}
+	} else {
+		for (int i = 0; i < u->favs.n; i++)
+			add_game_row(l, u, NULL, u->favs.path[i]);
+	}
+}
+
+/* The n-th game of the list and the row it sits on. */
+static struct xrow *list_game(struct xlist *l, int n, int *row)
+{
+	int seen = 0;
+	for (int i = 0; i < l->n; i++) {
+		if (l->r[i].heading)
+			continue;
+		if (seen++ == n) {
+			if (row)
+				*row = i;
+			return &l->r[i];
+		}
+	}
+	return NULL;
+}
+
+/* Drops the games whose files are gone, and writes the list back when
+ * something went. Called when a list opens, so it is as current as the
+ * storage it describes. */
+static void prune_lists(struct ui *u)
+{
+	if (recents_prune(&u->recent, path_exists) > 0)
+		recents_save(&u->recent, RECENT_FILE);
+	if (favs_prune(&u->favs, path_exists) > 0)
+		favs_save(&u->favs, FAVS_FILE);
+}
+
+static void toggle_favourite(struct ui *u, const char *path)
+{
+	favs_toggle(&u->favs, path);
+	favs_save(&u->favs, FAVS_FILE);
+}
+
+/* ---- the scrolling title ----------------------------------------------- */
+
+/* The selected row's title and the column it has, on the screens where a
+ * long title scrolls. 0 when the screen has no such row. */
+static int selected_label(const struct ui *u, const char **name, int *width)
+{
+	const struct term *t = &u->term;
+	if (u->screen == SCR_GAMES) {
+		const struct psystem *s = &u->cat.sys[u->sys_sel - QUICK_ROWS];
+		if (u->game_sel >= s->ngames)
+			return 0;
+		*name = s->games[u->game_sel].name;
+		*width = (int)t->cols - 4 - 2;
+		return 1;
+	}
+	if (u->screen == SCR_RECENT || u->screen == SCR_FAVS) {
+		build_list(u, u->screen, &xl);
+		struct xrow *x = list_game(&xl, u->list_sel, NULL);
+		if (!x)
+			return 0;
+		*name = x->label;
+		*width = (int)t->cols - 4 - (int)strlen(x->right) - 3;
+		return 1;
+	}
+	return 0;
+}
+
+/* How many columns the selected title is wider than its column; 0 when it
+ * fits, which is also "nothing to scroll". */
+static int marquee_overflow(const struct ui *u)
+{
+	const char *name;
+	int width;
+	if (!selected_label(u, &name, &width))
+		return 0;
+	int over = (int)strlen(name) - width;
+	return over > 0 ? over : 0;
+}
+
+static void marquee_reset(struct ui *u)
+{
+	u->mq_phase = 0;
+	u->mq_off = 0;
+	u->mq_at = now_ms();
+}
+
+/* Milliseconds until the title moves next, or -1 when nothing scrolls. */
+static int marquee_left(const struct ui *u)
+{
+	if (!marquee_overflow(u))
+		return -1;
+	long long span = u->mq_phase == 0 ? MARQUEE_WAIT_MS
+	               : u->mq_phase == 1 ? MARQUEE_STEP_MS : MARQUEE_END_MS;
+	long long left = u->mq_at + span - now_ms();
+	return left > 0 ? (int)left : 0;
+}
+
+static void marquee_tick(struct ui *u)
+{
+	int over = marquee_overflow(u);
+	if (!over || marquee_left(u) > 0)
+		return;
+	if (u->mq_phase == 0) {
+		u->mq_phase = 1;
+	} else if (u->mq_phase == 1) {
+		if (++u->mq_off >= over) {
+			u->mq_off = over;
+			u->mq_phase = 2;
+		}
+	} else {
+		u->mq_off = 0;
+		u->mq_phase = 0;
+	}
+	u->mq_at = now_ms();
 }
 
 static void draw_row(struct ui *u, unsigned y, int selected,
@@ -341,12 +614,19 @@ static void draw_row(struct ui *u, unsigned y, int selected,
  * has something in it. */
 static int system_rows(const struct ui *u)
 {
-	return u->cat.n + (u->tools.n > 0);
+	return QUICK_ROWS + u->cat.n + (u->tools.n > 0);
 }
 
 static int on_tools_row(const struct ui *u)
 {
-	return u->tools.n > 0 && u->sys_sel == u->cat.n;
+	return u->tools.n > 0 && u->sys_sel == QUICK_ROWS + u->cat.n;
+}
+
+/* The system under the selection, or -1 on a Quick Access or Tools row. */
+static int sys_index(const struct ui *u)
+{
+	int i = u->sys_sel - QUICK_ROWS;
+	return i >= 0 && i < u->cat.n ? i : -1;
 }
 
 static void draw_systems(struct ui *u)
@@ -356,24 +636,33 @@ static void draw_systems(struct ui *u)
 
 	draw_frame(u, "PortareOS");
 
-	/* No title row and no count: the list starts under the rule's blank,
-	 * like the games list, and the list is the count. Two more systems on
-	 * screen. */
-	const unsigned top = LIST_TOP - 2;
-	int rows = system_rows(u);
-	int visible = (int)(t->rows - 3) - (int)top;
-	scroll_to(u->sys_sel, &u->sys_top, rows, visible);
+	/* Quick Access first, a category of its own: the cross-system lists,
+	 * then a thin rule, then the systems under their title. No blank row
+	 * between; on twenty rows a blank is the expensive thing. */
+	term_puts(t, 2, 3, "QUICK ACCESS", ATTR_MID);
+	snprintf(buf, sizeof(buf), "%d", u->recent.n);
+	draw_row(u, 4, u->sys_sel == QUICK_RECENT, "Recently played", buf);
+	snprintf(buf, sizeof(buf), "%d", u->favs.n);
+	draw_row(u, 5, u->sys_sel == QUICK_FAVS, "Favourites", buf);
+	term_hline(t, 6, G_HLINE, ATTR_DIM);
+	term_puts(t, 2, 7, "SYSTEMS", ATTR_MID);
+
+	const unsigned top = 8;
+	int rows = system_rows(u) - QUICK_ROWS;
+	int visible = (int)(t->rows - 2) - (int)top;
+	int sel = u->sys_sel - QUICK_ROWS;
+	scroll_to(sel < 0 ? 0 : sel, &u->sys_top, rows, visible);
 
 	for (int i = 0; i < visible && u->sys_top + i < rows; i++) {
 		int idx = u->sys_top + i;
 		if (idx == u->cat.n) {
 			snprintf(buf, sizeof(buf), "%d", u->tools.n);
-			draw_row(u, top + (unsigned)i, idx == u->sys_sel, "Tools", buf);
+			draw_row(u, top + (unsigned)i, idx == sel, "Tools", buf);
 			continue;
 		}
 		const struct psystem *s = &u->cat.sys[idx];
 		snprintf(buf, sizeof(buf), "%d", s->ngames);
-		draw_row(u, top + (unsigned)i, idx == u->sys_sel,
+		draw_row(u, top + (unsigned)i, idx == sel,
 		         s->fullname[0] ? s->fullname : s->name, buf);
 	}
 
@@ -389,10 +678,25 @@ static void draw_systems(struct ui *u)
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
+/* The footer of a list of games is the favourite cue: FAVOURITE under a game
+ * that is not one, REMOVE under one that is. Nothing in the list says so. */
+static void draw_games_footer(struct ui *u, int fav, const char *right)
+{
+	struct term *t = &u->term;
+	struct face f = face_of(u->retroid);
+	char buf[64];
+
+	snprintf(buf, sizeof(buf), "%c LAUNCH   %c BACK   %c %s",
+	         f.confirm, f.back, f.fav, fav ? "REMOVE" : "FAVOURITE");
+	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
+	if (right && *right)
+		term_puts_right(t, t->cols - 2, t->rows - 1, right, ATTR_MID);
+}
+
 static void draw_games(struct ui *u)
 {
 	struct term *t = &u->term;
-	const struct psystem *s = &u->cat.sys[u->sys_sel];
+	const struct psystem *s = &u->cat.sys[sys_index(u)];
 	char crumb[96], buf[64];
 
 	snprintf(crumb, sizeof(crumb), "PortareOS  >  %s",
@@ -405,16 +709,70 @@ static void draw_games(struct ui *u)
 	int visible = (int)(t->rows - 3) - (LIST_TOP - 2);
 	scroll_to(u->game_sel, &u->game_top, s->ngames, visible);
 
-	for (int i = 0; i < visible && u->game_top + i < s->ngames; i++)
-		draw_row(u, (unsigned)(LIST_TOP + i - 2),
-		         u->game_top + i == u->game_sel,
-		         s->games[u->game_top + i].name, NULL);
+	int width = (int)t->cols - 4 - 2;
+	for (int i = 0; i < visible && u->game_top + i < s->ngames; i++) {
+		int selected = u->game_top + i == u->game_sel;
+		char label[192];
+		row_label(s->games[u->game_top + i].name, width, selected,
+		          u->mq_off, label, sizeof(label));
+		draw_row(u, (unsigned)(LIST_TOP + i - 2), selected, label, NULL);
+	}
 
-	struct face f = face_of(u->retroid);
-	snprintf(buf, sizeof(buf), "%c LAUNCH   %c BACK", f.confirm, f.back);
-	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 	snprintf(buf, sizeof(buf), "%d / %d", u->game_sel + 1, s->ngames);
-	term_puts_right(t, t->cols - 2, t->rows - 1, buf, ATTR_MID);
+	draw_games_footer(u, s->ngames > 0 &&
+	                  favs_has(&u->favs, s->games[u->game_sel].path), buf);
+}
+
+/* Recently played and Favourites: games across systems, the title on the
+ * left and the short system name on the right; Recently played under the
+ * day as a heading, which scrolls with its games. */
+static void draw_list(struct ui *u)
+{
+	struct term *t = &u->term;
+	int recent = u->screen == SCR_RECENT;
+	char crumb[64];
+
+	snprintf(crumb, sizeof(crumb), "PortareOS  >  %s",
+	         recent ? "Recently played" : "Favourites");
+	draw_frame_right(u, crumb, 0);
+
+	build_list(u, u->screen, &xl);
+	if (u->list_sel >= xl.ngames)
+		u->list_sel = xl.ngames > 0 ? xl.ngames - 1 : 0;
+
+	const unsigned top = LIST_TOP - 2;
+	int visible = (int)(t->rows - 2) - (int)top;
+	int selrow = 0;
+	struct xrow *cur = list_game(&xl, u->list_sel, &selrow);
+	scroll_to(selrow, &u->list_top, xl.n, visible);
+
+	for (int i = 0; i < visible && u->list_top + i < xl.n; i++) {
+		struct xrow *x = &xl.r[u->list_top + i];
+		unsigned y = top + (unsigned)i;
+		if (x->heading) {
+			term_puts(t, 1, y, x->label, ATTR_TEXT);
+			continue;
+		}
+		int selected = x == cur;
+		int width = (int)t->cols - 4 - (int)strlen(x->right) - 3;
+		char label[192];
+		row_label(x->label, width, selected, u->mq_off, label, sizeof(label));
+		draw_row(u, y, selected, label, x->right);
+	}
+
+	if (xl.ngames == 0) {
+		term_puts(t, 4, top + 1, recent ? "Nothing played yet."
+		                                : "No favourites yet.", ATTR_BRIGHT);
+		if (!recent) {
+			struct face f = face_of(u->retroid);
+			char hint[64];
+			snprintf(hint, sizeof(hint), "%c marks one in any list of games.",
+			         f.fav);
+			term_puts(t, 4, top + 3, hint, ATTR_MID);
+		}
+	}
+
+	draw_games_footer(u, cur && (!recent || favs_has(&u->favs, cur->path)), NULL);
 }
 
 /* A diamond of the four face buttons, because the argument is about where
@@ -1203,6 +1561,8 @@ static void redraw(struct ui *u)
 	case SCR_POWER:    draw_power(u);    break;
 	case SCR_CONSOLES: draw_consoles(u); break;
 	case SCR_UPDATE:   draw_update(u);   break;
+	case SCR_RECENT:
+	case SCR_FAVS:     draw_list(u);     break;
 	}
 	term_flush(&u->term);
 }
@@ -1281,10 +1641,12 @@ static int open_pidfd(pid_t pid)
 #endif
 }
 
-static void wait_or_quit(struct ui *u, pid_t pid)
+/* Returns the child's wait status, or -1 when it could not be collected. */
+static int wait_or_quit(struct ui *u, pid_t pid)
 {
 	enum { RUNNING, GRACE, TERMED, KILLED } stage = RUNNING;
 	long long deadline = 0;
+	int status = -1;
 	struct quit_combo q;
 	quit_reset(&q);
 
@@ -1292,9 +1654,13 @@ static void wait_or_quit(struct ui *u, pid_t pid)
 	input_quit_only(&u->in, 1);
 
 	for (;;) {
-		int status;
-		pid_t r = waitpid(pid, &status, WNOHANG);
-		if (r == pid || (r < 0 && errno != EINTR))
+		int st;
+		pid_t r = waitpid(pid, &st, WNOHANG);
+		if (r == pid) {
+			status = st;
+			break;
+		}
+		if (r < 0 && errno != EINTR)
 			break;
 
 		struct pollfd pfd[INPUT_MAX_DEV + 2];
@@ -1358,6 +1724,7 @@ static void wait_or_quit(struct ui *u, pid_t pid)
 	input_quit_only(&u->in, 0);
 	if (pidfd >= 0)
 		close(pidfd);
+	return status;
 }
 
 /* Takes the panel back after a child. The program that had it can still be
@@ -1406,12 +1773,14 @@ static int reclaim_panel(struct ui *u, int patience_ms)
 	return 0;
 }
 
-static void hand_over(struct ui *u, char *const argv[], const char *cwd)
+static int hand_over(struct ui *u, char *const argv[], const char *cwd)
 {
+	int status = -1;
+
 	/* Without master there is nothing to hand over; start it anyway
 	 * rather than refuse, since the panel is free for the child. */
 	if (!u->panel_lost && kms_drop_master(&u->kms) < 0)
-		return;
+		return -1;
 
 	pid_t pid = fork();
 	if (pid == 0) {
@@ -1426,11 +1795,12 @@ static void hand_over(struct ui *u, char *const argv[], const char *cwd)
 		fprintf(stderr, "fork: %s\n", strerror(errno));
 	} else {
 		setpgid(pid, pid);        /* both sides, so neither can race */
-		wait_or_quit(u, pid);
+		status = wait_or_quit(u, pid);
 	}
 
 	reclaim_panel(u, 3000);
 	input_drain(&u->in);         /* and everything pressed meanwhile */
+	return status;
 }
 
 /* Runs the emulator with the panel, then takes it back.
@@ -1467,7 +1837,32 @@ static void launch(struct ui *u, const struct psystem *s, const struct game *g)
 	};
 
 	draw_launching(u, g->name, s->core[0] ? s->core : s->emulator);
-	hand_over(u, argv, NULL);
+	int status = hand_over(u, argv, NULL);
+
+	/* Into Recently played when runemu came back clean: a game that never
+	 * started is not something that was played, and one quit with
+	 * Home + START exits 0 like any other. */
+	if (status >= 0 && WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+		recents_add(&u->recent, s->name, g->path, (long long)time(NULL));
+		recents_save(&u->recent, RECENT_FILE);
+	}
+}
+
+/* Launches a row of Recently played or Favourites. The catalog's own game
+ * when it has one; otherwise the file by its path, named after itself. */
+static void launch_row(struct ui *u, const struct xrow *x)
+{
+	if (!x->sys)
+		return;
+	if (x->game) {
+		launch(u, x->sys, x->game);
+		return;
+	}
+	struct game g;
+	memset(&g, 0, sizeof(g));
+	str_copy(g.name, sizeof(g.name), x->label);
+	str_copy(g.path, sizeof(g.path), x->path);
+	launch(u, x->sys, &g);
 }
 
 /* Runs a script from the Tools folder, from inside that folder, the way
@@ -1534,10 +1929,11 @@ static void refresh_catalog(struct ui *u)
 {
 	char keep[64] = "";
 	int on_tools = on_tools_row(u);
+	int quick = u->sys_sel < QUICK_ROWS ? u->sys_sel : -1;
 	struct catalog fresh;
 
-	if (u->sys_sel < u->cat.n)
-		str_copy(keep, sizeof(keep), u->cat.sys[u->sys_sel].name);
+	if (sys_index(u) >= 0)
+		str_copy(keep, sizeof(keep), u->cat.sys[sys_index(u)].name);
 
 	if (catalog_load(&fresh, ES_SYSTEMS, SETTINGS) < 0)
 		return;
@@ -1545,14 +1941,26 @@ static void refresh_catalog(struct ui *u)
 	u->cat = fresh;
 	tools_load(&u->tools);
 
-	u->sys_sel = 0;
+	if (quick >= 0) {
+		u->sys_sel = quick;
+		return;
+	}
+	u->sys_sel = QUICK_ROWS;
 	if (on_tools && u->tools.n > 0) {
-		u->sys_sel = u->cat.n;
+		u->sys_sel = QUICK_ROWS + u->cat.n;
 		return;
 	}
 	for (int i = 0; i < u->cat.n; i++)
 		if (strcmp(u->cat.sys[i].name, keep) == 0)
-			u->sys_sel = i;
+			u->sys_sel = QUICK_ROWS + i;
+}
+
+/* Opens Recently played or Favourites, current as of the storage. */
+static void show_list(struct ui *u, enum screen which)
+{
+	prune_lists(u);
+	u->list_sel = u->list_top = 0;
+	u->screen = which;
 }
 
 /* Back to the systems list, current as of now. */
@@ -1575,9 +1983,14 @@ static void on_action(struct ui *u, enum action a)
 	}
 
 	if (a == ACT_TICK) {
+		marquee_tick(u);
 		status_read(&u->st);
 		return;
 	}
+
+	/* Any press restarts the title's scroll: a moved selection has a new
+	 * title, and a title half scrolled is not where a reader starts. */
+	marquee_reset(u);
 
 	/* A reboot or poweroff that was accepted but has not happened: the
 	 * press that follows brings the panel back, and does nothing else. */
@@ -1608,6 +2021,10 @@ static void on_action(struct ui *u, enum action a)
 	case SCR_SYSTEMS:
 		if (a == ACT_UP && u->sys_sel > 0) u->sys_sel--;
 		else if (a == ACT_DOWN && u->sys_sel < system_rows(u) - 1) u->sys_sel++;
+		else if (a == ACT_CONFIRM && u->sys_sel == QUICK_RECENT)
+			show_list(u, SCR_RECENT);
+		else if (a == ACT_CONFIRM && u->sys_sel == QUICK_FAVS)
+			show_list(u, SCR_FAVS);
 		else if (a == ACT_CONFIRM && on_tools_row(u)) {
 			/* Re-read on the way in: a package or an update may have
 			 * changed the folder since start, and it costs one readdir. */
@@ -1617,7 +2034,7 @@ static void on_action(struct ui *u, enum action a)
 		}
 		else if (a == ACT_CONFIRM) {
 			refresh_catalog(u);
-			if (u->sys_sel < u->cat.n) {
+			if (sys_index(u) >= 0) {
 				u->screen = SCR_GAMES;
 				u->game_sel = u->game_top = 0;
 			}
@@ -1629,10 +2046,31 @@ static void on_action(struct ui *u, enum action a)
 		break;
 
 	case SCR_GAMES: {
-		const struct psystem *s = &u->cat.sys[u->sys_sel];
+		const struct psystem *s = &u->cat.sys[sys_index(u)];
 		if (a == ACT_UP && u->game_sel > 0) u->game_sel--;
 		else if (a == ACT_DOWN && u->game_sel < s->ngames - 1) u->game_sel++;
 		else if (a == ACT_CONFIRM) launch(u, s, &s->games[u->game_sel]);
+		else if (a == ACT_FAV && s->ngames > 0)
+			toggle_favourite(u, s->games[u->game_sel].path);
+		else if (a == ACT_BACK) show_systems(u);
+		else if (a == ACT_QUIT) u->running = 0;
+		break;
+	}
+
+	case SCR_RECENT:
+	case SCR_FAVS: {
+		build_list(u, u->screen, &xl);
+		struct xrow *x = list_game(&xl, u->list_sel, NULL);
+		if (a == ACT_UP && u->list_sel > 0) u->list_sel--;
+		else if (a == ACT_DOWN && u->list_sel < xl.ngames - 1) u->list_sel++;
+		else if (a == ACT_CONFIRM && x) launch_row(u, x);
+		else if (a == ACT_FAV && x) {
+			/* The path is the list's own memory, which the toggle
+			 * rewrites; copy it out first. */
+			char path[512];
+			str_copy(path, sizeof(path), x->path);
+			toggle_favourite(u, path);
+		}
 		else if (a == ACT_BACK) show_systems(u);
 		else if (a == ACT_QUIT) u->running = 0;
 		break;
@@ -1997,6 +2435,8 @@ int main(void)
 
 	if (catalog_load(&u.cat, ES_SYSTEMS, SETTINGS) < 0)
 		return 1;
+	recents_load(&u.recent, RECENT_FILE);
+	favs_load(&u.favs, FAVS_FILE);
 
 	if (kms_open(&u.kms, CARD) < 0) {
 		catalog_free(&u.cat);
@@ -2134,6 +2574,9 @@ int main(void)
 		int idle = status_ms_to_next_minute();
 		if (u.panel_lost && idle > 1000)
 			idle = 1000;         /* keep asking for the panel back */
+		int mq_left = marquee_left(&u);
+		if (mq_left >= 0 && mq_left < idle)
+			idle = mq_left;      /* a long title is scrolling */
 		int osd_left = osd_remaining(&u.osd);
 		if (osd_left >= 0 && osd_left < idle)
 			idle = osd_left;
@@ -2226,6 +2669,7 @@ int main(void)
 	input_close(&u.in);
 	term_free(&u.term);
 	kms_close(&u.kms);
+	favs_free(&u.favs);
 	catalog_free(&u.cat);
 	return 0;
 }
