@@ -62,6 +62,7 @@ static void test_xml_unescape(void)
 int main(void)
 {
 	test_str_copy();
-	test_strip_ansi();	test_xml_unescape();
+	test_strip_ansi();
+	test_xml_unescape();
 	return check_report("text");
 }

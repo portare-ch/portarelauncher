@@ -1571,14 +1571,15 @@ static void draw_busy(struct ui *u, const char *what)
 	term_flush(t);
 }
 
-static void draw_launching(struct ui *u, const char *what, const char *detail)
+/* The name of what is starting and nothing else: which emulator or script
+ * does the work is not the player's concern. */
+static void draw_launching(struct ui *u, const char *what)
 {
 	struct term *t = &u->term;
 
 	draw_frame(u, "PortareOS");
 	term_puts(t, 6, 6, what, ATTR_BRIGHT);
-	term_puts(t, 6, 8, detail, ATTR_MID);
-	term_puts(t, 6, 10, "Starting...", ATTR_DIM);
+	term_puts(t, 6, 8, "Starting...", ATTR_DIM);
 	term_flush(t);
 }
 
@@ -1825,7 +1826,7 @@ static void launch(struct ui *u, const struct psystem *s, const struct game *g)
 		(char *)"--controllers=", NULL
 	};
 
-	draw_launching(u, g->name, s->core[0] ? s->core : s->emulator);
+	draw_launching(u, g->name);
 	int status = hand_over(u, argv, NULL);
 
 	/* Into Recently played when runemu came back clean: a game that never
@@ -1865,7 +1866,7 @@ static void run_tool(struct ui *u, const struct tool *tl)
 	snprintf(path, sizeof(path), "%s/%s", u->tools.dir, tl->file);
 	char *const argv[] = { (char *)"/bin/bash", path, NULL };
 
-	draw_launching(u, tl->name, tl->file);
+	draw_launching(u, tl->name);
 	hand_over(u, argv, u->tools.dir);
 }
 
@@ -2010,20 +2011,21 @@ static void on_action(struct ui *u, enum action a)
 	case SCR_SYSTEMS:
 		if (a == ACT_UP && u->sys_sel > 0) u->sys_sel--;
 		else if (a == ACT_DOWN && u->sys_sel < system_rows(u) - 1) u->sys_sel++;
-		else if (a == ACT_CONFIRM && u->sys_sel == QUICK_RECENT)
-			show_list(u, SCR_RECENT);
-		else if (a == ACT_CONFIRM && u->sys_sel == QUICK_FAVS)
-			show_list(u, SCR_FAVS);
-		else if (a == ACT_CONFIRM && on_tools_row(u)) {
-			/* Re-read on the way in: a package or an update may have
-			 * changed the folder since start, and it costs one readdir. */
-			tools_load(&u->tools);
-			u->tool_sel = u->tool_top = 0;
-			u->screen = SCR_TOOLS;
-		}
 		else if (a == ACT_CONFIRM) {
+			/* Re-read on the way in, whatever the row: a card or an
+			 * update may have changed the folders since start, it costs
+			 * one readdir, and with no games at all it is the only way
+			 * the "press A to refresh" line can keep its word, since the
+			 * selection then sits on a Quick Access row. */
 			refresh_catalog(u);
-			if (sys_index(u) >= 0) {
+			if (u->sys_sel == QUICK_RECENT)
+				show_list(u, SCR_RECENT);
+			else if (u->sys_sel == QUICK_FAVS)
+				show_list(u, SCR_FAVS);
+			else if (on_tools_row(u)) {
+				u->tool_sel = u->tool_top = 0;
+				u->screen = SCR_TOOLS;
+			} else if (sys_index(u) >= 0) {
 				u->screen = SCR_GAMES;
 				u->game_sel = u->game_top = 0;
 			}

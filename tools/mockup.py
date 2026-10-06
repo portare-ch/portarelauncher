@@ -210,9 +210,8 @@ tools += [THIN, " B RUN   A BACK"]
 
 launching = [header("PortareOS"), RULE] + [""] * 4
 launching += ["           Tekken 3 (USA)", "",
-              "           swanstation", "",
               "           Starting..."]
-launching += [""] * 7
+launching += [""] * 9
 
 # ---- proposed: quick access, recent, favourites, long titles -----------
 #
