@@ -30,10 +30,12 @@ Ten games, newest first, grouped under the day as a heading: `TODAY`,
 A row is the title and a short system name; the day is not a third
 column. Short names (PS1, PS2, PSP, N64, GBA, GC, DC, SNES, NES) in the
 cross-system views only; the Systems screen keeps the full names. The
-footer is the favourite cue as everywhere, and carries no position: ten
-games under five days fill the panel, there is nothing to scroll. An
-entry is written when `runemu` exits with status 0, so a game that never
-started is not in the list, and a game quit with Home + Start is.
+footer is the favourite cue as everywhere, and carries no position. The
+sample fills the panel because its ten games fall on five days; ten games
+on ten days need twenty rows, so the list scrolls like any other, and the
+day headings scroll with their games. An entry is written when `runemu`
+exits with status 0, so a game that never started is not in the list,
+and a game quit with Home + Start is.
 
 ![Recently played](images/recently-played.png)
 

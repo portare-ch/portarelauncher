@@ -281,8 +281,9 @@ games_fav = games_screen("Super Mario World (USA)")
 # so a game that never started is not in it. Grouped under the day in
 # small caps: TODAY, YESTERDAY, then the weekday for the last week and
 # the date beyond it. A row is the title and a short system name; the
-# day is the heading, not a third column. Ten games under five days fill
-# the panel exactly.
+# day is the heading, not a third column. This sample's ten games fall on
+# five days and fill the panel exactly; on more days the list scrolls, the
+# headings with it.
 RECENT = [("TODAY", [("Super Mario World", "SNES"), ("Tekken 3", "PS1")]),
           ("YESTERDAY", [("Yoshi's Island - Super Mario World 2", "SNES"),
                          ("Metroid (USA)", "NES")]),
