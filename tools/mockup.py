@@ -208,9 +208,9 @@ joining = kb_screen("FRITZ!Box 7520 JI", "hunter2Hunter!", LOWER, sel=(1, 2),
 # Tools: whatever scripts are in the modules folder, named and described
 # from its gamelist.xml. The description gets fixed room under the list,
 # because it is where a tool says how to get back out of it.
-TOOLS = ["File Manager", "Remove ._ Files", "Start RetroArch (64-bit)"]
+TOOLS = ["Remove ._ Files", "Start RetroArch (64-bit)"]
 tools = [header("Tools"), RULE, "",
-         row("  TOOLS", "3 found  "), ""]
+         row("  TOOLS", "2 found  "), ""]
 tools += [item(n == "Remove ._ Files", n) for n in TOOLS]
 tools += [""] * (ROWS - 2 - 4 - 1 - len(tools))
 tools += [THIN,

@@ -219,11 +219,11 @@
      Tools              VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
-      TOOLS                                     3 found  |
+      TOOLS                                     2 found  |
                                                          |
-        File Manager                                     |
       ▸ Remove ._ Files                                  |
         Start RetroArch (64-bit)                         |
+                                                         |
                                                          |
                                                          |
                                                          |
