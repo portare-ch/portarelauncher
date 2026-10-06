@@ -36,7 +36,7 @@ struct input {
 	int fd[INPUT_MAX_DEV];
 	int n;
 	/* Something that is not an input device but has to wake the same
-	 * poll: the OSD pipe. Kept separate so its bytes are never parsed as
+	 * poll: the status notification pipe. Kept separate so its bytes are never parsed as
 	 * evdev events. */
 	int aux_fd;
 	/* inotify on /dev/input. InputPlumber recreates its virtual pad

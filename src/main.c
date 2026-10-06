@@ -10,7 +10,7 @@
 #include "input.h"
 #include "kms.h"
 #include "net.h"
-#include "osd.h"
+#include "notify.h"
 #include "osinfo.h"
 #include "osk.h"
 #include "proc.h"
@@ -21,6 +21,7 @@
 #include "tools.h"
 #include "tz.h"
 #include "update.h"
+#include "timeutil.h"
 
 #include <errno.h>
 #include <poll.h>
@@ -145,7 +146,7 @@ struct ui {
 	long long last_act;  /* when the last press came in, ms               */
 	int blanked;         /* the CRTC is off, by idle or by SIGUSR1        */
 	struct status st;
-	struct osd osd;
+	struct notify notify;
 
 	struct net_list nets;
 	int wifi_on;         /* the radio, as last asked                      */
@@ -208,13 +209,10 @@ struct ui {
 	long long mq_at;         /* when the phase began, ms                  */
 };
 
-static long long now_ms(void);
-
 /* Which face button confirms. Stored in system.cfg like everything else,
  * so it survives a restart and is visible to the rest of the system. */
 #define KEY_BUTTONS "launcher.buttons"
 #define KEY_PALETTE "launcher.palette"
-
 
 /* The PS marks approximated out of CP437, which is all the VGA font has.
  * Close enough to be recognised, and not the real symbols. */
@@ -233,7 +231,7 @@ static const char *const settings_labels[N_SETTINGS] = {
 	"Wi-Fi",
 	"SSH",
 	"Bluetooth",
-	"USB gadget mode",
+	"USB mode",
 	"Button style",
 	"Consoles",
 	"Color",
@@ -669,8 +667,10 @@ static void draw_systems(struct ui *u)
 	if (u->cat.n == 0) {
 		unsigned y = top + (u->tools.n > 0 ? 2 : 0);
 		term_puts(t, 4, y, "No games found.", ATTR_BRIGHT);
-		term_puts(t, 4, y + 2, "Copy them into roms/<system>", ATTR_MID);
-		term_puts(t, 4, y + 3, "and press A to look again.", ATTR_MID);
+		term_puts(t, 4, y + 2, "Add games to roms/<system>.", ATTR_MID);
+		struct face f = face_of(u->retroid);
+		snprintf(buf, sizeof(buf), "Press %c to refresh.", f.confirm);
+		term_puts(t, 4, y + 3, buf, ATTR_MID);
 	}
 
 	struct face f = face_of(u->retroid);
@@ -761,12 +761,12 @@ static void draw_list(struct ui *u)
 	}
 
 	if (xl.ngames == 0) {
-		term_puts(t, 4, top + 1, recent ? "Nothing played yet."
+		term_puts(t, 4, top + 1, recent ? "No games played yet."
 		                                : "No favourites yet.", ATTR_BRIGHT);
 		if (!recent) {
 			struct face f = face_of(u->retroid);
 			char hint[64];
-			snprintf(hint, sizeof(hint), "%c marks one in any list of games.",
+			snprintf(hint, sizeof(hint), "Press %c on a game to add a favourite.",
 			         f.fav);
 			term_puts(t, 4, top + 3, hint, ATTR_MID);
 		}
@@ -810,7 +810,7 @@ static void draw_settings(struct ui *u)
 
 	char val[64];
 	for (int i = 0; i < N_SETTINGS; i++) {
-		const char *value = "not wired up";
+		const char *value = "";
 		switch (i) {
 		case SET_WIFI: {
 			const char *ssid = NULL;
@@ -819,7 +819,7 @@ static void draw_settings(struct ui *u)
 					ssid = u->nets.e[k].name;
 			/* The list is from the last scan; the address is live. */
 			value = ssid ? ssid : u->addr[0] ? "connected"
-			      : (net_wifi_enabled() ? "not connected" : "off");
+			      : (net_wifi_enabled() ? "disconnected" : "off");
 			break;
 		}
 		case SET_SSH:
@@ -897,7 +897,7 @@ static void draw_settings(struct ui *u)
 		break;
 	case SET_CONSOLES:
 		wrap_puts(t, 4, y + 1, t->cols - 8, 2,
-		          "Experimental. Pre-emptive frames, per console.", ATTR_DIM);
+		          "Experimental: reduce input lag per console.", ATTR_DIM);
 		break;
 	case SET_WIFI: {
 		char addr[40] = "";
@@ -927,22 +927,22 @@ static void draw_settings(struct ui *u)
 		/* Both corrections crush the dark greys on the device today
 		 * (PortareOS BUGS.md), so stock is the standard for now. */
 		wrap_puts(t, 4, y + 1, t->cols - 8, 2,
-		          "Experimental. sRGB, D65; both crush dark greys today.", ATTR_DIM);
+		          "Experimental: may lose detail in dark areas.", ATTR_DIM);
 		if (!u->profile_ok[1] && !u->profile_ok[2])
-			term_puts(t, 4, y + 1, "no profile files on this image", ATTR_MID);
+			term_puts(t, 4, y + 1, "No colour profiles installed.", ATTR_MID);
 		break;
 	case SET_CHARGING:
 		wrap_puts(t, 4, y + 1, t->cols - 8, 2,
-		          "Experimental. Yellow thumbsticks while charging.", ATTR_DIM);
+		          "Experimental: yellow thumbsticks when charging.", ATTR_DIM);
 		break;
 	case SET_BLUETOOTH:
-		term_puts(t, 4, y + 1, "Open to scan and connect.", ATTR_DIM);
+		term_puts(t, 4, y + 1, "Scan and connect devices.", ATTR_DIM);
 		break;
 	case SET_TIMEZONE:
-		term_puts(t, 4, y + 1, "Open to pick a region, then a city.", ATTR_DIM);
+		term_puts(t, 4, y + 1, "Choose a region, then a city.", ATTR_DIM);
 		break;
 	case SET_POWER:
-		term_puts(t, 4, y + 1, "Restart, or switch the device off.", ATTR_DIM);
+		term_puts(t, 4, y + 1, "Restart or power off.", ATTR_DIM);
 		break;
 	case SET_ABOUT:
 		term_puts(t, 4, y + 1, "Version, address, updates.", ATTR_DIM);
@@ -950,7 +950,7 @@ static void draw_settings(struct ui *u)
 	case SET_USB: {
 		char addr[40] = "";
 		usb_address(addr, sizeof(addr));
-		term_puts(t, 4, y + 1, "USB as a network link, or as file transfer.", ATTR_DIM);
+		term_puts(t, 4, y + 1, "USB networking or file transfer.", ATTR_DIM);
 		if (addr[0] && strcmp(u->usb, "network") == 0) {
 			snprintf(val, sizeof(val), "address  %s", addr);
 			term_puts(t, 4, y + 2, val, ATTR_MID);
@@ -958,7 +958,6 @@ static void draw_settings(struct ui *u)
 		break;
 	}
 	default:
-		term_puts(t, 4, y + 1, "Not implemented yet.", ATTR_DIM);
 		break;
 	}
 
@@ -989,8 +988,7 @@ static void draw_consoles(struct ui *u)
 	unsigned width = t->cols - 8, room = t->rows - 2 - (y + 1);
 	unsigned r = wrap_puts(t, 4, y + 1, width, room, "Experimental.", ATTR_DIM);
 	wrap_puts(t, 4, y + 1 + r, width, room - r,
-	          "PRMPT: Enables or disables 1 pre-emptive frame for lower "
-	          "input latency.", ATTR_DIM);
+	          "PRMPT adds a pre-emptive frame to reduce input lag.", ATTR_DIM);
 
 	if (u->note[0])
 		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
@@ -1016,8 +1014,7 @@ static void draw_wifi(struct ui *u)
 	draw_row(u, 3, u->wifi_sel == 0, "Wi-Fi", u->wifi_on ? "on" : "off");
 
 	if (!u->wifi_on) {
-		term_puts(t, 4, LIST_TOP + 1, "Switch Wi-Fi on to see the networks", ATTR_DIM);
-		term_puts(t, 4, LIST_TOP + 2, "in range and join one.", ATTR_DIM);
+		term_puts(t, 4, LIST_TOP + 1, "Turn on Wi-Fi to find networks.", ATTR_DIM);
 	} else {
 		term_puts(t, 2, LIST_TOP - 1, "NETWORKS", ATTR_MID);
 		snprintf(buf, sizeof(buf), "%d found", u->nets.n);
@@ -1076,7 +1073,7 @@ static void draw_bt(struct ui *u)
 	draw_frame(u, "Settings  >  Bluetooth");
 
 	draw_row(u, 3, u->bt_sel == 0, "Bluetooth", u->bt_on ? "on" : "off");
-	draw_row(u, 4, u->bt_sel == 1, "Auto-connect known devices",
+	draw_row(u, 4, u->bt_sel == 1, "Auto-connect paired devices",
 	         u->bt_auto ? "yes" : "no");
 	term_hline(t, 5, G_HLINE, ATTR_DIM);
 
@@ -1090,8 +1087,8 @@ static void draw_bt(struct ui *u)
 
 	if (u->bt.n == 0)
 		term_puts(t, 4, BT_LIST_TOP,
-		          u->bt_on ? "none known - scan to find some"
-		                   : "bluetooth is off", ATTR_DIM);
+		          u->bt_on ? "No devices found. Scan to find devices."
+		                   : "Bluetooth is off.", ATTR_DIM);
 
 	for (int i = 0; i < visible && u->bt_top + i < u->bt.n; i++) {
 		const struct bt_device *d = &u->bt.d[u->bt_top + i];
@@ -1200,7 +1197,7 @@ static void draw_keyboard(struct ui *u)
 	if (u->note[0])
 		term_puts(t, 4, y + 1, u->note, ATTR_BRIGHT);
 	else
-		term_puts(t, 4, y + 1, "SELECT shows or hides the password", ATTR_DIM);
+		term_puts(t, 4, y + 1, "SELECT: show or hide password", ATTR_DIM);
 
 	/* Built from the pad's own printing, like every other hint line, so
 	 * it names the buttons the user is actually holding. */
@@ -1261,9 +1258,8 @@ static void draw_power(struct ui *u)
 
 	if (u->power_sel == POW_BLANK)
 		wrap_puts(t, 4, 3 + N_POWER_ROWS + 1, t->cols - 8, 3,
-		          "How long the menu may sit untouched before the panel "
-		          "goes off. Any button wakes it. A running game owns the "
-		          "panel and is not covered.", ATTR_DIM);
+		          "Screen timeout while in menus. Press any button to wake. "
+		          "Does not affect games.", ATTR_DIM);
 
 	/* One press arms it and says so; the second does it. Anything else
 	 * disarms, so a stray press on the way through never switches off. */
@@ -1459,13 +1455,13 @@ static void draw_update(struct ui *u)
 
 	const char *l1 = "", *l2 = "";
 	if (u->upd_staged) {
-		l1 = "Downloaded and checked. Restart to";
-		l2 = "install it; that takes a minute.";
+		l1 = "Update verified. Restart to install.";
+		l2 = "";
 	} else switch (u->upd.state) {
 	case UPD_AVAILABLE: l1 = "An update is available."; break;
-	case UPD_CURRENT:   l1 = "This is the newest build on this"; l2 = "channel."; break;
-	case UPD_NEWER:     l1 = "The installed build is newer than"; l2 = "anything on this channel."; break;
-	case UPD_NONE:      l1 = "Nothing published on this channel"; l2 = "for this device yet."; break;
+	case UPD_CURRENT:   l1 = "Up to date on this channel."; break;
+	case UPD_NEWER:     l1 = "Installed build is newer than this channel."; break;
+	case UPD_NONE:      l1 = "No builds for this device on this channel."; break;
 	case UPD_ERROR:     l1 = u->upd.error; break;
 	case UPD_UNKNOWN:   break;
 	}
@@ -1473,11 +1469,11 @@ static void draw_update(struct ui *u)
 	term_puts(t, 4, 12, l2, ATTR_BRIGHT);
 
 	if (!strcmp(u->upd.channel, "release")) {
-		term_puts(t, 4, 14, "release: the monthly builds only.", ATTR_DIM);
-		term_puts(t, 4, 15, "Fewer changes, each one tested longer.", ATTR_DIM);
+		term_puts(t, 4, 14, "Release: monthly builds.", ATTR_DIM);
+		term_puts(t, 4, 15, "Fewer changes; longer testing.", ATTR_DIM);
 	} else {
-		term_puts(t, 4, 14, "nightly: every build, most days.", ATTR_DIM);
-		term_puts(t, 4, 15, "Newest fixes first, and newest bugs.", ATTR_DIM);
+		term_puts(t, 4, 14, "Nightly: latest builds.", ATTR_DIM);
+		term_puts(t, 4, 15, "Latest fixes; may be less stable.", ATTR_DIM);
 	}
 
 	if (u->note[0])
@@ -1497,7 +1493,7 @@ static void draw_download(int pct, int verifying, void *ctx)
 	char buf[64];
 
 	draw_frame(u, "Settings  >  About  >  Update");
-	term_puts(t, 4, 4, verifying ? "Checking the download..." : "Downloading",
+	term_puts(t, 4, 4, verifying ? "Verifying download..." : "Downloading",
 	          ATTR_BRIGHT);
 	term_puts(t, 4, 5, u->upd.tag, ATTR_MID);
 
@@ -1515,8 +1511,8 @@ static void draw_download(int pct, int verifying, void *ctx)
 		term_puts(t, 4, 10, buf, ATTR_MID);
 	}
 
-	term_puts(t, 4, 13, "Keep Wi-Fi on. If it stops, choosing", ATTR_DIM);
-	term_puts(t, 4, 14, "it again continues where it was.", ATTR_DIM);
+	term_puts(t, 4, 13, "Keep your network connected.", ATTR_DIM);
+	term_puts(t, 4, 14, "Retry an interrupted download to resume.", ATTR_DIM);
 	term_flush(t);
 }
 
@@ -1567,7 +1563,7 @@ static void redraw(struct ui *u)
 	term_flush(&u->term);
 }
 
-/* nmcli and usbgadget both take a moment. Say so rather than appear frozen. */
+/* Network and USB commands take a moment. Say so rather than appear frozen. */
 static void draw_busy(struct ui *u, const char *what)
 {
 	struct term *t = &u->term;
@@ -1575,14 +1571,15 @@ static void draw_busy(struct ui *u, const char *what)
 	term_flush(t);
 }
 
-static void draw_launching(struct ui *u, const char *what, const char *detail)
+/* The name of what is starting and nothing else: which emulator or script
+ * does the work is not the player's concern. */
+static void draw_launching(struct ui *u, const char *what)
 {
 	struct term *t = &u->term;
 
 	draw_frame(u, "PortareOS");
 	term_puts(t, 6, 6, what, ATTR_BRIGHT);
-	term_puts(t, 6, 8, detail, ATTR_MID);
-	term_puts(t, 6, 10, "handing over the display...", ATTR_DIM);
+	term_puts(t, 6, 8, "Starting...", ATTR_DIM);
 	term_flush(t);
 }
 
@@ -1608,12 +1605,6 @@ static void draw_launching(struct ui *u, const char *what, const char *detail)
 #define NET_POLL_SLOW_MS  60000
 #define NET_POLL_FAST_FOR 300000   /* 5 minutes of quick looks after start */
 
-static long long now_ms(void)
-{
-	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
-}
 
 static void net_poll(struct ui *u)
 {
@@ -1818,9 +1809,8 @@ static void launch(struct ui *u, const struct psystem *s, const struct game *g)
 	if (!s->core[0] || !s->emulator[0]) {
 		struct term *t = &u->term;
 		draw_frame(u, "PortareOS");
-		term_puts(t, 4, 6, "Cannot launch: no", ATTR_BRIGHT);
-		term_puts(t, 4, 7, s->core[0] ? "emulator" : "core", ATTR_BRIGHT);
-		term_puts(t, 4, 8, "for this system.", ATTR_BRIGHT);
+		term_puts(t, 4, 6, "Cannot launch this game.", ATTR_BRIGHT);
+		term_puts(t, 4, 7, s->core[0] ? "No emulator configured." : "No core configured.", ATTR_BRIGHT);
 		term_puts(t, 4, 10, s->name, ATTR_MID);
 		term_flush(t);
 		return;
@@ -1836,7 +1826,7 @@ static void launch(struct ui *u, const struct psystem *s, const struct game *g)
 		(char *)"--controllers=", NULL
 	};
 
-	draw_launching(u, g->name, s->core[0] ? s->core : s->emulator);
+	draw_launching(u, g->name);
 	int status = hand_over(u, argv, NULL);
 
 	/* Into Recently played when runemu came back clean: a game that never
@@ -1876,7 +1866,7 @@ static void run_tool(struct ui *u, const struct tool *tl)
 	snprintf(path, sizeof(path), "%s/%s", u->tools.dir, tl->file);
 	char *const argv[] = { (char *)"/bin/bash", path, NULL };
 
-	draw_launching(u, tl->name, tl->file);
+	draw_launching(u, tl->name);
 	hand_over(u, argv, u->tools.dir);
 }
 
@@ -1903,18 +1893,18 @@ static void join(struct ui *u, const char *password)
 		return;
 	case 4:
 		str_copy(u->note, sizeof(u->note),
-		         "Wrong password, or the network refused it.");
+		         "Password rejected. Check and retry.");
 		break;
 	case 10:
-		str_copy(u->note, sizeof(u->note), "The network is out of range now.");
+		str_copy(u->note, sizeof(u->note), "Network out of range.");
 		break;
 	case 3:
 	case PROC_TIMEOUT:
 		str_copy(u->note, sizeof(u->note),
-		         "No answer from the network. Try closer to it.");
+		         "No response. Move closer and retry.");
 		break;
 	default:
-		snprintf(u->note, sizeof(u->note), "Could not join (nmcli error %d).", rc);
+		snprintf(u->note, sizeof(u->note), "Connection failed (error %d).", rc);
 		break;
 	}
 }
@@ -1977,7 +1967,7 @@ static void on_action(struct ui *u, enum action a)
 		/* Something changed a setting we show. The pipe carries a
 		 * message but the header is the display now, so only the
 		 * nudge matters. */
-		osd_read(&u->osd);
+		notify_drain(&u->notify);
 		status_read(&u->st);
 		return;
 	}
@@ -2021,20 +2011,21 @@ static void on_action(struct ui *u, enum action a)
 	case SCR_SYSTEMS:
 		if (a == ACT_UP && u->sys_sel > 0) u->sys_sel--;
 		else if (a == ACT_DOWN && u->sys_sel < system_rows(u) - 1) u->sys_sel++;
-		else if (a == ACT_CONFIRM && u->sys_sel == QUICK_RECENT)
-			show_list(u, SCR_RECENT);
-		else if (a == ACT_CONFIRM && u->sys_sel == QUICK_FAVS)
-			show_list(u, SCR_FAVS);
-		else if (a == ACT_CONFIRM && on_tools_row(u)) {
-			/* Re-read on the way in: a package or an update may have
-			 * changed the folder since start, and it costs one readdir. */
-			tools_load(&u->tools);
-			u->tool_sel = u->tool_top = 0;
-			u->screen = SCR_TOOLS;
-		}
 		else if (a == ACT_CONFIRM) {
+			/* Re-read on the way in, whatever the row: a card or an
+			 * update may have changed the folders since start, it costs
+			 * one readdir, and with no games at all it is the only way
+			 * the "press A to refresh" line can keep its word, since the
+			 * selection then sits on a Quick Access row. */
 			refresh_catalog(u);
-			if (sys_index(u) >= 0) {
+			if (u->sys_sel == QUICK_RECENT)
+				show_list(u, SCR_RECENT);
+			else if (u->sys_sel == QUICK_FAVS)
+				show_list(u, SCR_FAVS);
+			else if (on_tools_row(u)) {
+				u->tool_sel = u->tool_top = 0;
+				u->screen = SCR_TOOLS;
+			} else if (sys_index(u) >= 0) {
 				u->screen = SCR_GAMES;
 				u->game_sel = u->game_top = 0;
 			}
@@ -2171,7 +2162,7 @@ static void on_action(struct ui *u, enum action a)
 					u->profile = next;
 					settings_set(SETTINGS, KEY_PROFILE, profile_names[next].key);
 				} else {
-					snprintf(u->note, sizeof(u->note), "the display refused the profile");
+					snprintf(u->note, sizeof(u->note), "Could not apply colour profile.");
 				}
 			}
 		}
@@ -2222,7 +2213,7 @@ static void on_action(struct ui *u, enum action a)
 			else
 				memset(&u->nets, 0, sizeof(u->nets));
 			if (on && !u->wifi_on)
-				str_copy(u->note, sizeof(u->note), "Wi-Fi did not come on.");
+				str_copy(u->note, sizeof(u->note), "Could not enable Wi-Fi.");
 			u->wifi_top = 0;
 		}
 		else if (a == ACT_MENU && u->wifi_on) {
@@ -2235,7 +2226,7 @@ static void on_action(struct ui *u, enum action a)
 			int min = net_min_password(e->security);
 			if (!e->saved && min < 0) {
 				str_copy(u->note, sizeof(u->note),
-				         "Needs a username too - not supported yet.");
+				         "Networks requiring a username are unsupported.");
 			} else if (!e->saved) {
 				str_copy(u->join_ssid, sizeof(u->join_ssid), e->name);
 				osk_init(&u->osk, min);
@@ -2311,13 +2302,13 @@ static void on_action(struct ui *u, enum action a)
 			tz_show_region(u, u->tz_sel);
 		else if (a == ACT_CONFIRM && u->tz_level == 1 && u->tz_sel < count) {
 			const char *zone = u->tz.zone[u->tz_idx[u->tz_sel]];
-			draw_busy(u, "setting the time zone...");
+			draw_busy(u, "Saving time zone...");
 			if (tz_apply(zone, SETTINGS, TZ_CACHE) == 0) {
 				str_copy(u->tz_cur, sizeof(u->tz_cur), zone);
 				status_read(&u->st);        /* the header clock, now */
 				u->screen = SCR_SETTINGS;
 			} else {
-				str_copy(u->note, sizeof(u->note), "Could not save it.");
+				str_copy(u->note, sizeof(u->note), "Could not save time zone.");
 			}
 		}
 		else if (a == ACT_BACK && u->tz_level == 1) {
@@ -2373,7 +2364,7 @@ static void on_action(struct ui *u, enum action a)
 		else if (a == ACT_DOWN && u->bt_sel < last) u->bt_sel++;
 		else if (a == ACT_MENU) {
 			if (!u->bt_on) {
-				draw_busy(u, "bluetooth is off");
+				draw_busy(u, "Bluetooth is off.");
 				break;
 			}
 			/* Eight seconds with the panel frozen. Long enough for
@@ -2462,8 +2453,8 @@ int main(void)
 	 * struct, aux_fd included. The other way round registered the pipe and
 	 * then forgot it, so input_sense's notifications piled up unread and
 	 * the header only caught up on the minute tick. */
-	if (osd_open(&u.osd) == 0)
-		input_set_aux(&u.in, u.osd.fd);
+	if (notify_open(&u.notify) == 0)
+		input_set_aux(&u.in, u.notify.fd);
 
 	fprintf(stderr, "portarelauncher: %ux%u, %ux%u grid, %d systems\n",
 	        u.kms.mode.hdisplay, u.kms.mode.vdisplay,
@@ -2568,18 +2559,14 @@ int main(void)
 	redraw(&u);
 
 	while (u.running && !stop_requested) {
-		/* Sleep until the minute turns over, until the overlay is due
-		 * to come down, or until something is pressed. Nothing else
-		 * wakes this program. */
+		/* Refresh the clock at the next minute boundary; the deadlines
+		 * below shorten the wait for other pending work. */
 		int idle = status_ms_to_next_minute();
 		if (u.panel_lost && idle > 1000)
 			idle = 1000;         /* keep asking for the panel back */
 		int mq_left = marquee_left(&u);
 		if (mq_left >= 0 && mq_left < idle)
 			idle = mq_left;      /* a long title is scrolling */
-		int osd_left = osd_remaining(&u.osd);
-		if (osd_left >= 0 && osd_left < idle)
-			idle = osd_left;
 		long long net_left = u.net_next - now_ms();
 		if (net_left < idle)
 			idle = net_left > 0 ? (int)net_left : 0;
@@ -2661,11 +2648,10 @@ int main(void)
 		if (a == ACT_NONE)
 			continue;
 		on_action(&u, a);
-		osd_remaining(&u.osd);   /* clears the text once it has expired */
 		redraw(&u);
 	}
 
-	osd_close(&u.osd);
+	notify_close(&u.notify);
 	input_close(&u.in);
 	term_free(&u.term);
 	kms_close(&u.kms);

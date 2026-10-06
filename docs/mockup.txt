@@ -54,7 +54,7 @@
         Wi-Fi                                Hofmann-5G  |
         SSH                                          on  |
         Bluetooth                            WH-1000XM4  |
-        USB gadget mode                         network  |
+        USB mode                                network  |
       ▸ Button style                            Retroid  |
         Consoles                              2 changed  |
         Color                                      grey  |
@@ -84,8 +84,8 @@
         Genesis                               PRMPT off  |
      ─────────────────────────────────────────────────── |
         Experimental.                                    |
-        PRMPT: Enables or disables 1 pre-emptive frame   |
-        for lower input latency.                         |
+        PRMPT adds a pre-emptive frame to reduce         |
+        input lag.                                       |
                                                          |
                                                          |
                                                          |
@@ -100,7 +100,7 @@
      ═══════════════════════════════════════════════════ |
                                                          |
         Bluetooth                                    on  |
-        Auto-connect known devices                  yes  |
+        Auto-connect paired devices                 yes  |
      ─────────────────────────────────────────────────── |
       DEVICES                                   4 found  |
       ▸ WH-1000XM4                            connected  |
@@ -134,7 +134,7 @@
        z    x    c    v    b    n    m    _    .    @    |
        SHIFT      #+=         SPACE      DEL    DONE     |
                                                          |
-        SELECT shows or hides the password               |
+        SELECT: show or hide password                    |
                                                          |
                                                          |
                                                          |
@@ -158,7 +158,7 @@
        Z    X    C    V    B    N    M    _    .    @    |
        SHIFT      #+=         SPACE      DEL    DONE     |
                                                          |
-        SELECT shows or hides the password               |
+        SELECT: show or hide password                    |
                                                          |
                                                          |
                                                          |
@@ -182,7 +182,7 @@
        \    ]    ^    `    {    |    }    ~              |
        SHIFT      abc         SPACE      DEL [  DONE  ]  |
                                                          |
-        SELECT shows or hides the password               |
+        SELECT: show or hide password                    |
                                                          |
                                                          |
                                                          |
@@ -206,7 +206,7 @@
        z    x    c    v    b    n    m    _    .    @    |
        SHIFT      #+=         SPACE      DEL    DONE     |
                                                          |
-        Wrong password, or the network refused it.       |
+        Password rejected. Check and retry.              |
                                                          |
                                                          |
                                                          |
@@ -248,9 +248,9 @@
                                                          |
                Tekken 3 (USA)                            |
                                                          |
-               swanstation                               |
+               Starting...                               |
                                                          |
-               handing over the display…                 |
+                                                         |
                                                          |
                                                          |
                                                          |

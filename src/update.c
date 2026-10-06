@@ -66,7 +66,7 @@ void update_check(struct update_info *u)
 			str_copy(u->error, sizeof(u->error), "No answer from GitHub.");
 		else
 			snprintf(u->error, sizeof(u->error),
-			         "The update check failed (%d).", rc);
+			         "Update check failed (%d).", rc);
 	}
 }
 
@@ -113,9 +113,9 @@ int update_fetch(void (*progress)(int pct, int verifying, void *ctx),
 	if (f.error[0])
 		str_copy(err, esz, f.error);
 	else if (rc == PROC_TIMEOUT)
-		str_copy(err, esz, "The download took too long. Try again to continue it.");
+		str_copy(err, esz, "Download timed out. Retry to resume.");
 	else
-		snprintf(err, esz, "The update failed (%d).", rc);
+		snprintf(err, esz, "Update failed (%d).", rc);
 	return -1;
 }
 

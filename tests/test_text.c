@@ -52,9 +52,17 @@ static void test_strip_ansi(void)
 	CHECK_STR(s, "name");
 }
 
+static void test_xml_unescape(void)
+{
+	char s[] = "&lt;&gt;&amp;&apos;&quot; &unknown; &amp;lt; &";
+	xml_unescape(s);
+	CHECK_STR(s, "<>&'\" &unknown; &lt; &");
+}
+
 int main(void)
 {
 	test_str_copy();
 	test_strip_ansi();
+	test_xml_unescape();
 	return check_report("text");
 }

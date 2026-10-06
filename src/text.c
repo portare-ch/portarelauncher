@@ -37,3 +37,30 @@ void strip_ansi(char *s)
 	}
 	*w = '\0';
 }
+
+/* The five entities an XML generator will emit. Decoded in place. */
+void xml_unescape(char *s)
+{
+	static const struct { const char *ent; char ch; } map[] = {
+		{ "&amp;", '&' }, { "&lt;", '<' }, { "&gt;", '>' },
+		{ "&apos;", '\'' }, { "&quot;", '"' },
+	};
+	char *r = s, *w = s;
+	while (*r) {
+		if (*r == '&') {
+			size_t i;
+			for (i = 0; i < sizeof(map) / sizeof(map[0]); i++) {
+				size_t l = strlen(map[i].ent);
+				if (strncmp(r, map[i].ent, l) == 0) {
+					*w++ = map[i].ch;
+					r += l;
+					break;
+				}
+			}
+			if (i < sizeof(map) / sizeof(map[0]))
+				continue;
+		}
+		*w++ = *r++;
+	}
+	*w = '\0';
+}

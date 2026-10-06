@@ -31,33 +31,6 @@ static char *read_all(const char *path)
 	return buf;
 }
 
-/* The five entities XML defines; gamelist.xml uses &amp; in a few names. */
-static void unescape(char *s)
-{
-	static const struct { const char *ent; char ch; } map[] = {
-		{ "&amp;", '&' }, { "&lt;", '<' }, { "&gt;", '>' },
-		{ "&quot;", '"' }, { "&apos;", '\'' },
-	};
-	char *w = s;
-	for (const char *r = s; *r; ) {
-		int done = 0;
-		if (*r == '&') {
-			for (size_t i = 0; i < sizeof(map) / sizeof(map[0]); i++) {
-				size_t n = strlen(map[i].ent);
-				if (strncmp(r, map[i].ent, n) == 0) {
-					*w++ = map[i].ch;
-					r += n;
-					done = 1;
-					break;
-				}
-			}
-		}
-		if (!done)
-			*w++ = *r++;
-	}
-	*w = '\0';
-}
-
 /* Copies the text of <tag>...</tag> found between from and end. */
 static int tag_in(const char *from, const char *end, const char *tag,
                   char *out, size_t osz)
@@ -79,7 +52,7 @@ static int tag_in(const char *from, const char *end, const char *tag,
 		n = osz - 1;
 	memcpy(out, a, n);
 	out[n] = '\0';
-	unescape(out);
+	xml_unescape(out);
 	return 1;
 }
 
