@@ -137,5 +137,6 @@ if __name__ == "__main__":
         render(lines, os.path.join(out, name + ".png"), glyphs)
     render(mockup.gamepad, os.path.join(out, "portscope.png"), glyphs,
            mockup.pad_spans(), mockup.pad_shapes())
-    render(mockup.gamepad_ps, os.path.join(out, "portscope-ps.png"), glyphs,
+    render(mockup.gamepad_shapes, os.path.join(out, "portscope-shapes.png"), glyphs,
            mockup.pad_spans(True), mockup.pad_shapes(True))
+    render(mockup.diagnostics, os.path.join(out, "settings-diagnostics.png"), glyphs)

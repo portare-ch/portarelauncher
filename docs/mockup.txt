@@ -50,7 +50,6 @@
     .....................................................  <- 53 columns
      Settings                                            |
      ═══════════════════════════════════════════════════ |
-                                                         |
         Wi-Fi                                Hofmann-5G  |
         SSH                                          on  |
         Bluetooth                            WH-1000XM4  |
@@ -61,6 +60,7 @@
         Color profile                             stock  |
         Charging LED                                 on  |
         Time zone                         Europe/Zurich  |
+        Diagnostics                                      |
         About                         v0.2.6 2026-09-26  |
         Power                                            |
              X          X confirm                        |
@@ -142,7 +142,7 @@
      A TYPE  B DELETE  X SPACE  L1 SHIFT  START JOIN     |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
-    KEYBOARD - shift, PS button style
+    KEYBOARD - shift, shape marks
     .....................................................  <- 53 columns
      Settings  ›  Wi-Fi VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
@@ -219,20 +219,20 @@
      Tools              VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
-      TOOLS                                     5 found  |
+      TOOLS                                     3 found  |
                                                          |
         File Manager                                     |
-        PortMaster                                       |
-        Remove ._ Files                                  |
+      ▸ Remove ._ Files                                  |
         Start RetroArch (64-bit)                         |
-      ▸ Test Gamepad                                     |
+                                                         |
+                                                         |
                                                          |
                                                          |
                                                          |
      ─────────────────────────────────────────────────── |
-        A simple SDL GUI gamepad tester to help          |
-        validate gamepad inputs. To exit, hold L1 and    |
-        press START + SELECT.                            |
+        Deletes the ._ files macOS leaves beside         |
+        every ROM on an SD card. Returns on its own.     |
+                                                         |
                                                          |
      ─────────────────────────────────────────────────── |
      B RUN   A BACK                                      |
@@ -382,6 +382,30 @@
      A LAUNCH   B BACK   Y REMOVE                  3 / 7 |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
+    SETTINGS - DIAGNOSTICS
+    .....................................................  <- 53 columns
+     Settings  ›  Diagnostics                            |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+      ▸ PortScope                                        |
+        PortScope, raw input                             |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+        Every button and stick as the system sees it.    |
+        Home + START leaves it.                          |
+     ─────────────────────────────────────────────────── |
+     A OPEN   B BACK                             ↑↓ MOVE |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
     PROPOSED - PORTSCOPE
     .....................................................  <- 53 columns
      PortScope                               RATE 200 Hz |
@@ -392,7 +416,7 @@
               ↑                             X            |
            ←  ·  →                       Y     A         |
               ↓                             B            |
-                                                         |
+             L3                              R3          |
                                                          |
                                                          |
                                                          |
@@ -406,7 +430,7 @@
      ABS_Z      21580                                    |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
-    PROPOSED - PORTSCOPE, PS BUTTON STYLE
+    PROPOSED - PORTSCOPE, SHAPE MARKS
     .....................................................  <- 53 columns
      PortScope                               RATE 200 Hz |
      ═══════════════════════════════════════════════════ |
@@ -416,7 +440,7 @@
               ↑                             ▲            |
            ←  ·  →                       ■     ○         |
               ↓                             ×            |
-                                                         |
+             L3                              R3          |
                                                          |
                                                          |
                                                          |
