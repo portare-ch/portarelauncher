@@ -12,8 +12,12 @@ launcher's own font, so what is shown is what the device can draw.
 A category of its own above the systems: cross-system shortcuts first,
 platforms below, a thin rule between and no blank row. Recently played
 comes first because it needs no curation. The systems section keeps its
-title and count. The header keeps the device's order, with the clock at
-the right edge. The games screen no longer names the emulator under the
+title; its count, `12 found`, sits at the right end of the footer, as the
+position does on the games screens, and the plain Systems screen without
+Quick Access drops the title row and the blank under it altogether, two
+more systems on screen. The header is the device's status on every
+screen, with the clock at the right edge; no screen counts its rows up
+there. The games screen no longer names the emulator under the
 list; which core runs a system is not the player's concern.
 
 ![Systems with Quick Access](images/systems-quick-access.png)

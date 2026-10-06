@@ -30,14 +30,14 @@ SYS = [("GameCube", 24), ("Nintendo 64", 9), ("PlayStation", 112),
        ("Mega Drive", 88), ("Game Boy Advance", 140), ("Dreamcast", 6),
        ("Arcade", 47)]
 
-systems = [row(" PortareOS", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, "",
-           row("  SYSTEMS", "12 found  "), ""]
+systems = [row(" PortareOS", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, ""]
 systems += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(SYS)]
-systems += ["", THIN, row(" A SELECT   X SETTINGS", "\u2191\u2193 MOVE ")]
+systems += [""] * (ROWS - 2 - len(systems))
+systems += [THIN, row(" A SELECT   X SETTINGS", "12 found ")]
 
 GAMES = ["Tekken 2", "Tekken 3", "Tomb Raider", "Tony Hawk's Pro Skater 2",
          "Vagrant Story", "Wipeout XL", "Xenogears"]
-games = [row(" PortareOS  \u203a  PlayStation", "112 games "), RULE, ""]
+games = [row(" PortareOS  \u203a  PlayStation", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, ""]
 games += [item(n == "Tekken 3", n) for n in GAMES]
 games += [""] * (ROWS - 2 - len(games))
 games += [THIN, row(" A LAUNCH   B BACK", "8 of 112 ")]
@@ -211,9 +211,9 @@ QUICK = [("Recently played", 10), ("Favourites", 7)]
 systems_quick = [row(" PortareOS", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, "",
                  row("  QUICK ACCESS", "")]
 systems_quick += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(QUICK)]
-systems_quick += [THIN, row("  SYSTEMS", "12 found  ")]
+systems_quick += [THIN, row("  SYSTEMS", "")]
 systems_quick += [item(False, n, str(c)) for n, c in SYS]
-systems_quick += [THIN, row(" A SELECT   X SETTINGS", "\u2191\u2193 MOVE ")]
+systems_quick += [THIN, row(" A SELECT   X SETTINGS", "12 found ")]
 
 # A title wider than the column is cut with ... while it is not selected.
 # The selected row scrolls instead: still for 1 s, then one column left
@@ -252,7 +252,7 @@ SNES = [("Chrono Trigger (USA)", False),
         ("Teenage Mutant Ninja Turtles IV - Turtles in Time (USA)", False),
         ("Yoshi's Island - Super Mario World 2 (USA) (Rev 1)", False)]
 def games_screen(selected, shift=0):
-    lines = [row(" PortareOS  \u203a  Super Nintendo", "204 games "), RULE, ""]
+    lines = [row(" PortareOS  \u203a  Super Nintendo", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, ""]
     lines += [game(t == selected, t, shift=shift) for t, _ in SNES]
     n = 1 + [t for t, _ in SNES].index(selected)
     lines += [""] * (ROWS - 2 - len(lines))
@@ -273,7 +273,7 @@ RECENT = [("Super Mario World", "SNES", "today"), ("Tekken 3", "PS1", "today"),
 def across(sel, title, right):
     w = COLS - 4 - len(right) - 3
     return item(sel, title if len(title) <= w else title[:w - 3] + "...", right)
-recent = [row(" PortareOS  \u203a  Recently played", "10 games "), RULE, ""]
+recent = [row(" PortareOS  \u203a  Recently played", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, ""]
 recent += [across(i == 0, t, "%-5s%9s" % (sy, d)) for i, (t, sy, d) in enumerate(RECENT)]
 recent += [""] * (ROWS - 2 - len(recent))
 recent += [THIN, games_footer(False, 1, 10)]
@@ -287,7 +287,7 @@ FAVS = [("Final Fantasy III (USA) (Rev 1)", "SNES"),
         ("Super Mario World (USA)", "SNES"), ("Tekken 3", "PS1"),
         ("Castlevania - Symphony of the Night", "PS1"),
         ("Soulcalibur II", "GC"), ("Mario Kart 64", "N64")]
-favourites = [row(" PortareOS  \u203a  Favourites", "7 games "), RULE, ""]
+favourites = [row(" PortareOS  \u203a  Favourites", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, ""]
 favourites += [across(i == 2, t, sy) for i, (t, sy) in enumerate(FAVS)]
 favourites += [""] * (ROWS - 2 - len(favourites))
 favourites += [THIN, games_footer(True, 3, 7)]
