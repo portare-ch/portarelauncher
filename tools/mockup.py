@@ -329,7 +329,7 @@ favourites += [THIN, games_footer(True, 3, 7)]
 # which, in three words, so nobody wonders what they are looking at.
 def pad_screen(ps=False, raw=False):
     top, left, right, bottom = ("\u25b2", "\u25a0", "\u25cb", "\u00d7") if ps else ("X", "Y", "A", "B")
-    L = [row(" Gamepad tester", "200 Hz "), RULE]
+    L = [row(" Gamepad tester" + (", raw" if raw else ""), "200 Hz "), RULE]
     L.append(row("  L1", "R1  "))
     L.append(row("  L2  0.00", "0.67  R2  "))
     L.append("")
@@ -337,27 +337,29 @@ def pad_screen(ps=False, raw=False):
     L.append(" " * 7 + "\u2190  \u00b7  \u2192" + " " * 23 + left + "     " + right)
     L.append(" " * 10 + "\u2193" + " " * 29 + bottom)
     L.append("")
-    box = ["\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510",
-           "\u2502       \u2502", "\u2502       \u2502", "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518"]
-    lstick = [box[0], "\u2502   \u00b7   \u2502", box[2], box[3]]
-    rstick = [box[0], "\u2502 \u2022     \u2502", box[2], box[3]]
-    for i in range(4):
-        L.append(" " * 5 + lstick[i] + " " * 24 + rstick[i])
+    # A stick is round, so its travel is drawn as a ring, out of the
+    # slashes and bars the font has; the dot is the position.
+    ring = ["   .-----.   ", "  /       \\  ", " |         | ", "  \\       /  ", "   '-----'   "]
+    lstick = list(ring); lstick[2] = " |    \u00b7    | "
+    rstick = list(ring); rstick[1] = "  / \u2022     \\  "
+    for i in range(5):
+        L.append(" " * 3 + lstick[i] + " " * 19 + rstick[i])
     L.append(" " * 5 + "X +0.02 Y -0.01" + " " * 18 + "X -0.41 Y -0.83")
-    L.append("")
     L.append(" " * 12 + "SELECT     HOME     START")
     L.append(" " * 19 + "M1       M2")
     L.append(row(" Last   ABS_RY -27210   ABS_Z 21580", ""))
     L.append(THIN)
-    L.append(row(" HOME + START  BACK", ("MCU, raw " if raw else "as games see it ")))
+    L.append(row(" HOME + START  BACK", ""))
     return L
 
 gamepad = pad_screen()
 gamepad_ps = pad_screen(ps=True)
 
 # Which cells are bright (held) and which dim (idle); the rest is text.
-# Rows and columns of pad_screen above; one list serves both variants.
+# Rows and columns of pad_screen above. The rings and their dots are
+# found in the lines themselves, so moving a dot moves its highlight.
 def pad_spans(ps=False):
+    lines = pad_screen(ps)
     bright, dim = [], []
     dim += [(2, 2, 4)]                      # L1
     bright += [(2, 49, 51)]                 # R1
@@ -367,8 +369,11 @@ def pad_spans(ps=False):
     bright += [(6, 13, 14)]                 # right
     dim += [(5, 40, 41), (6, 37, 38), (7, 40, 41)]   # top, left, bottom face
     bright += [(6, 43, 44)]                 # A, or the circle
-    dim += [(r, 5, 14) for r in range(9, 13)] + [(r, 38, 47) for r in range(9, 13)]
-    bright += [(10, 9, 10), (10, 40, 41)]   # the two dots
+    for r in range(9, 14):
+        dim += [(r, 3, 15), (r, 35, 47)]
+        for c, ch in enumerate(lines[r]):
+            if ch in "\u00b7\u2022":
+                bright.append((r, c, c))
     dim += [(15, 12, 18), (15, 23, 27), (15, 32, 37), (16, 19, 21), (16, 28, 30)]
     return bright, dim
 

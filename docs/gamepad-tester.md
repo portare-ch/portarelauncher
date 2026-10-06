@@ -17,7 +17,7 @@ like the other mockups, so the layout cannot drift from what it claims.
 
 A menu never needs a diagram; this does. The pad is drawn where its
 controls sit, in the font's own glyphs: arrows for the D-pad, the letters
-or marks for the face buttons, a box for each stick's travel with a dot
+or marks for the face buttons, a ring for each stick's travel with a dot
 for its position, plain words for the rest. Nothing decorative: no
 enclosure, no bevel, no second palette. A control is drawn with the
 launcher's bright attribute while it is held and the dim one while it is
@@ -37,10 +37,10 @@ of CP437 (`G_CIRCLE`, `G_TRIANGLE`, `G_SQUARE`, a plain `X`).
   (`ABS_Z`, `ABS_RZ`).
 - The **D-pad** arrows, the pressed one bright.
 - **A B X Y** in the Nova's diamond, A on the right, B at the bottom.
-- Each **stick** as a 9x4 box with a dot that moves with the position, and
-  the normalised `X` and `Y` beneath. The box gives the direction at a
-  glance; the numbers carry the precision, since a cell is coarse. The box
-  goes bright while the stick is clicked (`L3`, `R3`).
+- Each **stick** as a ring, since a stick is round, with a dot that moves
+  with the position and the normalised `X` and `Y` beneath. The ring gives
+  the direction at a glance; the numbers carry the precision, since a cell
+  is coarse. The ring goes bright while the stick is clicked (`L3`, `R3`).
 - **SELECT, HOME, START** and the paddles **M1, M2**.
 - **Last**: the last two events as the kernel names them, code and value.
 - In the header, the pad's report rate, which is what a tester of this
@@ -52,8 +52,9 @@ There are two devices to look at: the MCU's own evdev device, and the
 virtual pad InputPlumber presents, which is what games get. Lighting a
 control when either reports it would leave the reader unsure which layer
 is under test, so the tester shows one: the virtual pad by default, the
-MCU's device when started with `--raw`. The footer says which, in a few
-words: `as games see it`, or `MCU, raw`. Tools can list both entries.
+MCU's device when started with `--raw`, which the header then says with
+", raw" after the name. Nothing is said in the default case; what games
+see is the normal thing to look at. Tools can list both entries.
 
 ## What it does not do
 
