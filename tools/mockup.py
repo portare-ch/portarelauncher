@@ -30,7 +30,7 @@ SYS = [("GameCube", 24), ("Nintendo 64", 9), ("PlayStation", 112),
        ("Mega Drive", 88), ("Game Boy Advance", 140), ("Dreamcast", 6),
        ("Arcade", 47)]
 
-systems = [row(" PortareOS", "23:59  BAT 87% "), RULE, "",
+systems = [row(" PortareOS", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, "",
            row("  SYSTEMS", "12 found  "), ""]
 systems += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(SYS)]
 systems += ["", THIN, row(" A SELECT   X SETTINGS", "\u2191\u2193 MOVE ")]
@@ -193,7 +193,7 @@ tools += [THIN,
           "    press START + SELECT.", ""]
 tools += [THIN, " B RUN   A BACK"]
 
-launching = [row(" PortareOS", "23:59  BAT 87% "), RULE] + [""] * 4
+launching = [row(" PortareOS", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE] + [""] * 4
 launching += ["           Tekken 3 (USA)", "",
               "           swanstation", "",
               "           handing over the display\u2026"]
@@ -209,7 +209,7 @@ launching += [""] * 7
 # it needs no curation. The cross-system views use short system names so
 # the title keeps the width the long-title work just won.
 QUICK = [("Recently played", 10), ("Favourites", 7)]
-systems_quick = [row(" PortareOS", "23:59  BAT 87% "), RULE, "",
+systems_quick = [row(" PortareOS", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, "",
                  row("  QUICK ACCESS", "")]
 systems_quick += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(QUICK)]
 systems_quick += [THIN, row("  SYSTEMS", "12 found  ")]
@@ -229,6 +229,12 @@ def scrolled(t, shift):
     return t[shift:shift + TITLE_W]
 def game(sel, title, shift=0):
     return item(sel, scrolled(title, shift) if sel else cut(title))
+
+# The footer is the favourite cue: Y FAVOURITE under a game that is not
+# one, Y REMOVE under one that is. Nothing in the list itself says so.
+def games_footer(fav):
+    return row(" A LAUNCH   B BACK   Y " + ("REMOVE" if fav else "FAVOURITE"),
+               "\u2191\u2193 MOVE ")
 SNES = [("Donkey Kong Country 2 - Diddy's Kong Quest (USA) (En,Fr)", False),
         ("Final Fantasy III (USA) (Rev 1)", True),
         ("Legend of Zelda, The - A Link to the Past (USA)", True),
@@ -239,10 +245,15 @@ SNES = [("Donkey Kong Country 2 - Diddy's Kong Quest (USA) (En,Fr)", False),
         ("Super Metroid (Japan, USA) (En,Ja)", False),
         ("Teenage Mutant Ninja Turtles IV - Turtles in Time (USA)", False),
         ("Yoshi's Island - Super Mario World 2 (USA) (Rev 1)", False)]
-games_long = [row(" PortareOS  \u203a  Super Nintendo", "204 games "), RULE, ""]
-games_long += [game(t.startswith("Teenage"), t, shift=9) for t, _ in SNES]
-games_long += ["", row("", "9 of 204  "), "", THIN,
-               row(" A LAUNCH   B BACK   Y FAVOURITE", "\u2191\u2193 MOVE ")]
+def games_screen(selected, shift=0):
+    lines = [row(" PortareOS  \u203a  Super Nintendo", "204 games "), RULE, ""]
+    lines += [game(t == selected, t, shift=shift) for t, _ in SNES]
+    n = 1 + [t for t, _ in SNES].index(selected)
+    fav = dict(SNES)[selected]
+    return lines + ["", row("", "%d of 204  " % n), "", THIN, games_footer(fav)]
+
+games_long = games_screen("Teenage Mutant Ninja Turtles IV - Turtles in Time (USA)", shift=9)
+games_fav = games_screen("Super Mario World (USA)")
 
 # Ten launches, newest first, written when runemu exits with status 0,
 # so a game that never started is not in it. Short system names and the
@@ -287,6 +298,7 @@ if __name__ == "__main__":
                  ("LAUNCHING", launching),
                  ("PROPOSED - SYSTEMS WITH QUICK ACCESS", systems_quick),
                  ("PROPOSED - GAMES, LONG TITLES", games_long),
+                 ("PROPOSED - GAMES, A FAVOURITE SELECTED", games_fav),
                  ("PROPOSED - RECENTLY PLAYED", recent),
                  ("PROPOSED - FAVOURITES", favourites)):
         print(screen(t, s))

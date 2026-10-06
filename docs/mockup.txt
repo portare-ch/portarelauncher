@@ -1,6 +1,6 @@
     SYSTEMS
     .....................................................  <- 53 columns
-     PortareOS                            23:59  BAT 87% |
+     PortareOS          VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
       SYSTEMS                                  12 found  |
@@ -240,7 +240,7 @@
 
     LAUNCHING
     .....................................................  <- 53 columns
-     PortareOS                            23:59  BAT 87% |
+     PortareOS          VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
                                                          |
@@ -264,7 +264,7 @@
 
     PROPOSED - SYSTEMS WITH QUICK ACCESS
     .....................................................  <- 53 columns
-     PortareOS                            23:59  BAT 87% |
+     PortareOS          VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
       QUICK ACCESS                                       |
@@ -306,6 +306,30 @@
                                                          |
      ─────────────────────────────────────────────────── |
      A LAUNCH   B BACK   Y FAVOURITE             ↑↓ MOVE |
+                                                         |
+                                                         |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    PROPOSED - GAMES, A FAVOURITE SELECTED
+    .....................................................  <- 53 columns
+     PortareOS  ›  Super Nintendo              204 games |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+        Donkey Kong Country 2 - Diddy's Kong Quest (...  |
+        Final Fantasy III (USA) (Rev 1)                  |
+        Legend of Zelda, The - A Link to the Past (USA)  |
+        Mega Man X (USA) (Rev 1)                         |
+        Secret of Mana (USA)                             |
+        Super Castlevania IV (USA)                       |
+      ▸ Super Mario World (USA)                          |
+        Super Metroid (Japan, USA) (En,Ja)               |
+        Teenage Mutant Ninja Turtles IV - Turtles in...  |
+        Yoshi's Island - Super Mario World 2 (USA) (...  |
+                                                         |
+                                               7 of 204  |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A LAUNCH   B BACK   Y REMOVE                ↑↓ MOVE |
                                                          |
                                                          |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows

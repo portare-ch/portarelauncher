@@ -65,6 +65,7 @@ if __name__ == "__main__":
     glyphs = font()
     for name, lines in (("systems-quick-access", mockup.systems_quick),
                         ("games-long-titles", mockup.games_long),
+                        ("games-favourite-selected", mockup.games_fav),
                         ("recently-played", mockup.recent),
                         ("favourites", mockup.favourites)):
         render(lines, os.path.join(out, name + ".png"), glyphs)

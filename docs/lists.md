@@ -12,7 +12,8 @@ launcher's own font, so what is shown is what the device can draw.
 A category of its own above the systems: cross-system shortcuts first,
 platforms below, a thin rule between and no blank row. Recently played
 comes first because it needs no curation. The systems section keeps its
-title and count. The games screen no longer names the emulator under the
+title and count. The header keeps the device's order, with the clock at
+the right edge. The games screen no longer names the emulator under the
 list; which core runs a system is not the player's concern.
 
 ![Systems with Quick Access](images/systems-quick-access.png)
@@ -33,9 +34,11 @@ game quit with Home + Start is.
 One file, a game path per line, in the launcher's config directory. It is
 pruned of paths that no longer exist when it is read, so a renamed or
 deleted ROM leaves no dead row. `Y` toggles the selected game wherever a
-game is listed; inside Favourites the same key removes it, and the hint
-says `Y REMOVE`. Hints name keys and nothing else, and nothing marks a
-favourite in a system's list: Favourites is where favourites are.
+game is listed, and the footer is the cue: `Y FAVOURITE` under a game
+that is not one, `Y REMOVE` under one that is, in every list. Nothing in
+the list itself marks a favourite, and hints name keys and nothing else.
+
+![Games, a favourite selected](images/games-favourite-selected.png)
 
 ![Favourites](images/favourites.png)
 
