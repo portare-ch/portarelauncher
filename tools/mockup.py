@@ -278,21 +278,26 @@ games_long = games_screen("Teenage Mutant Ninja Turtles IV - Turtles in Time (US
 games_fav = games_screen("Super Mario World (USA)")
 
 # Ten launches, newest first, written when runemu exits with status 0,
-# so a game that never started is not in it. Short system names and the
-# day: today, yesterday, then the weekday.
-RECENT = [("Super Mario World", "SNES", "today"), ("Tekken 3", "PS1", "today"),
-          ("Yoshi's Island - Super Mario World 2", "SNES", "yesterday"),
-          ("Metroid (USA)", "NES", "yesterday"), ("Soulcalibur II", "GC", "Mon"),
-          ("Pop'n Music Portable", "PSP", "Mon"), ("Super Metroid", "SNES", "Sun"),
-          ("Wipeout XL", "PS1", "Sun"), ("Mega Man X", "SNES", "Sat"),
-          ("Xenogears", "PS1", "Sat")]
+# so a game that never started is not in it. Grouped under the day in
+# small caps: TODAY, YESTERDAY, then the weekday for the last week and
+# the date beyond it. A row is the title and a short system name; the
+# day is the heading, not a third column. Ten games under five days fill
+# the panel exactly.
+RECENT = [("TODAY", [("Super Mario World", "SNES"), ("Tekken 3", "PS1")]),
+          ("YESTERDAY", [("Yoshi's Island - Super Mario World 2", "SNES"),
+                         ("Metroid (USA)", "NES")]),
+          ("MONDAY", [("Soulcalibur II", "GC"), ("Pop'n Music Portable", "PSP")]),
+          ("SUNDAY", [("Super Metroid", "SNES"), ("Wipeout XL", "PS1")]),
+          ("SATURDAY", [("Mega Man X", "SNES"), ("Xenogears", "PS1")])]
 def across(sel, title, right):
     w = COLS - 4 - len(right) - 3
     return item(sel, title if len(title) <= w else title[:w - 3] + "...", right)
 recent = [crumb("Recently played"), RULE, ""]
-recent += [across(i == 0, t, "%-5s%9s" % (sy, d)) for i, (t, sy, d) in enumerate(RECENT)]
+for day, games_of_day in RECENT:
+    recent.append(" " + day)
+    recent += [across(t == "Super Mario World", t, sy) for t, sy in games_of_day]
 recent += [""] * (ROWS - 2 - len(recent))
-recent += [THIN, games_footer(False, 1, 10)]
+recent += [THIN, row(" A LAUNCH   B BACK   Y REMOVE", "")]
 
 # One file, a game path per line, pruned of paths that no longer exist
 # when it is read. Y toggles the selected game wherever a game is listed;

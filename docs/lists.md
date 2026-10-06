@@ -25,12 +25,15 @@ list; which core runs a system is not the player's concern.
 
 ## Recently played
 
-Ten games, newest first. A row carries a short system name and the day:
-`today`, `yesterday`, then the weekday. Short names (PS1, PS2, PSP, N64,
-GBA, GC, DC, SNES, NES) in the cross-system views only; the Systems
-screen keeps the full names. An entry is written when `runemu` exits
-with status 0, so a game that never started is not in the list, and a
-game quit with Home + Start is.
+Ten games, newest first, grouped under the day as a heading: `TODAY`,
+`YESTERDAY`, then the weekday for the last week and the date beyond it.
+A row is the title and a short system name; the day is not a third
+column. Short names (PS1, PS2, PSP, N64, GBA, GC, DC, SNES, NES) in the
+cross-system views only; the Systems screen keeps the full names. The
+footer is the favourite cue as everywhere, and carries no position: ten
+games under five days fill the panel, there is nothing to scroll. An
+entry is written when `runemu` exits with status 0, so a game that never
+started is not in the list, and a game quit with Home + Start is.
 
 ![Recently played](images/recently-played.png)
 

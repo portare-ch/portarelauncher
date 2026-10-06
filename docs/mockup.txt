@@ -339,23 +339,23 @@
      PortareOS  ›  Recently played                 23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
-      ▸ Super Mario World                SNES     today  |
-        Tekken 3                         PS1      today  |
-        Yoshi's Island - Super Mario ... SNES yesterday  |
-        Metroid (USA)                    NES  yesterday  |
-        Soulcalibur II                   GC         Mon  |
-        Pop'n Music Portable             PSP        Mon  |
-        Super Metroid                    SNES       Sun  |
-        Wipeout XL                       PS1        Sun  |
-        Mega Man X                       SNES       Sat  |
-        Xenogears                        PS1        Sat  |
-                                                         |
-                                                         |
-                                                         |
-                                                         |
-                                                         |
+     TODAY                                               |
+      ▸ Super Mario World                          SNES  |
+        Tekken 3                                    PS1  |
+     YESTERDAY                                           |
+        Yoshi's Island - Super Mario World 2       SNES  |
+        Metroid (USA)                               NES  |
+     MONDAY                                              |
+        Soulcalibur II                               GC  |
+        Pop'n Music Portable                        PSP  |
+     SUNDAY                                              |
+        Super Metroid                              SNES  |
+        Wipeout XL                                  PS1  |
+     SATURDAY                                            |
+        Mega Man X                                 SNES  |
+        Xenogears                                   PS1  |
      ─────────────────────────────────────────────────── |
-     A LAUNCH   B BACK   Y FAVOURITE              1 / 10 |
+     A LAUNCH   B BACK   Y REMOVE                        |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     PROPOSED - FAVOURITES
