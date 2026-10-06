@@ -94,9 +94,9 @@ def consoles_screen(sel):
 consoles = consoles_screen(0)
 
 # Settings > Diagnostics: the tools that show what the hardware does, each
-# a screen of its own. PortScope first; the raw entry reads the pad's MCU
-# before InputPlumber, the plain one what games get.
-DIAG = [("PortScope", ""), ("PortScope, raw input", "")]
+# a screen of its own. One entry so far; which layer PortScope reads is a
+# mode inside it, not a second entry.
+DIAG = [("PortScope", "")]
 diagnostics = [row(" Settings  \u203a  Diagnostics", ""), RULE, ""]
 diagnostics += [item(i == 0, n, v) for i, (n, v) in enumerate(DIAG)]
 # No description band: the names say it, and Home + START is the way out
@@ -335,8 +335,8 @@ favourites += [THIN, games_footer(True, 3, 7)]
 #
 # Sample state: A down, D-pad right, R1 held, R2 two thirds in, the right
 # stick up and left. One layer at a time: the virtual pad games see by
-# default, the MCU's raw device when started with --raw; the footer says
-# which, in three words, so nobody wonders what they are looking at.
+# default, the MCU's raw device after a long press of SELECT; the header
+# says which, in one word, so nobody wonders what they are looking at.
 def pad_screen(shapes=False, raw=False):
     top, left, right, bottom = ("\u25b2", "\u25a0", "\u25cb", "\u00d7") if shapes else ("X", "Y", "A", "B")
     L = [row(" PortScope" + (", raw" if raw else ""), "RATE 200 Hz "), RULE]

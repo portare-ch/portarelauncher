@@ -65,9 +65,12 @@ There are two devices to look at: the MCU's own evdev device, and the
 virtual pad InputPlumber presents, which is what games get. Lighting a
 control when either reports it would leave the reader unsure which layer
 is under test, so PortScope shows one: the virtual pad by default, the
-MCU's device when started with `--raw`, which the header then says with
-", raw" after the name. Nothing is said in the default case; what games
-see is the normal thing to look at. Diagnostics lists both entries.
+MCU's device after SELECT is held for a second, and back again the same
+way. The header says ", raw" after the name while the MCU's device is
+shown and nothing in the default case; what games see is the normal thing
+to look at. `--raw` starts there. A short press of SELECT is a press like
+any other and lights its word; only the hold switches. Diagnostics has
+one entry, PortScope; the layer is a mode of it, not a second item.
 
 ## What it does not do
 
