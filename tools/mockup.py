@@ -49,14 +49,14 @@ SYS = [("GameCube", 24), ("Nintendo 64", 9), ("PlayStation", 112),
 systems = [header("PortareOS"), RULE, ""]
 systems += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(SYS)]
 systems += [""] * (ROWS - 2 - len(systems))
-systems += [THIN, row(" A SELECT   X SETTINGS", "12 found ")]
+systems += [THIN, row(" A SELECT   X SETTINGS", "")]
 
 GAMES = ["Tekken 2", "Tekken 3", "Tomb Raider", "Tony Hawk's Pro Skater 2",
          "Vagrant Story", "Wipeout XL", "Xenogears"]
 games = [crumb("PlayStation"), RULE, ""]
 games += [item(n == "Tekken 3", n) for n in GAMES]
 games += [""] * (ROWS - 2 - len(games))
-games += [THIN, row(" A LAUNCH   B BACK", "8 of 112 ")]
+games += [THIN, row(" A LAUNCH   B BACK", "8 / 112 ")]
 
 SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
        ("USB gadget mode", "network"), ("Button style", "Retroid"),
@@ -229,7 +229,7 @@ systems_quick = [header("PortareOS"), RULE, "",
 systems_quick += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(QUICK)]
 systems_quick += [THIN, row("  SYSTEMS", "")]
 systems_quick += [item(False, n, str(c)) for n, c in SYS]
-systems_quick += [THIN, row(" A SELECT   X SETTINGS", "12 found ")]
+systems_quick += [THIN, row(" A SELECT   X SETTINGS", "")]
 
 # A title wider than the column is cut with ... while it is not selected.
 # The selected row scrolls instead: still for 1 s, then one column left
@@ -247,12 +247,12 @@ def game(sel, title, shift=0):
 
 # The footer is the favourite cue: Y FAVOURITE under a game that is not
 # one, Y REMOVE under one that is. Nothing in the list itself says so.
-# Its right end carries the position, "9 of 204", where the MOVE hint
+# Its right end carries the position, "9 / 204", where the MOVE hint
 # used to be: the d-pad needs no hint, and the row the count had, with
 # the blanks around it, goes to the list - 14 games on screen, not 10.
 def games_footer(fav, pos, total):
     return row(" A LAUNCH   B BACK   Y " + ("REMOVE" if fav else "FAVOURITE"),
-               "%d of %d " % (pos, total))
+               "%d / %d " % (pos, total))
 SNES = [("Chrono Trigger (USA)", False),
         ("Donkey Kong Country 2 - Diddy's Kong Quest (USA) (En,Fr)", False),
         ("EarthBound (USA)", False),

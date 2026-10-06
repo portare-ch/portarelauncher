@@ -19,7 +19,7 @@
                                                          |
                                                          |
      ─────────────────────────────────────────────────── |
-     A SELECT   X SETTINGS                      12 found |
+     A SELECT   X SETTINGS                               |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     GAMES
@@ -43,7 +43,7 @@
                                                          |
                                                          |
      ─────────────────────────────────────────────────── |
-     A LAUNCH   B BACK                          8 of 112 |
+     A LAUNCH   B BACK                           8 / 112 |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     SETTINGS
@@ -283,7 +283,7 @@
         Dreamcast                                     6  |
         Arcade                                       47  |
      ─────────────────────────────────────────────────── |
-     A SELECT   X SETTINGS                      12 found |
+     A SELECT   X SETTINGS                               |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     PROPOSED - GAMES, LONG TITLES
@@ -307,7 +307,7 @@
         Yoshi's Island - Super Mario World 2 (USA) (...  |
                                                          |
      ─────────────────────────────────────────────────── |
-     A LAUNCH   B BACK   Y FAVOURITE           13 of 204 |
+     A LAUNCH   B BACK   Y FAVOURITE            13 / 204 |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     PROPOSED - GAMES, A FAVOURITE SELECTED
@@ -331,7 +331,7 @@
         Yoshi's Island - Super Mario World 2 (USA) (...  |
                                                          |
      ─────────────────────────────────────────────────── |
-     A LAUNCH   B BACK   Y REMOVE              11 of 204 |
+     A LAUNCH   B BACK   Y REMOVE               11 / 204 |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     PROPOSED - RECENTLY PLAYED
@@ -355,7 +355,7 @@
                                                          |
                                                          |
      ─────────────────────────────────────────────────── |
-     A LAUNCH   B BACK   Y FAVOURITE             1 of 10 |
+     A LAUNCH   B BACK   Y FAVOURITE              1 / 10 |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     PROPOSED - FAVOURITES
@@ -379,6 +379,6 @@
                                                          |
                                                          |
      ─────────────────────────────────────────────────── |
-     A LAUNCH   B BACK   Y REMOVE                 3 of 7 |
+     A LAUNCH   B BACK   Y REMOVE                  3 / 7 |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 

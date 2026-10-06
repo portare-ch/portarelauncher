@@ -12,10 +12,9 @@ launcher's own font, so what is shown is what the device can draw.
 A category of its own above the systems: cross-system shortcuts first,
 platforms below, a thin rule between and no blank row. Recently played
 comes first because it needs no curation. The systems section keeps its
-title; its count, `12 found`, sits at the right end of the footer, as the
-position does on the games screens, and the plain Systems screen without
-Quick Access drops the title row and the blank under it altogether, two
-more systems on screen. The Systems screen keeps the device's status in
+title and loses its count: the list is the count. The plain Systems
+screen without Quick Access drops the title row and the blank under it
+altogether, two more systems on screen. The Systems screen keeps the device's status in
 its header. A list of games, Recently played and Favourites included,
 carries only its crumb and the clock at the right edge: no volume,
 brightness or battery there, and no count of its rows, which the footer
@@ -58,7 +57,7 @@ in view, 1.5 seconds there, back to the start, and again. No wrap, so the
 ending the reader was after is not followed by what they already read.
 Only the selected row ever moves.
 
-The position, `9 of 204`, sits at the right end of the footer where the
+The position, `9 / 204`, sits at the right end of the footer where the
 `↑↓ MOVE` hint was; a d-pad needs no hint. The row the count had, and the
 blank rows around it, go to the list: fourteen games on screen instead of
 ten.
