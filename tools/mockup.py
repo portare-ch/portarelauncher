@@ -23,6 +23,22 @@ def item(sel, label, right=""):
     return row(("  \u25b8 " if sel else "    ") + label, (right + "  ") if right else "")
 
 RULE = " " + "\u2550" * (COLS - 2)
+
+# The header as draw_frame draws it: the status at the right edge, the
+# crumb cut to end two columns short of it. On the device the games
+# screen's crumb is the system's name alone.
+STATUS = "VOL 50%  BRI 70%  BAT 87%  23:59 "
+CLOCK = "23:59 "
+def header(crumb, status=STATUS):
+    room = COLS - 1 - len(status) - 2 - 1
+    return row(" " + crumb[:room], status)
+
+# A list of games is a step down from the Systems screen, and its header
+# says so: the crumb, and the clock alone at the right. Volume, brightness
+# and battery stay on the Systems screen; a game list is not the place to
+# read them, and a count of the rows is in the footer already.
+def crumb(name):
+    return header("PortareOS  \u203a  " + name, CLOCK)
 THIN = " " + "\u2500" * (COLS - 2)
 
 SYS = [("GameCube", 24), ("Nintendo 64", 9), ("PlayStation", 112),
@@ -30,18 +46,17 @@ SYS = [("GameCube", 24), ("Nintendo 64", 9), ("PlayStation", 112),
        ("Mega Drive", 88), ("Game Boy Advance", 140), ("Dreamcast", 6),
        ("Arcade", 47)]
 
-systems = [row(" PortareOS", "23:59  BAT 87% "), RULE, "",
-           row("  SYSTEMS", "12 found  "), ""]
+systems = [header("PortareOS"), RULE, ""]
 systems += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(SYS)]
-systems += ["", THIN, row(" A SELECT   X SETTINGS", "\u2191\u2193 MOVE ")]
+systems += [""] * (ROWS - 2 - len(systems))
+systems += [THIN, row(" A SELECT   X SETTINGS", "")]
 
 GAMES = ["Tekken 2", "Tekken 3", "Tomb Raider", "Tony Hawk's Pro Skater 2",
          "Vagrant Story", "Wipeout XL", "Xenogears"]
-games = [row(" PortareOS  \u203a  PlayStation", "112 games "), RULE, ""]
+games = [crumb("PlayStation"), RULE, ""]
 games += [item(n == "Tekken 3", n) for n in GAMES]
-games += [""] * 4
-games += [row("    swanstation", "8 of 112  "), "", THIN,
-          row(" A LAUNCH   B BACK", "\u2191\u2193 MOVE ")]
+games += [""] * (ROWS - 2 - len(games))
+games += [THIN, row(" A LAUNCH   B BACK", "8 / 112 ")]
 
 SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
        ("USB gadget mode", "network"), ("Button style", "Retroid"),
@@ -183,7 +198,7 @@ joining = kb_screen("FRITZ!Box 7520 JI", "hunter2Hunter!", LOWER, sel=(1, 2),
 # because it is where a tool says how to get back out of it.
 TOOLS = ["File Manager", "PortMaster", "Remove ._ Files",
          "Start RetroArch (64-bit)", "Test Gamepad"]
-tools = [row(" Tools", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, "",
+tools = [header("Tools"), RULE, "",
          row("  TOOLS", "5 found  "), ""]
 tools += [item(n == "Test Gamepad", n) for n in TOOLS]
 tools += [""] * (ROWS - 2 - 4 - 1 - len(tools))
@@ -193,11 +208,111 @@ tools += [THIN,
           "    press START + SELECT.", ""]
 tools += [THIN, " B RUN   A BACK"]
 
-launching = [row(" PortareOS", "23:59  BAT 87% "), RULE] + [""] * 4
+launching = [header("PortareOS"), RULE] + [""] * 4
 launching += ["           Tekken 3 (USA)", "",
               "           swanstation", "",
               "           handing over the display\u2026"]
 launching += [""] * 7
+
+# ---- proposed: quick access, recent, favourites, long titles -----------
+#
+# From a tester who filled several systems: a way back to a game without
+# scrolling the list, and titles that do not stop at the panel's edge.
+# Quick Access is a category of its own above the systems, cross-system
+# shortcuts first, platforms below, a thin rule between and no blank row:
+# on 20 rows whitespace is the expensive thing. Recent comes first because
+# it needs no curation. The cross-system views use short system names so
+# the title keeps the width the long-title work just won.
+QUICK = [("Recently played", 10), ("Favourites", 7)]
+systems_quick = [header("PortareOS"), RULE, "",
+                 row("  QUICK ACCESS", "")]
+systems_quick += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(QUICK)]
+systems_quick += [THIN, row("  SYSTEMS", "")]
+systems_quick += [item(False, n, str(c)) for n, c in SYS]
+systems_quick += [THIN, row(" A SELECT   X SETTINGS", "")]
+
+# A title wider than the column is cut with ... while it is not selected.
+# The selected row scrolls instead: still for 1 s, then one column left
+# every 150 ms until the end is in view, 1.5 s there, back to the start.
+# No wrap, so the ending the reader was after is not followed by what
+# they already read. Only the selected row ever moves. Nothing marks a
+# favourite in the list: Favourites is where favourites are.
+TITLE_W = COLS - 4 - 2    # marker and indent, then the right margin
+def cut(t):
+    return t if len(t) <= TITLE_W else t[:TITLE_W - 3] + "..."
+def scrolled(t, shift):
+    return t[shift:shift + TITLE_W]
+def game(sel, title, shift=0):
+    return item(sel, scrolled(title, shift) if sel else cut(title))
+
+# The footer is the favourite cue: Y FAVOURITE under a game that is not
+# one, Y REMOVE under one that is. Nothing in the list itself says so.
+# Its right end carries the position, "9 / 204", where the MOVE hint
+# used to be: the d-pad needs no hint, and the row the count had, with
+# the blanks around it, goes to the list - 14 games on screen, not 10.
+def games_footer(fav, pos, total):
+    return row(" A LAUNCH   B BACK   Y " + ("REMOVE" if fav else "FAVOURITE"),
+               "%d / %d " % (pos, total))
+SNES = [("Chrono Trigger (USA)", False),
+        ("Donkey Kong Country 2 - Diddy's Kong Quest (USA) (En,Fr)", False),
+        ("EarthBound (USA)", False),
+        ("Final Fantasy III (USA) (Rev 1)", True),
+        ("Kirby Super Star (USA)", False),
+        ("Legend of Zelda, The - A Link to the Past (USA)", True),
+        ("Mega Man X (USA) (Rev 1)", False),
+        ("Secret of Mana (USA)", False),
+        ("Star Fox (USA)", False),
+        ("Super Castlevania IV (USA)", False),
+        ("Super Mario World (USA)", True),
+        ("Super Metroid (Japan, USA) (En,Ja)", False),
+        ("Teenage Mutant Ninja Turtles IV - Turtles in Time (USA)", False),
+        ("Yoshi's Island - Super Mario World 2 (USA) (Rev 1)", False)]
+def games_screen(selected, shift=0):
+    lines = [crumb("Super Nintendo"), RULE, ""]
+    lines += [game(t == selected, t, shift=shift) for t, _ in SNES]
+    n = 1 + [t for t, _ in SNES].index(selected)
+    lines += [""] * (ROWS - 2 - len(lines))
+    return lines + [THIN, games_footer(dict(SNES)[selected], n, 204)]
+
+games_long = games_screen("Teenage Mutant Ninja Turtles IV - Turtles in Time (USA)", shift=9)
+games_fav = games_screen("Super Mario World (USA)")
+
+# Ten launches, newest first, written when runemu exits with status 0,
+# so a game that never started is not in it. Grouped under the day in
+# small caps: TODAY, YESTERDAY, then the weekday for the last week and
+# the date beyond it. A row is the title and a short system name; the
+# day is the heading, not a third column. This sample's ten games fall on
+# five days and fill the panel exactly; on more days the list scrolls, the
+# headings with it.
+RECENT = [("TODAY", [("Super Mario World", "SNES"), ("Tekken 3", "PS1")]),
+          ("YESTERDAY", [("Yoshi's Island - Super Mario World 2", "SNES"),
+                         ("Metroid (USA)", "NES")]),
+          ("MONDAY", [("Soulcalibur II", "GC"), ("Pop'n Music Portable", "PSP")]),
+          ("SUNDAY", [("Super Metroid", "SNES"), ("Wipeout XL", "PS1")]),
+          ("SATURDAY", [("Mega Man X", "SNES"), ("Xenogears", "PS1")])]
+def across(sel, title, right):
+    w = COLS - 4 - len(right) - 3
+    return item(sel, title if len(title) <= w else title[:w - 3] + "...", right)
+recent = [crumb("Recently played"), RULE, ""]
+for day, games_of_day in RECENT:
+    recent.append(" " + day)
+    recent += [across(t == "Super Mario World", t, sy) for t, sy in games_of_day]
+recent += [""] * (ROWS - 2 - len(recent))
+recent += [THIN, row(" A LAUNCH   B BACK   Y REMOVE", "")]
+
+# One file, a game path per line, pruned of paths that no longer exist
+# when it is read. Y toggles the selected game wherever a game is listed;
+# in here the same key removes. Hints name keys, A B X Y, nothing else,
+# and no glyph stands for a favourite anywhere.
+FAVS = [("Final Fantasy III (USA) (Rev 1)", "SNES"),
+        ("Legend of Zelda, The - A Link to the Past (USA)", "SNES"),
+        ("Super Mario World (USA)", "SNES"), ("Tekken 3", "PS1"),
+        ("Castlevania - Symphony of the Night", "PS1"),
+        ("Soulcalibur II", "GC"), ("Mario Kart 64", "N64")]
+favourites = [crumb("Favourites"), RULE, ""]
+favourites += [across(i == 2, t, sy) for i, (t, sy) in enumerate(FAVS)]
+favourites += [""] * (ROWS - 2 - len(favourites))
+favourites += [THIN, games_footer(True, 3, 7)]
 
 if __name__ == "__main__":
     for t, s in (("SYSTEMS", systems), ("GAMES", games),
@@ -208,6 +323,11 @@ if __name__ == "__main__":
                  ("KEYBOARD - symbols, password hidden, DONE selected", kb_syms),
                  ("KEYBOARD - join failed", joining),
                  ("TOOLS", tools),
-                 ("LAUNCHING", launching)):
+                 ("LAUNCHING", launching),
+                 ("PROPOSED - SYSTEMS WITH QUICK ACCESS", systems_quick),
+                 ("PROPOSED - GAMES, LONG TITLES", games_long),
+                 ("PROPOSED - GAMES, A FAVOURITE SELECTED", games_fav),
+                 ("PROPOSED - RECENTLY PLAYED", recent),
+                 ("PROPOSED - FAVOURITES", favourites)):
         print(screen(t, s))
         print()

@@ -76,6 +76,7 @@ font: tools/mkfont.py
 # Regenerates docs/mockup.txt, and fails if any row overflows the grid.
 mockup:
 	python3 tools/mockup.py > docs/mockup.txt
+	python3 tools/mockup_png.py
 
 .PHONY: all clean font mockup test
 

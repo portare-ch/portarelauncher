@@ -1,9 +1,7 @@
     SYSTEMS
     .....................................................  <- 53 columns
-     PortareOS                            23:59  BAT 87% |
+     PortareOS          VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
-                                                         |
-      SYSTEMS                                  12 found  |
                                                          |
       ▸ GameCube                                     24  |
         Nintendo 64                                   9  |
@@ -16,15 +14,17 @@
         Dreamcast                                     6  |
         Arcade                                       47  |
                                                          |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
      ─────────────────────────────────────────────────── |
-     A SELECT   X SETTINGS                       ↑↓ MOVE |
-                                                         |
-                                                         |
+     A SELECT   X SETTINGS                               |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     GAMES
     .....................................................  <- 53 columns
-     PortareOS  ›  PlayStation                 112 games |
+     PortareOS  ›  PlayStation                     23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
         Tekken 2                                         |
@@ -38,12 +38,12 @@
                                                          |
                                                          |
                                                          |
-        swanstation                            8 of 112  |
+                                                         |
+                                                         |
+                                                         |
                                                          |
      ─────────────────────────────────────────────────── |
-     A LAUNCH   B BACK                           ↑↓ MOVE |
-                                                         |
-                                                         |
+     A LAUNCH   B BACK                           8 / 112 |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     SETTINGS
@@ -240,7 +240,7 @@
 
     LAUNCHING
     .....................................................  <- 53 columns
-     PortareOS                            23:59  BAT 87% |
+     PortareOS          VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
                                                          |
@@ -260,5 +260,125 @@
                                                          |
                                                          |
                                                          |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    PROPOSED - SYSTEMS WITH QUICK ACCESS
+    .....................................................  <- 53 columns
+     PortareOS          VOL 50%  BRI 70%  BAT 87%  23:59 |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+      QUICK ACCESS                                       |
+      ▸ Recently played                              10  |
+        Favourites                                    7  |
+     ─────────────────────────────────────────────────── |
+      SYSTEMS                                            |
+        GameCube                                     24  |
+        Nintendo 64                                   9  |
+        PlayStation                                 112  |
+        PlayStation 2                                 2  |
+        PlayStation Portable                         31  |
+        SNES                                        204  |
+        Mega Drive                                   88  |
+        Game Boy Advance                            140  |
+        Dreamcast                                     6  |
+        Arcade                                       47  |
+     ─────────────────────────────────────────────────── |
+     A SELECT   X SETTINGS                               |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    PROPOSED - GAMES, LONG TITLES
+    .....................................................  <- 53 columns
+     PortareOS  ›  Super Nintendo                  23:59 |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+        Chrono Trigger (USA)                             |
+        Donkey Kong Country 2 - Diddy's Kong Quest (...  |
+        EarthBound (USA)                                 |
+        Final Fantasy III (USA) (Rev 1)                  |
+        Kirby Super Star (USA)                           |
+        Legend of Zelda, The - A Link to the Past (USA)  |
+        Mega Man X (USA) (Rev 1)                         |
+        Secret of Mana (USA)                             |
+        Star Fox (USA)                                   |
+        Super Castlevania IV (USA)                       |
+        Super Mario World (USA)                          |
+        Super Metroid (Japan, USA) (En,Ja)               |
+      ▸ utant Ninja Turtles IV - Turtles in Time (USA)   |
+        Yoshi's Island - Super Mario World 2 (USA) (...  |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A LAUNCH   B BACK   Y FAVOURITE            13 / 204 |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    PROPOSED - GAMES, A FAVOURITE SELECTED
+    .....................................................  <- 53 columns
+     PortareOS  ›  Super Nintendo                  23:59 |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+        Chrono Trigger (USA)                             |
+        Donkey Kong Country 2 - Diddy's Kong Quest (...  |
+        EarthBound (USA)                                 |
+        Final Fantasy III (USA) (Rev 1)                  |
+        Kirby Super Star (USA)                           |
+        Legend of Zelda, The - A Link to the Past (USA)  |
+        Mega Man X (USA) (Rev 1)                         |
+        Secret of Mana (USA)                             |
+        Star Fox (USA)                                   |
+        Super Castlevania IV (USA)                       |
+      ▸ Super Mario World (USA)                          |
+        Super Metroid (Japan, USA) (En,Ja)               |
+        Teenage Mutant Ninja Turtles IV - Turtles in...  |
+        Yoshi's Island - Super Mario World 2 (USA) (...  |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A LAUNCH   B BACK   Y REMOVE               11 / 204 |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    PROPOSED - RECENTLY PLAYED
+    .....................................................  <- 53 columns
+     PortareOS  ›  Recently played                 23:59 |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+     TODAY                                               |
+      ▸ Super Mario World                          SNES  |
+        Tekken 3                                    PS1  |
+     YESTERDAY                                           |
+        Yoshi's Island - Super Mario World 2       SNES  |
+        Metroid (USA)                               NES  |
+     MONDAY                                              |
+        Soulcalibur II                               GC  |
+        Pop'n Music Portable                        PSP  |
+     SUNDAY                                              |
+        Super Metroid                              SNES  |
+        Wipeout XL                                  PS1  |
+     SATURDAY                                            |
+        Mega Man X                                 SNES  |
+        Xenogears                                   PS1  |
+     ─────────────────────────────────────────────────── |
+     A LAUNCH   B BACK   Y REMOVE                        |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    PROPOSED - FAVOURITES
+    .....................................................  <- 53 columns
+     PortareOS  ›  Favourites                      23:59 |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+        Final Fantasy III (USA) (Rev 1)            SNES  |
+        Legend of Zelda, The - A Link to the Pa... SNES  |
+      ▸ Super Mario World (USA)                    SNES  |
+        Tekken 3                                    PS1  |
+        Castlevania - Symphony of the Night         PS1  |
+        Soulcalibur II                               GC  |
+        Mario Kart 64                               N64  |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A LAUNCH   B BACK   Y REMOVE                  3 / 7 |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
