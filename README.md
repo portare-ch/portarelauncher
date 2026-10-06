@@ -22,7 +22,10 @@ are still listed one by one.
 
 ## Status
 
-Runs on the device. It finds the systems that have games, lists them, lists
+Runs on the device. Above the systems sit two lists of their own, Recently
+played (the last ten games, under the day they were played) and Favourites
+(the left face button marks and unmarks a game in any list). It finds the
+systems that have games, lists them, lists
 the games, and launches one.
 
 Tools, the last row of the systems list, runs the scripts in the modules

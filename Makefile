@@ -48,7 +48,7 @@ PL_VERSION := dev
 endif
 
 SRC  := src/text.c src/proc.c src/update.c src/osinfo.c src/tz.c src/quit.c src/sheets.c src/color.c src/net.c src/bt.c src/osk.c src/tools.c src/settings.c src/status.c src/osd.c src/term.c src/kms.c \
-        src/input.c src/catalog.c src/main.c
+        src/input.c src/catalog.c src/lists.c src/main.c
 OBJ  := $(SRC:.c=.o)
 BIN  := portarelauncher
 
@@ -98,7 +98,7 @@ endif
 
 TESTS := tests/test_text tests/test_settings tests/test_proc \
          tests/test_catalog tests/test_tools tests/test_net tests/test_bt \
-         tests/test_osk tests/test_update tests/test_osinfo tests/test_tz tests/test_quit tests/test_sheets tests/test_color
+         tests/test_osk tests/test_update tests/test_osinfo tests/test_tz tests/test_quit tests/test_sheets tests/test_color tests/test_lists
 
 tests/test_text:     src/text.c
 tests/test_settings: src/settings.c
@@ -114,6 +114,7 @@ tests/test_tz:       src/tz.c src/text.c src/settings.c tests/fake_proc.c
 tests/test_quit:     src/quit.c
 tests/test_sheets:   src/sheets.c
 tests/test_color:   src/color.c
+tests/test_lists:    src/lists.c src/text.c
 
 $(TESTS): %: %.c tests/check.h
 	$(CC) $(TEST_CFLAGS) $(PL_WARN) -o $@ $(filter %.c,$^)
