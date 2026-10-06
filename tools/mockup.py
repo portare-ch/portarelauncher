@@ -23,6 +23,14 @@ def item(sel, label, right=""):
     return row(("  \u25b8 " if sel else "    ") + label, (right + "  ") if right else "")
 
 RULE = " " + "\u2550" * (COLS - 2)
+
+# The header as draw_frame draws it: the status at the right edge, the
+# crumb cut to end two columns short of it. On the device the games
+# screen's crumb is the system's name alone.
+STATUS = "VOL 50%  BRI 70%  BAT 87%  23:59 "
+def header(crumb, status=STATUS):
+    room = COLS - 1 - len(status) - 2 - 1
+    return row(" " + crumb[:room], status)
 THIN = " " + "\u2500" * (COLS - 2)
 
 SYS = [("GameCube", 24), ("Nintendo 64", 9), ("PlayStation", 112),
@@ -30,14 +38,14 @@ SYS = [("GameCube", 24), ("Nintendo 64", 9), ("PlayStation", 112),
        ("Mega Drive", 88), ("Game Boy Advance", 140), ("Dreamcast", 6),
        ("Arcade", 47)]
 
-systems = [row(" PortareOS", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, ""]
+systems = [header("PortareOS"), RULE, ""]
 systems += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(SYS)]
 systems += [""] * (ROWS - 2 - len(systems))
 systems += [THIN, row(" A SELECT   X SETTINGS", "12 found ")]
 
 GAMES = ["Tekken 2", "Tekken 3", "Tomb Raider", "Tony Hawk's Pro Skater 2",
          "Vagrant Story", "Wipeout XL", "Xenogears"]
-games = [row(" PortareOS  \u203a  PlayStation", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, ""]
+games = [header("PlayStation"), RULE, ""]
 games += [item(n == "Tekken 3", n) for n in GAMES]
 games += [""] * (ROWS - 2 - len(games))
 games += [THIN, row(" A LAUNCH   B BACK", "8 of 112 ")]
@@ -182,7 +190,7 @@ joining = kb_screen("FRITZ!Box 7520 JI", "hunter2Hunter!", LOWER, sel=(1, 2),
 # because it is where a tool says how to get back out of it.
 TOOLS = ["File Manager", "PortMaster", "Remove ._ Files",
          "Start RetroArch (64-bit)", "Test Gamepad"]
-tools = [row(" Tools", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, "",
+tools = [header("Tools"), RULE, "",
          row("  TOOLS", "5 found  "), ""]
 tools += [item(n == "Test Gamepad", n) for n in TOOLS]
 tools += [""] * (ROWS - 2 - 4 - 1 - len(tools))
@@ -192,7 +200,7 @@ tools += [THIN,
           "    press START + SELECT.", ""]
 tools += [THIN, " B RUN   A BACK"]
 
-launching = [row(" PortareOS", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE] + [""] * 4
+launching = [header("PortareOS"), RULE] + [""] * 4
 launching += ["           Tekken 3 (USA)", "",
               "           swanstation", "",
               "           handing over the display\u2026"]
@@ -208,7 +216,7 @@ launching += [""] * 7
 # it needs no curation. The cross-system views use short system names so
 # the title keeps the width the long-title work just won.
 QUICK = [("Recently played", 10), ("Favourites", 7)]
-systems_quick = [row(" PortareOS", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, "",
+systems_quick = [header("PortareOS"), RULE, "",
                  row("  QUICK ACCESS", "")]
 systems_quick += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(QUICK)]
 systems_quick += [THIN, row("  SYSTEMS", "")]
@@ -252,7 +260,7 @@ SNES = [("Chrono Trigger (USA)", False),
         ("Teenage Mutant Ninja Turtles IV - Turtles in Time (USA)", False),
         ("Yoshi's Island - Super Mario World 2 (USA) (Rev 1)", False)]
 def games_screen(selected, shift=0):
-    lines = [row(" PortareOS  \u203a  Super Nintendo", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, ""]
+    lines = [header("Super Nintendo"), RULE, ""]
     lines += [game(t == selected, t, shift=shift) for t, _ in SNES]
     n = 1 + [t for t, _ in SNES].index(selected)
     lines += [""] * (ROWS - 2 - len(lines))
@@ -273,7 +281,7 @@ RECENT = [("Super Mario World", "SNES", "today"), ("Tekken 3", "PS1", "today"),
 def across(sel, title, right):
     w = COLS - 4 - len(right) - 3
     return item(sel, title if len(title) <= w else title[:w - 3] + "...", right)
-recent = [row(" PortareOS  \u203a  Recently played", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, ""]
+recent = [header("Recently played"), RULE, ""]
 recent += [across(i == 0, t, "%-5s%9s" % (sy, d)) for i, (t, sy, d) in enumerate(RECENT)]
 recent += [""] * (ROWS - 2 - len(recent))
 recent += [THIN, games_footer(False, 1, 10)]
@@ -287,7 +295,7 @@ FAVS = [("Final Fantasy III (USA) (Rev 1)", "SNES"),
         ("Super Mario World (USA)", "SNES"), ("Tekken 3", "PS1"),
         ("Castlevania - Symphony of the Night", "PS1"),
         ("Soulcalibur II", "GC"), ("Mario Kart 64", "N64")]
-favourites = [row(" PortareOS  \u203a  Favourites", "VOL 50%  BRI 70%  BAT 87%  23:59 "), RULE, ""]
+favourites = [header("Favourites"), RULE, ""]
 favourites += [across(i == 2, t, sy) for i, (t, sy) in enumerate(FAVS)]
 favourites += [""] * (ROWS - 2 - len(favourites))
 favourites += [THIN, games_footer(True, 3, 7)]
