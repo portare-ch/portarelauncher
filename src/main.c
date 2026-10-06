@@ -356,29 +356,29 @@ static void draw_systems(struct ui *u)
 
 	draw_frame(u, "PortareOS");
 
-	snprintf(buf, sizeof(buf), "%d found", u->cat.n);
-	term_puts(t, 2, 3, "SYSTEMS", ATTR_MID);
-	term_puts_right(t, t->cols - 2, 3, buf, ATTR_MID);
-
+	/* No title row and no count: the list starts under the rule's blank,
+	 * like the games list, and the list is the count. Two more systems on
+	 * screen. */
+	const unsigned top = LIST_TOP - 2;
 	int rows = system_rows(u);
-	int visible = (int)list_rows(u);
+	int visible = (int)(t->rows - 3) - (int)top;
 	scroll_to(u->sys_sel, &u->sys_top, rows, visible);
 
 	for (int i = 0; i < visible && u->sys_top + i < rows; i++) {
 		int idx = u->sys_top + i;
 		if (idx == u->cat.n) {
 			snprintf(buf, sizeof(buf), "%d", u->tools.n);
-			draw_row(u, (unsigned)(LIST_TOP + i), idx == u->sys_sel, "Tools", buf);
+			draw_row(u, top + (unsigned)i, idx == u->sys_sel, "Tools", buf);
 			continue;
 		}
 		const struct psystem *s = &u->cat.sys[idx];
 		snprintf(buf, sizeof(buf), "%d", s->ngames);
-		draw_row(u, (unsigned)(LIST_TOP + i), idx == u->sys_sel,
+		draw_row(u, top + (unsigned)i, idx == u->sys_sel,
 		         s->fullname[0] ? s->fullname : s->name, buf);
 	}
 
 	if (u->cat.n == 0) {
-		unsigned y = (unsigned)(LIST_TOP + (u->tools.n > 0 ? 2 : 0));
+		unsigned y = top + (u->tools.n > 0 ? 2 : 0);
 		term_puts(t, 4, y, "No games found.", ATTR_BRIGHT);
 		term_puts(t, 4, y + 2, "Copy them into roms/<system>", ATTR_MID);
 		term_puts(t, 4, y + 3, "and press A to look again.", ATTR_MID);
