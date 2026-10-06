@@ -337,13 +337,10 @@ def pad_screen(ps=False, raw=False):
     L.append(" " * 7 + "\u2190  \u00b7  \u2192" + " " * 23 + left + "     " + right)
     L.append(" " * 10 + "\u2193" + " " * 29 + bottom)
     L.append("")
-    # A stick is round, so its travel is drawn as a ring, out of the
-    # slashes and bars the font has; the dot is the position.
-    ring = ["   .-----.   ", "  /       \\  ", " |         | ", "  \\       /  ", "   '-----'   "]
-    lstick = list(ring); lstick[2] = " |    \u00b7    | "
-    rstick = list(ring); rstick[1] = "  / \u2022     \\  "
-    for i in range(5):
-        L.append(" " * 3 + lstick[i] + " " * 19 + rstick[i])
+    # The sticks are round, so their travel is drawn round: a ring and a
+    # dot at the panel's own resolution, not out of the font. These five
+    # rows are theirs; tools/mockup_png.py draws into them from pad_shapes.
+    L += [""] * 5
     L.append(" " * 5 + "X +0.02 Y -0.01" + " " * 18 + "X -0.41 Y -0.83")
     L.append(" " * 12 + "SELECT     HOME     START")
     L.append(" " * 19 + "M1       M2")
@@ -356,10 +353,8 @@ gamepad = pad_screen()
 gamepad_ps = pad_screen(ps=True)
 
 # Which cells are bright (held) and which dim (idle); the rest is text.
-# Rows and columns of pad_screen above. The rings and their dots are
-# found in the lines themselves, so moving a dot moves its highlight.
+# Rows and columns of pad_screen above.
 def pad_spans(ps=False):
-    lines = pad_screen(ps)
     bright, dim = [], []
     dim += [(2, 2, 4)]                      # L1
     bright += [(2, 49, 51)]                 # R1
@@ -369,13 +364,23 @@ def pad_spans(ps=False):
     bright += [(6, 13, 14)]                 # right
     dim += [(5, 40, 41), (6, 37, 38), (7, 40, 41)]   # top, left, bottom face
     bright += [(6, 43, 44)]                 # A, or the circle
-    for r in range(9, 14):
-        dim += [(r, 3, 15), (r, 35, 47)]
-        for c, ch in enumerate(lines[r]):
-            if ch in "\u00b7\u2022":
-                bright.append((r, c, c))
     dim += [(15, 12, 18), (15, 23, 27), (15, 32, 37), (16, 19, 21), (16, 28, 30)]
     return bright, dim
+
+# What is drawn rather than typed: the two stick rings with their dots,
+# centred on rows 9-13, and in the PS style the four marks as plain
+# geometric outlines in the face cells, a circle, a triangle, a square and
+# a cross, thin and never filled. Held is bright, idle is dim.
+def pad_shapes(ps=False):
+    rings = [dict(row=11, col=9.5, rows=5, x=0.02, y=-0.01, clicked=False),
+             dict(row=11, col=41.5, rows=5, x=-0.41, y=-0.83, clicked=False)]
+    marks = []
+    if ps:
+        marks = [dict(row=5, col=40, shape="triangle", held=False),
+                 dict(row=6, col=37, shape="square", held=False),
+                 dict(row=6, col=43, shape="circle", held=True),
+                 dict(row=7, col=40, shape="cross", held=False)]
+    return dict(rings=rings, marks=marks)
 
 if __name__ == "__main__":
     for t, s in (("SYSTEMS", systems), ("GAMES", games),

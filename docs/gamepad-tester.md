@@ -16,17 +16,22 @@ like the other mockups, so the layout cannot drift from what it claims.
 ## The one concession
 
 A menu never needs a diagram; this does. The pad is drawn where its
-controls sit, in the font's own glyphs: arrows for the D-pad, the letters
-or marks for the face buttons, a ring for each stick's travel with a dot
-for its position, plain words for the rest. Nothing decorative: no
-enclosure, no bevel, no second palette. A control is drawn with the
+controls sit: arrows for the D-pad and plain words for the rest out of the
+font, and two things drawn as geometry at the panel's own resolution,
+because the font cannot: a round ring for each stick's travel, since a
+stick is round, with a dot for its position, and in the PS style the four
+marks as thin outlines, a circle, a triangle, a square and a cross, never
+filled, at the letters' height. Nothing decorative: no enclosure, no
+bevel, no second palette. A control is drawn with the
 launcher's bright attribute while it is held and the dim one while it is
 not, the values in body text, so whatever palette the launcher has, grey,
 amber, green, the tester has too.
 
 The face buttons follow the button style setting, `launcher.buttons`:
-the Retroid letters, or the PS marks the launcher already approximates out
-of CP437 (`G_CIRCLE`, `G_TRIANGLE`, `G_SQUARE`, a plain `X`).
+the Retroid letters from the font, or the PS marks drawn as outlines. The
+launcher's hint lines approximate those marks out of CP437 today; drawing
+them gives both the tester and the hints one proper set, two-pixel lines
+in the current attribute.
 
 ![PS button style](images/gamepad-tester-ps.png)
 
@@ -37,10 +42,9 @@ of CP437 (`G_CIRCLE`, `G_TRIANGLE`, `G_SQUARE`, a plain `X`).
   (`ABS_Z`, `ABS_RZ`).
 - The **D-pad** arrows, the pressed one bright.
 - **A B X Y** in the Nova's diamond, A on the right, B at the bottom.
-- Each **stick** as a ring, since a stick is round, with a dot that moves
-  with the position and the normalised `X` and `Y` beneath. The ring gives
-  the direction at a glance; the numbers carry the precision, since a cell
-  is coarse. The ring goes bright while the stick is clicked (`L3`, `R3`).
+- Each **stick** as a round ring with a dot that moves with the position,
+  and the normalised `X` and `Y` beneath. The dot moves in pixels, not
+  cells; the ring goes bright while the stick is clicked (`L3`, `R3`).
 - **SELECT, HOME, START** and the paddles **M1, M2**.
 - **Last**: the last two events as the kernel names them, code and value.
 - In the header, the pad's report rate, which is what a tester of this

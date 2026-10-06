@@ -36,10 +36,62 @@ def png(path, px):
         f.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", W, H, 8, 2, 0, 0, 0))
                 + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
 
-def render(lines, path, glyphs, spans=None):
+def shapes_draw(px, shapes):
+    """Geometry at the panel's resolution: rings for the sticks, thin
+    outlines for the PS marks. Lines two pixels wide, nothing filled but
+    the stick's dot."""
+    def put(x, y, c):
+        if 0 <= x < W and 0 <= y < H:
+            px[(y * W + x) * 3:(y * W + x) * 3 + 3] = bytes(c)
+    def disc(cx, cy, r, c):
+        for yy in range(-r, r + 1):
+            half = int((r * r - yy * yy) ** 0.5)
+            for xx in range(-half, half + 1):
+                put(cx + xx, cy + yy, c)
+    def ring(cx, cy, r, c, t=2):
+        for yy in range(-r, r + 1):
+            for xx in range(-r, r + 1):
+                d2 = xx * xx + yy * yy
+                if (r - t) * (r - t) <= d2 <= r * r:
+                    put(cx + xx, cy + yy, c)
+    def line(x0, y0, x1, y1, c, t=2):
+        n = max(abs(x1 - x0), abs(y1 - y0), 1)
+        for i in range(n + 1):
+            x = x0 + (x1 - x0) * i // n
+            y = y0 + (y1 - y0) * i // n
+            for dx in range(t):
+                for dy in range(t):
+                    put(x + dx, y + dy, c)
+    cell_w, cell_h = 8 * SCALE, 16 * SCALE
+    for g in shapes.get("rings", []):
+        cx = OX + int(g["col"] * cell_w)
+        cy = OY + int(g["row"] * cell_h) + cell_h // 2
+        r = g["rows"] * cell_h // 2 - 6
+        ring(cx, cy, r, BRIGHT if g["clicked"] else DIM)
+        disc(cx + int(g["x"] * (r - 12)), cy + int(g["y"] * (r - 12)), 8, BRIGHT)
+    for m in shapes.get("marks", []):
+        c = BRIGHT if m["held"] else DIM
+        cx = OX + m["col"] * cell_w + cell_w // 2
+        cy = OY + m["row"] * cell_h + cell_h // 2
+        s = 11                                  # half size, in pixels: the letters' cap height
+        if m["shape"] == "circle":
+            ring(cx, cy, s, c)
+        elif m["shape"] == "square":
+            line(cx - s, cy - s, cx + s, cy - s, c); line(cx - s, cy + s, cx + s, cy + s, c)
+            line(cx - s, cy - s, cx - s, cy + s, c); line(cx + s, cy - s, cx + s, cy + s, c)
+        elif m["shape"] == "triangle":
+            line(cx, cy - s, cx - s, cy + s, c); line(cx, cy - s, cx + s, cy + s, c)
+            line(cx - s, cy + s, cx + s, cy + s, c)
+        elif m["shape"] == "cross":
+            line(cx - s, cy - s, cx + s, cy + s, c); line(cx + s, cy - s, cx - s, cy + s, c)
+
+def render(lines, path, glyphs, spans=None, shapes=None):
     """spans: ([(row, c0, c1)] bright, [(row, c0, c1)] dim): cells coloured
-    by state rather than by their row, for the pad diagram."""
+    by state rather than by their row, for the pad diagram. shapes: drawn
+    over the text afterwards, see shapes_draw; a cell a mark sits in is
+    left blank of its glyph."""
     px = bytearray(W * H * 3)
+    skip = {(m["row"], m["col"]) for m in (shapes or {}).get("marks", [])}
     forced = {}
     if spans:
         for r, c0, c1 in spans[1]:
@@ -63,11 +115,13 @@ def render(lines, path, glyphs, spans=None):
         rule = line.strip() and set(line.strip()) <= {"═", "─"}
         selected = "▸" in line
         for c, ch in enumerate(line[:COLS]):
-            if ch == " ":
+            if ch == " " or (r, c) in skip:
                 continue
             color = MID if rule else BRIGHT if selected else TEXT
             color = forced.get((r, c), color)
             put(c, r, ch, color)
+    if shapes:
+        shapes_draw(px, shapes)
     png(path, px)
     print("wrote", os.path.relpath(path))
 
@@ -81,5 +135,7 @@ if __name__ == "__main__":
                         ("recently-played", mockup.recent),
                         ("favourites", mockup.favourites)):
         render(lines, os.path.join(out, name + ".png"), glyphs)
-    render(mockup.gamepad, os.path.join(out, "gamepad-tester.png"), glyphs, mockup.pad_spans())
-    render(mockup.gamepad_ps, os.path.join(out, "gamepad-tester-ps.png"), glyphs, mockup.pad_spans(True))
+    render(mockup.gamepad, os.path.join(out, "gamepad-tester.png"), glyphs,
+           mockup.pad_spans(), mockup.pad_shapes())
+    render(mockup.gamepad_ps, os.path.join(out, "gamepad-tester-ps.png"), glyphs,
+           mockup.pad_spans(True), mockup.pad_shapes(True))
