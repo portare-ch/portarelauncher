@@ -393,7 +393,10 @@ static void draw_games(struct ui *u)
 	         s->fullname[0] ? s->fullname : s->name);
 	draw_frame(u, crumb);
 
-	int visible = (int)list_rows(u);
+	/* The list starts two rows above LIST_TOP, under the rule, and runs
+	 * to the blank row above the footer's rule: the position count that
+	 * used to take a row of its own sits in the footer now. */
+	int visible = (int)(t->rows - 3) - (LIST_TOP - 2);
 	scroll_to(u->game_sel, &u->game_top, s->ngames, visible);
 
 	for (int i = 0; i < visible && u->game_top + i < s->ngames; i++)
@@ -401,12 +404,11 @@ static void draw_games(struct ui *u)
 		         u->game_top + i == u->game_sel,
 		         s->games[u->game_top + i].name, NULL);
 
-	snprintf(buf, sizeof(buf), "%d of %d", u->game_sel + 1, s->ngames);
-	term_puts_right(t, t->cols - 2, t->rows - 4, buf, ATTR_MID);
-
 	struct face f = face_of(u->retroid);
 	snprintf(buf, sizeof(buf), "%c LAUNCH   %c BACK", f.confirm, f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
+	snprintf(buf, sizeof(buf), "%d of %d", u->game_sel + 1, s->ngames);
+	term_puts_right(t, t->cols - 2, t->rows - 1, buf, ATTR_MID);
 }
 
 /* A diamond of the four face buttons, because the argument is about where
