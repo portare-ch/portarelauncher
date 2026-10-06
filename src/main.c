@@ -214,8 +214,8 @@ struct ui {
 #define KEY_BUTTONS "launcher.buttons"
 #define KEY_PALETTE "launcher.palette"
 
-/* The PS marks approximated out of CP437, which is all the VGA font has.
- * Close enough to be recognised, and not the real symbols. */
+/* The shape marks approximated out of CP437, which is all the VGA font
+ * has. Close enough to be recognised, and not the real symbols. */
 #define G_CIRCLE    0x09   /* O   */
 #define G_TRIANGLE  0x1E   /* /\  */
 #define G_SQUARE    0xFE   /* []  */
@@ -783,7 +783,7 @@ static void draw_face(struct ui *u, unsigned y, int retroid)
 	struct face f = face_of(retroid);
 
 	/* The button that confirms is the bright one, wherever it sits: on
-	 * the right of a Retroid, at the bottom of a PS pad. */
+	 * the right of a Retroid, at the bottom with the shape marks. */
 #define FACE_ATTR(g) ((g) == f.confirm ? ATTR_BRIGHT : ATTR_TEXT)
 	term_putc(t, 9,  y,     f.top,    FACE_ATTR(f.top));
 	term_putc(t, 6,  y + 1, f.left,   FACE_ATTR(f.left));
@@ -838,7 +838,7 @@ static void draw_settings(struct ui *u)
 			break;
 		}
 		case SET_BUTTONS:
-			value = u->retroid ? "Retroid" : "PS";
+			value = u->retroid ? "Retroid" : "Shapes";
 			break;
 		case SET_CONSOLES: {
 			int n = 0;
@@ -2180,7 +2180,7 @@ static void on_action(struct ui *u, enum action a)
 			 * decides how to leave it should not be the one that is
 			 * lost. */
 			settings_set(SETTINGS, KEY_BUTTONS,
-			             u->retroid ? "retroid" : "ps");
+			             u->retroid ? "retroid" : "shapes");
 		}
 		else if (a == ACT_BACK || a == ACT_MENU) show_systems(u);
 		else if (a == ACT_QUIT) u->running = 0;
@@ -2527,11 +2527,12 @@ int main(void)
 	 * positional convention, which would put confirm on the button
 	 * labelled B. */
 	char style[32];
-	/* "sony" is accepted as well as "ps" because it is what earlier builds
-	 * wrote, and a setting that silently flips on upgrade is worse than a
-	 * spare string comparison. */
+	/* "ps" and "sony" are accepted as well as "shapes" because they are
+	 * what earlier builds wrote, and a setting that silently flips on
+	 * upgrade is worse than two spare string comparisons. */
 	u.retroid = !(settings_get(SETTINGS, KEY_BUTTONS, style, sizeof(style)) &&
-	              (strcmp(style, "ps") == 0 || strcmp(style, "sony") == 0));
+	              (strcmp(style, "shapes") == 0 || strcmp(style, "ps") == 0 ||
+	               strcmp(style, "sony") == 0));
 	input_set_layout(u.retroid);
 	/* Read what is cheap now and leave the scan until the Wi-Fi screen is
 	 * opened: a rescan takes seconds and nothing on the first screen shows

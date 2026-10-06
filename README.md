@@ -27,7 +27,7 @@ display and input devices.
 
 ## Controls
 
-| Action | Retroid (default) | PlayStation style |
+| Action | Retroid (default) | Shape marks |
 |---|---|---|
 | Confirm / launch | A | Cross |
 | Back | B | Circle |

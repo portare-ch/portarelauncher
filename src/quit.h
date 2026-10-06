@@ -19,7 +19,7 @@
  * a machine without that header. */
 #define QUIT_EV_KEY     0x01
 #define QUIT_BTN_START  0x13b
-#define QUIT_BTN_MODE   0x13c     /* Home, PS, Guide: the button in the middle */
+#define QUIT_BTN_MODE   0x13c     /* Home, Guide: the button in the middle */
 
 #define QUIT_MAX_DEV    24
 

@@ -164,11 +164,11 @@ static enum action from_key(unsigned code)
 {
 	switch (code) {
 	/* The face buttons by role. The top one opens settings whatever the
-	 * style, X on a Retroid, triangle on a PS pad; the left one, Y or
-	 * square, marks a favourite. The style decides the other two. Retroid: A on the right
-	 * confirms, B at the bottom goes back. PS: cross at the bottom
-	 * confirms, circle on the right goes back. L1 is the keyboard's
-	 * shift. */
+	 * style, X on a Retroid, the triangle with the shape marks; the left
+	 * one, Y or the square, marks a favourite. The style decides the other
+	 * two. Retroid: A on the right confirms, B at the bottom goes back.
+	 * Shapes: the cross at the bottom confirms, the circle on the right
+	 * goes back. L1 is the keyboard's shift. */
 	case BTN_SOUTH:  return retroid_layout ? ACT_BACK    : ACT_CONFIRM;
 	case BTN_EAST:   return retroid_layout ? ACT_CONFIRM : ACT_BACK;
 	case BTN_NORTH:  return ACT_MENU;
