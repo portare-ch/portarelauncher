@@ -28,9 +28,17 @@ RULE = " " + "\u2550" * (COLS - 2)
 # crumb cut to end two columns short of it. On the device the games
 # screen's crumb is the system's name alone.
 STATUS = "VOL 50%  BRI 70%  BAT 87%  23:59 "
+CLOCK = "23:59 "
 def header(crumb, status=STATUS):
     room = COLS - 1 - len(status) - 2 - 1
     return row(" " + crumb[:room], status)
+
+# A list of games is a step down from the Systems screen, and its header
+# says so: the crumb, and the clock alone at the right. Volume, brightness
+# and battery stay on the Systems screen; a game list is not the place to
+# read them, and a count of the rows is in the footer already.
+def crumb(name):
+    return header("PortareOS  \u203a  " + name, CLOCK)
 THIN = " " + "\u2500" * (COLS - 2)
 
 SYS = [("GameCube", 24), ("Nintendo 64", 9), ("PlayStation", 112),
@@ -45,7 +53,7 @@ systems += [THIN, row(" A SELECT   X SETTINGS", "12 found ")]
 
 GAMES = ["Tekken 2", "Tekken 3", "Tomb Raider", "Tony Hawk's Pro Skater 2",
          "Vagrant Story", "Wipeout XL", "Xenogears"]
-games = [header("PlayStation"), RULE, ""]
+games = [crumb("PlayStation"), RULE, ""]
 games += [item(n == "Tekken 3", n) for n in GAMES]
 games += [""] * (ROWS - 2 - len(games))
 games += [THIN, row(" A LAUNCH   B BACK", "8 of 112 ")]
@@ -260,7 +268,7 @@ SNES = [("Chrono Trigger (USA)", False),
         ("Teenage Mutant Ninja Turtles IV - Turtles in Time (USA)", False),
         ("Yoshi's Island - Super Mario World 2 (USA) (Rev 1)", False)]
 def games_screen(selected, shift=0):
-    lines = [header("Super Nintendo"), RULE, ""]
+    lines = [crumb("Super Nintendo"), RULE, ""]
     lines += [game(t == selected, t, shift=shift) for t, _ in SNES]
     n = 1 + [t for t, _ in SNES].index(selected)
     lines += [""] * (ROWS - 2 - len(lines))
@@ -281,7 +289,7 @@ RECENT = [("Super Mario World", "SNES", "today"), ("Tekken 3", "PS1", "today"),
 def across(sel, title, right):
     w = COLS - 4 - len(right) - 3
     return item(sel, title if len(title) <= w else title[:w - 3] + "...", right)
-recent = [header("Recently played"), RULE, ""]
+recent = [crumb("Recently played"), RULE, ""]
 recent += [across(i == 0, t, "%-5s%9s" % (sy, d)) for i, (t, sy, d) in enumerate(RECENT)]
 recent += [""] * (ROWS - 2 - len(recent))
 recent += [THIN, games_footer(False, 1, 10)]
@@ -295,7 +303,7 @@ FAVS = [("Final Fantasy III (USA) (Rev 1)", "SNES"),
         ("Super Mario World (USA)", "SNES"), ("Tekken 3", "PS1"),
         ("Castlevania - Symphony of the Night", "PS1"),
         ("Soulcalibur II", "GC"), ("Mario Kart 64", "N64")]
-favourites = [header("Favourites"), RULE, ""]
+favourites = [crumb("Favourites"), RULE, ""]
 favourites += [across(i == 2, t, sy) for i, (t, sy) in enumerate(FAVS)]
 favourites += [""] * (ROWS - 2 - len(favourites))
 favourites += [THIN, games_footer(True, 3, 7)]

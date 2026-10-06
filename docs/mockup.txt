@@ -24,7 +24,7 @@
 
     GAMES
     .....................................................  <- 53 columns
-     PlayStation        VOL 50%  BRI 70%  BAT 87%  23:59 |
+     PortareOS  ›  PlayStation                     23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
         Tekken 2                                         |
@@ -288,7 +288,7 @@
 
     PROPOSED - GAMES, LONG TITLES
     .....................................................  <- 53 columns
-     Super Nintendo     VOL 50%  BRI 70%  BAT 87%  23:59 |
+     PortareOS  ›  Super Nintendo                  23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
         Chrono Trigger (USA)                             |
@@ -312,7 +312,7 @@
 
     PROPOSED - GAMES, A FAVOURITE SELECTED
     .....................................................  <- 53 columns
-     Super Nintendo     VOL 50%  BRI 70%  BAT 87%  23:59 |
+     PortareOS  ›  Super Nintendo                  23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
         Chrono Trigger (USA)                             |
@@ -336,7 +336,7 @@
 
     PROPOSED - RECENTLY PLAYED
     .....................................................  <- 53 columns
-     Recently played    VOL 50%  BRI 70%  BAT 87%  23:59 |
+     PortareOS  ›  Recently played                 23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
       ▸ Super Mario World                SNES     today  |
@@ -360,7 +360,7 @@
 
     PROPOSED - FAVOURITES
     .....................................................  <- 53 columns
-     Favourites         VOL 50%  BRI 70%  BAT 87%  23:59 |
+     PortareOS  ›  Favourites                      23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
         Final Fantasy III (USA) (Rev 1)            SNES  |

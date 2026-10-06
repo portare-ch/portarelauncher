@@ -15,9 +15,11 @@ comes first because it needs no curation. The systems section keeps its
 title; its count, `12 found`, sits at the right end of the footer, as the
 position does on the games screens, and the plain Systems screen without
 Quick Access drops the title row and the blank under it altogether, two
-more systems on screen. The header is the device's status on every
-screen, with the clock at the right edge; no screen counts its rows up
-there. The games screen no longer names the emulator under the
+more systems on screen. The Systems screen keeps the device's status in
+its header. A list of games, Recently played and Favourites included,
+carries only its crumb and the clock at the right edge: no volume,
+brightness or battery there, and no count of its rows, which the footer
+has. The games screen no longer names the emulator under the
 list; which core runs a system is not the player's concern.
 
 ![Systems with Quick Access](images/systems-quick-access.png)
