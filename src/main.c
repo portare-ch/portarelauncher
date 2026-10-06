@@ -350,9 +350,9 @@ static void draw_systems(struct ui *u)
 
 	draw_frame(u, "PortareOS");
 
-	/* No title row and no count row: the list starts under the rule's
-	 * blank, like the games list, and the count sits in the footer. Two
-	 * more systems on screen. */
+	/* No title row and no count: the list starts under the rule's blank,
+	 * like the games list, and the list is the count. Two more systems on
+	 * screen. */
 	const unsigned top = LIST_TOP - 2;
 	int rows = system_rows(u);
 	int visible = (int)(t->rows - 3) - (int)top;
@@ -381,8 +381,6 @@ static void draw_systems(struct ui *u)
 	struct face f = face_of(u->retroid);
 	snprintf(buf, sizeof(buf), "%c SELECT   %c SETTINGS", f.confirm, f.menu);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
-	snprintf(buf, sizeof(buf), "%d found", u->cat.n);
-	term_puts_right(t, t->cols - 2, t->rows - 1, buf, ATTR_MID);
 }
 
 static void draw_games(struct ui *u)
