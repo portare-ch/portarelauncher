@@ -78,8 +78,9 @@ stick calibration; this only shows.
 
 Home + START, the same combo that leaves every emulator: the launcher
 holds it while a child runs (`quit.h`) and takes the panel back. PortScope
-has no exit combo of its own and no footer saying so; the Diagnostics
-screen's description says it.
+has no exit combo of its own and nothing says so, neither a footer here
+nor a description on the Diagnostics screen; it is the way out of
+everything on the device.
 
 ## In the distribution
 

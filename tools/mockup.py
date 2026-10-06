@@ -99,10 +99,10 @@ consoles = consoles_screen(0)
 DIAG = [("PortScope", ""), ("PortScope, raw input", "")]
 diagnostics = [row(" Settings  \u203a  Diagnostics", ""), RULE, ""]
 diagnostics += [item(i == 0, n, v) for i, (n, v) in enumerate(DIAG)]
-diagnostics += [""] * (ROWS - 2 - 3 - len(diagnostics))
-diagnostics += [THIN, "    Every button and stick as the system sees it.",
-                "    Home + START leaves it.", THIN,
-                row(" A OPEN   B BACK", "\u2191\u2193 MOVE ")]
+# No description band: the names say it, and Home + START is the way out
+# of everything on the device.
+diagnostics += [""] * (ROWS - 2 - len(diagnostics))
+diagnostics += [THIN, row(" A OPEN   B BACK", "\u2191\u2193 MOVE ")]
 
 # Two toggles and the devices in one list: switching it on, letting known
 # headphones come back, and picking them when they have not.
