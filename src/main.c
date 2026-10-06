@@ -254,7 +254,7 @@ static void scroll_to(int sel, int *top, int count, int visible)
 		*top = 0;
 }
 
-static void draw_frame(struct ui *u, const char *crumb)
+static void draw_frame_right(struct ui *u, const char *crumb, int status)
 {
 	struct term *t = &u->term;
 	char right[64];
@@ -263,13 +263,14 @@ static void draw_frame(struct ui *u, const char *crumb)
 
 	/* Retro machines did not pop up overlays; they showed the state on the
 	 * panel and left it there. Volume and brightness sit beside the
-	 * battery for the same reason. */
+	 * battery for the same reason. A list of games shows only the clock:
+	 * it is a step down from the Systems screen, where the state is. */
 	int n = 0;
-	if (u->st.volume >= 0)
+	if (status && u->st.volume >= 0)
 		n += snprintf(right + n, sizeof(right) - n, "VOL %d%%  ", u->st.volume);
-	if (u->st.brightness >= 0)
+	if (status && u->st.brightness >= 0)
 		n += snprintf(right + n, sizeof(right) - n, "BRI %d%%  ", u->st.brightness);
-	if (u->st.capacity >= 0)
+	if (status && u->st.capacity >= 0)
 		n += snprintf(right + n, sizeof(right) - n, "%s %d%%  ",
 		              u->st.charging ? "CHG" : "BAT", u->st.capacity);
 	snprintf(right + n, sizeof(right) - n, "%s", u->st.clock);
@@ -290,6 +291,11 @@ static void draw_frame(struct ui *u, const char *crumb)
 
 	term_hline(t, 1, G_HLINE_D, ATTR_DIM);
 	term_hline(t, t->rows - 2, G_HLINE, ATTR_DIM);
+}
+
+static void draw_frame(struct ui *u, const char *crumb)
+{
+	draw_frame_right(u, crumb, 1);
 }
 
 /* What the four face buttons are called on the pad in the user's hands,
@@ -389,11 +395,14 @@ static void draw_games(struct ui *u)
 	const struct psystem *s = &u->cat.sys[u->sys_sel];
 	char crumb[96], buf[64];
 
-	snprintf(crumb, sizeof(crumb), "%s",
+	snprintf(crumb, sizeof(crumb), "PortareOS  >  %s",
 	         s->fullname[0] ? s->fullname : s->name);
-	draw_frame(u, crumb);
+	draw_frame_right(u, crumb, 0);
 
-	int visible = (int)list_rows(u);
+	/* The list starts two rows above LIST_TOP, under the rule, and runs
+	 * to the blank row above the footer's rule: the position count that
+	 * used to take a row of its own sits in the footer now. */
+	int visible = (int)(t->rows - 3) - (LIST_TOP - 2);
 	scroll_to(u->game_sel, &u->game_top, s->ngames, visible);
 
 	for (int i = 0; i < visible && u->game_top + i < s->ngames; i++)
@@ -401,13 +410,11 @@ static void draw_games(struct ui *u)
 		         u->game_top + i == u->game_sel,
 		         s->games[u->game_top + i].name, NULL);
 
-	snprintf(buf, sizeof(buf), "%d of %d", u->game_sel + 1, s->ngames);
-	term_puts(t, 4, t->rows - 4, s->core[0] ? s->core : s->emulator, ATTR_MID);
-	term_puts_right(t, t->cols - 2, t->rows - 4, buf, ATTR_MID);
-
 	struct face f = face_of(u->retroid);
 	snprintf(buf, sizeof(buf), "%c LAUNCH   %c BACK", f.confirm, f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
+	snprintf(buf, sizeof(buf), "%d / %d", u->game_sel + 1, s->ngames);
+	term_puts_right(t, t->cols - 2, t->rows - 1, buf, ATTR_MID);
 }
 
 /* A diamond of the four face buttons, because the argument is about where
