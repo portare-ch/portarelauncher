@@ -402,7 +402,6 @@ static void draw_games(struct ui *u)
 		         s->games[u->game_top + i].name, NULL);
 
 	snprintf(buf, sizeof(buf), "%d of %d", u->game_sel + 1, s->ngames);
-	term_puts(t, 4, t->rows - 4, s->core[0] ? s->core : s->emulator, ATTR_MID);
 	term_puts_right(t, t->cols - 2, t->rows - 4, buf, ATTR_MID);
 
 	struct face f = face_of(u->retroid);
