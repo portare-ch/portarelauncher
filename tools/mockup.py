@@ -40,7 +40,7 @@ GAMES = ["Tekken 2", "Tekken 3", "Tomb Raider", "Tony Hawk's Pro Skater 2",
 games = [row(" PortareOS  \u203a  PlayStation", "112 games "), RULE, ""]
 games += [item(n == "Tekken 3", n) for n in GAMES]
 games += [""] * 4
-games += [row("    swanstation", "8 of 112  "), "", THIN,
+games += [row("", "8 of 112  "), "", THIN,
           row(" A LAUNCH   B BACK", "\u2191\u2193 MOVE ")]
 
 SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
@@ -208,7 +208,7 @@ launching += [""] * 7
 # on 20 rows whitespace is the expensive thing. Recent comes first because
 # it needs no curation. The cross-system views use short system names so
 # the title keeps the width the long-title work just won.
-QUICK = [("Recently played", 10), ("\u2665 Favourites", 7)]
+QUICK = [("Recently played", 10), ("Favourites", 7)]
 systems_quick = [row(" PortareOS", "23:59  BAT 87% "), RULE, "",
                  row("  QUICK ACCESS", "")]
 systems_quick += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(QUICK)]
@@ -220,16 +220,15 @@ systems_quick += [THIN, row(" A SELECT   X SETTINGS", "\u2191\u2193 MOVE ")]
 # The selected row scrolls instead: still for 1 s, then one column left
 # every 150 ms until the end is in view, 1.5 s there, back to the start.
 # No wrap, so the ending the reader was after is not followed by what
-# they already read. Only the selected row ever moves. A favourite shows
-# the same glyph as the Quick Access entry, in the last column.
-TITLE_W = COLS - 4 - 4    # marker and indent, then the glyph column and its gap
+# they already read. Only the selected row ever moves. Nothing marks a
+# favourite in the list: Favourites is where favourites are.
+TITLE_W = COLS - 4 - 2    # marker and indent, then the right margin
 def cut(t):
     return t if len(t) <= TITLE_W else t[:TITLE_W - 3] + "..."
 def scrolled(t, shift):
     return t[shift:shift + TITLE_W]
-def game(sel, title, fav=False, shift=0):
-    label = scrolled(title, shift) if sel else cut(title)
-    return item(sel, label, "\u2665" if fav and not sel else "")
+def game(sel, title, shift=0):
+    return item(sel, scrolled(title, shift) if sel else cut(title))
 SNES = [("Donkey Kong Country 2 - Diddy's Kong Quest (USA) (En,Fr)", False),
         ("Final Fantasy III (USA) (Rev 1)", True),
         ("Legend of Zelda, The - A Link to the Past (USA)", True),
@@ -241,8 +240,8 @@ SNES = [("Donkey Kong Country 2 - Diddy's Kong Quest (USA) (En,Fr)", False),
         ("Teenage Mutant Ninja Turtles IV - Turtles in Time (USA)", False),
         ("Yoshi's Island - Super Mario World 2 (USA) (Rev 1)", False)]
 games_long = [row(" PortareOS  \u203a  Super Nintendo", "204 games "), RULE, ""]
-games_long += [game(t.startswith("Teenage"), t, f, shift=9) for t, f in SNES]
-games_long += ["", row("    snes9x", "9 of 204  "), "", THIN,
+games_long += [game(t.startswith("Teenage"), t, shift=9) for t, _ in SNES]
+games_long += ["", row("", "9 of 204  "), "", THIN,
                row(" A LAUNCH   B BACK   Y FAVOURITE", "\u2191\u2193 MOVE ")]
 
 # Ten launches, newest first, written when runemu exits with status 0,
@@ -264,14 +263,14 @@ recent += [THIN, row(" A LAUNCH   B BACK   Y FAVOURITE", "\u2191\u2193 MOVE ")]
 
 # One file, a game path per line, pruned of paths that no longer exist
 # when it is read. Y toggles the selected game wherever a game is listed;
-# in here the same key removes, and the hint says so without a glyph:
-# hints name keys, A B X Y, nothing else.
+# in here the same key removes. Hints name keys, A B X Y, nothing else,
+# and no glyph stands for a favourite anywhere.
 FAVS = [("Final Fantasy III (USA) (Rev 1)", "SNES"),
         ("Legend of Zelda, The - A Link to the Past (USA)", "SNES"),
         ("Super Mario World (USA)", "SNES"), ("Tekken 3", "PS1"),
         ("Castlevania - Symphony of the Night", "PS1"),
         ("Soulcalibur II", "GC"), ("Mario Kart 64", "N64")]
-favourites = [row(" PortareOS  \u203a  \u2665 Favourites", "7 games "), RULE, ""]
+favourites = [row(" PortareOS  \u203a  Favourites", "7 games "), RULE, ""]
 favourites += [across(i == 2, t, sy) for i, (t, sy) in enumerate(FAVS)]
 favourites += [""] * (ROWS - 2 - len(favourites))
 favourites += [THIN, row(" A LAUNCH   B BACK   Y REMOVE", "\u2191\u2193 MOVE ")]

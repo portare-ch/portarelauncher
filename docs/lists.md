@@ -12,7 +12,8 @@ launcher's own font, so what is shown is what the device can draw.
 A category of its own above the systems: cross-system shortcuts first,
 platforms below, a thin rule between and no blank row. Recently played
 comes first because it needs no curation. The systems section keeps its
-title and count.
+title and count. The games screen no longer names the emulator under the
+list; which core runs a system is not the player's concern.
 
 ![Systems with Quick Access](images/systems-quick-access.png)
 
@@ -33,16 +34,15 @@ One file, a game path per line, in the launcher's config directory. It is
 pruned of paths that no longer exist when it is read, so a renamed or
 deleted ROM leaves no dead row. `Y` toggles the selected game wherever a
 game is listed; inside Favourites the same key removes it, and the hint
-says `Y REMOVE`. Hints name keys and nothing else; the heart marks a
-favourite in a row's last column and labels the Quick Access entry, and
-it is the one glyph used for it everywhere.
+says `Y REMOVE`. Hints name keys and nothing else, and nothing marks a
+favourite in a system's list: Favourites is where favourites are.
 
 ![Favourites](images/favourites.png)
 
 ## Long titles
 
-The title column is 45 characters once the marker, the indent and the
-glyph column are taken. A title longer than that is cut to the column with
+The title column is 47 characters once the marker, the indent and the
+right margin are taken. A title longer than that is cut to the column with
 `...` while it is not selected. The selected row scrolls instead: still
 for one second, then one column to the left every 150 ms until the end is
 in view, 1.5 seconds there, back to the start, and again. No wrap, so the

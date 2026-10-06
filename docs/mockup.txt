@@ -38,7 +38,7 @@
                                                          |
                                                          |
                                                          |
-        swanstation                            8 of 112  |
+                                               8 of 112  |
                                                          |
      ─────────────────────────────────────────────────── |
      A LAUNCH   B BACK                           ↑↓ MOVE |
@@ -269,7 +269,7 @@
                                                          |
       QUICK ACCESS                                       |
       ▸ Recently played                              10  |
-        ♥ Favourites                                  7  |
+        Favourites                                    7  |
      ─────────────────────────────────────────────────── |
       SYSTEMS                                  12 found  |
         GameCube                                     24  |
@@ -291,18 +291,18 @@
      PortareOS  ›  Super Nintendo              204 games |
      ═══════════════════════════════════════════════════ |
                                                          |
-        Donkey Kong Country 2 - Diddy's Kong Quest...    |
-        Final Fantasy III (USA) (Rev 1)               ♥  |
-        Legend of Zelda, The - A Link to the Past ... ♥  |
+        Donkey Kong Country 2 - Diddy's Kong Quest (...  |
+        Final Fantasy III (USA) (Rev 1)                  |
+        Legend of Zelda, The - A Link to the Past (USA)  |
         Mega Man X (USA) (Rev 1)                         |
         Secret of Mana (USA)                             |
         Super Castlevania IV (USA)                       |
-        Super Mario World (USA)                       ♥  |
+        Super Mario World (USA)                          |
         Super Metroid (Japan, USA) (En,Ja)               |
-      ▸ utant Ninja Turtles IV - Turtles in Time (USA    |
-        Yoshi's Island - Super Mario World 2 (USA)...    |
+      ▸ utant Ninja Turtles IV - Turtles in Time (USA)   |
+        Yoshi's Island - Super Mario World 2 (USA) (...  |
                                                          |
-        snes9x                                 9 of 204  |
+                                               9 of 204  |
                                                          |
      ─────────────────────────────────────────────────── |
      A LAUNCH   B BACK   Y FAVOURITE             ↑↓ MOVE |
@@ -336,7 +336,7 @@
 
     PROPOSED - FAVOURITES
     .....................................................  <- 53 columns
-     PortareOS  ›  ♥ Favourites                  7 games |
+     PortareOS  ›  Favourites                    7 games |
      ═══════════════════════════════════════════════════ |
                                                          |
         Final Fantasy III (USA) (Rev 1)            SNES  |
