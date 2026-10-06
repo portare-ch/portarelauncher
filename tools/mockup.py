@@ -323,20 +323,23 @@ favourites += [across(i == 2, t, sy) for i, (t, sy) in enumerate(FAVS)]
 favourites += [""] * (ROWS - 2 - len(favourites))
 favourites += [THIN, games_footer(True, 3, 7)]
 
-# ---- proposed: PortScope, the gamepad tester -------------------------------
+# ---- proposed: PortScope, input diagnostics --------------------------------
 #
-# Tools > PortScope, as one more launcher screen rather than a program
-# that looks like something else: the same grid, font and palette, nothing
-# decorative. The one thing a menu never needs and this does is a diagram
-# of the pad, drawn in line glyphs. A control is bright while it is held
-# and dim while it is not, so the tester takes whatever palette the launcher
-# has. The face buttons follow the button style setting: the Retroid letters
-# or the shape marks, which the renderer draws as outlines.
+# Settings > Diagnostics > PortScope, as one more launcher screen rather
+# than a program that looks like something else: the same grid, font and
+# palette, nothing decorative. The one thing a menu never needs and this
+# does is a diagram of the pad, drawn in line glyphs. A control is bright
+# while it is held and dim while it is not, so PortScope takes whatever
+# palette the launcher has. The face buttons follow the button style
+# setting: the Retroid letters or the shape marks, which the renderer
+# draws as outlines.
 #
 # Sample state: A down, D-pad right, R1 held, R2 two thirds in, the right
 # stick up and left. One layer at a time: the virtual pad games see by
 # default, the MCU's raw device after a long press of SELECT; the header
 # says which, in one word, so nobody wonders what they are looking at.
+# RATE is measured from the device shown, so it is the virtual pad's rate
+# by default and the MCU's in raw mode.
 def pad_screen(shapes=False, raw=False):
     top, left, right, bottom = ("\u25b2", "\u25a0", "\u25cb", "\u00d7") if shapes else ("X", "Y", "A", "B")
     L = [row(" PortScope" + (", raw" if raw else ""), "RATE 200 Hz "), RULE]

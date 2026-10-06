@@ -1,9 +1,8 @@
 # PortScope
 
-PortScope is a tool of our own to replace the SDL GamepadTester the image
-ships today,
-which needs SDL2_gfx and a controller database and looks like nothing else
-on the device. This one is a second binary in this repository, built from
+PortScope is input diagnostics of our own. It replaces the SDL
+GamepadTester the image ships today, which needs SDL2_gfx and a controller
+database and looks like nothing else on the device. This one is a second binary in this repository, built from
 the launcher's own pieces: `kms.c` for the panel, the evdev reading of
 `input.c`, the 8x16 font and the palette. No SDL, no database: it shows the
 pad as the kernel reports it, and it looks like one more launcher screen.
@@ -32,7 +31,7 @@ cross, never filled, at the letters' height. Nothing decorative: no enclosure, n
 bevel, no second palette. A control is drawn with the
 launcher's bright attribute while it is held and the dim one while it is
 not, the values in body text, so whatever palette the launcher has, grey,
-amber, green, the tester has too.
+amber, green, PortScope has too.
 
 The face buttons follow the button style setting, `launcher.buttons`:
 the Retroid letters from the font, or the shape marks drawn as outlines.
@@ -56,8 +55,11 @@ lines in the current attribute.
 - **SELECT, HOME, START** and the paddles **M1, M2**.
 - **Last input**: the last events as the kernel names them, code and
   value, in the rows a footer would have taken.
-- In the header, `RATE` and the pad's report rate, which is what a tester
-  of this device most often wants to know (the MCU reports at 200 Hz).
+- In the header, `RATE` and the report rate of the device shown, measured
+  from its events over the last second: the virtual pad's by default, the
+  MCU's in raw mode. Whether the full rate survives the path to a game is
+  what someone testing this device most often wants to know; the MCU
+  itself reports at 200 Hz.
 
 ## One layer at a time
 
