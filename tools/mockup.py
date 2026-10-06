@@ -342,12 +342,13 @@ def pad_screen(shapes=False, raw=False):
     L = [row(" PortScope" + (", raw" if raw else ""), "RATE 200 Hz "), RULE]
     L.append(row("  L1", "R1  "))
     L.append(row("  L2  0.00", "0.67  R2  "))
-    L.append("")
+    # The stick's click is a button too; it sits with the other shoulder
+    # buttons rather than crowding the ring.
+    L.append(row("  L3", "R3  "))
     L.append(" " * 10 + "\u2191" + " " * 29 + top)
     L.append(" " * 7 + "\u2190  \u00b7  \u2192" + " " * 23 + left + "     " + right)
     L.append(" " * 10 + "\u2193" + " " * 29 + bottom)
-    # L3 and R3 over the rings: the stick's click is a button too.
-    L.append(" " * 9 + "L3" + " " * 30 + "R3")
+    L.append("")
     # The sticks are round, so their travel is drawn round: a ring and a
     # dot at the panel's own resolution, not out of the font. These five
     # rows are theirs; tools/mockup_png.py draws into them from pad_shapes.
@@ -369,11 +370,11 @@ gamepad_shapes = pad_screen(shapes=True)
 # Rows and columns of pad_screen above.
 def pad_spans(shapes=False):
     bright, dim = [], []
-    dim += [(8, 9, 10), (8, 41, 42)]        # L3, R3
     dim += [(2, 2, 4)]                      # L1
     bright += [(2, 49, 51)]                 # R1
     dim += [(3, 2, 4), (3, 6, 10)]          # L2 and its 0.00
     bright += [(3, 43, 47), (3, 49, 51)]    # 0.67 and R2
+    dim += [(4, 2, 4), (4, 49, 51)]         # L3, R3
     dim += [(5, 10, 11), (6, 7, 8), (7, 10, 11)]   # up, left, down
     bright += [(6, 13, 14)]                 # right
     dim += [(5, 40, 41), (6, 37, 38), (7, 40, 41)]   # top, left, bottom face

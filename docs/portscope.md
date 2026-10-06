@@ -49,10 +49,10 @@ lines in the current attribute.
   (`ABS_Z`, `ABS_RZ`).
 - The **D-pad** arrows, the pressed one bright.
 - **A B X Y** in the Nova's diamond, A on the right, B at the bottom.
-- Each **stick** as a round ring with a dot that moves with the position,
-  `L3` or `R3` over it and the normalised `X` and `Y` beneath. The dot
-  moves in pixels, not cells; the label and the ring go bright while the
-  stick is clicked.
+- Each **stick** as a round ring with a dot that moves with the position
+  and the normalised `X` and `Y` beneath. The dot moves in pixels, not
+  cells. The click is `L3` or `R3` in the shoulder column, under `L2` and
+  `R2`; label and ring go bright while the stick is clicked.
 - **SELECT, HOME, START** and the paddles **M1, M2**.
 - **Last input**: the last events as the kernel names them, code and
   value, in the rows a footer would have taken.
