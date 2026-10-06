@@ -135,7 +135,7 @@ if __name__ == "__main__":
                         ("recently-played", mockup.recent),
                         ("favourites", mockup.favourites)):
         render(lines, os.path.join(out, name + ".png"), glyphs)
-    render(mockup.gamepad, os.path.join(out, "gamepad-tester.png"), glyphs,
+    render(mockup.gamepad, os.path.join(out, "portscope.png"), glyphs,
            mockup.pad_spans(), mockup.pad_shapes())
-    render(mockup.gamepad_ps, os.path.join(out, "gamepad-tester-ps.png"), glyphs,
+    render(mockup.gamepad_ps, os.path.join(out, "portscope-ps.png"), glyphs,
            mockup.pad_spans(True), mockup.pad_shapes(True))

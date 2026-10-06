@@ -1,13 +1,14 @@
-# Gamepad tester
+# PortScope
 
-A tool of our own to replace the SDL GamepadTester the image ships today,
+PortScope is a tool of our own to replace the SDL GamepadTester the image
+ships today,
 which needs SDL2_gfx and a controller database and looks like nothing else
 on the device. This one is a second binary in this repository, built from
 the launcher's own pieces: `kms.c` for the panel, the evdev reading of
 `input.c`, the 8x16 font and the palette. No SDL, no database: it shows the
 pad as the kernel reports it, and it looks like one more launcher screen.
 
-![Gamepad tester](images/gamepad-tester.png)
+![Gamepad tester](images/portscope.png)
 
 The picture is `tools/mockup.py`'s `pad_screen`, at the launcher's 53x20
 grid, rendered by `tools/mockup_png.py` with the launcher's font; a program
@@ -33,7 +34,7 @@ launcher's hint lines approximate those marks out of CP437 today; drawing
 them gives both the tester and the hints one proper set, two-pixel lines
 in the current attribute.
 
-![PS button style](images/gamepad-tester-ps.png)
+![PS button style](images/portscope-ps.png)
 
 ## What it shows
 
@@ -46,9 +47,10 @@ in the current attribute.
   and the normalised `X` and `Y` beneath. The dot moves in pixels, not
   cells; the ring goes bright while the stick is clicked (`L3`, `R3`).
 - **SELECT, HOME, START** and the paddles **M1, M2**.
-- **Last**: the last two events as the kernel names them, code and value.
-- In the header, the pad's report rate, which is what a tester of this
-  device most often wants to know (the MCU reports at 200 Hz).
+- **Last input**: the last events as the kernel names them, code and
+  value, in the rows a footer would have taken.
+- In the header, `RATE` and the pad's report rate, which is what a tester
+  of this device most often wants to know (the MCU reports at 200 Hz).
 
 ## One layer at a time
 
@@ -68,12 +70,14 @@ stick calibration; this only shows.
 ## Leaving
 
 Home + START, the same combo that leaves every emulator: the launcher
-holds it while a child runs (`quit.h`) and takes the panel back. The tester
-has no exit combo of its own, so the Tools description changes from
+holds it while a child runs (`quit.h`) and takes the panel back. PortScope
+has no exit combo of its own and no footer saying so; the Tools
+description carries it, as it does for every tool, and changes from
 "hold L1, press START and SELECT" to "Home + START".
 
 ## In the distribution
 
 `packages/apps/gamepadtester` goes, with its two SM8550 patches; the Tools
-script `Test Gamepad.sh` runs the new binary instead. `SDL2_gfx` was pulled
+script runs the new binary, `portscope`, instead, and the entry is named
+PortScope. `SDL2_gfx` was pulled
 in for it and may go too once nothing else lists it.

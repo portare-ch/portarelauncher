@@ -313,9 +313,9 @@ favourites += [across(i == 2, t, sy) for i, (t, sy) in enumerate(FAVS)]
 favourites += [""] * (ROWS - 2 - len(favourites))
 favourites += [THIN, games_footer(True, 3, 7)]
 
-# ---- proposed: the gamepad tester -----------------------------------------
+# ---- proposed: PortScope, the gamepad tester -------------------------------
 #
-# Tools > Test Gamepad, as one more launcher screen rather than a program
+# Tools > PortScope, as one more launcher screen rather than a program
 # that looks like something else: the same grid, font and palette, nothing
 # decorative. The one thing a menu never needs and this does is a diagram
 # of the pad, drawn in line glyphs. A control is bright while it is held
@@ -329,7 +329,7 @@ favourites += [THIN, games_footer(True, 3, 7)]
 # which, in three words, so nobody wonders what they are looking at.
 def pad_screen(ps=False, raw=False):
     top, left, right, bottom = ("\u25b2", "\u25a0", "\u25cb", "\u00d7") if ps else ("X", "Y", "A", "B")
-    L = [row(" Gamepad tester" + (", raw" if raw else ""), "200 Hz "), RULE]
+    L = [row(" PortScope" + (", raw" if raw else ""), "RATE 200 Hz "), RULE]
     L.append(row("  L1", "R1  "))
     L.append(row("  L2  0.00", "0.67  R2  "))
     L.append("")
@@ -344,9 +344,11 @@ def pad_screen(ps=False, raw=False):
     L.append(" " * 5 + "X +0.02 Y -0.01" + " " * 18 + "X -0.41 Y -0.83")
     L.append(" " * 12 + "SELECT     HOME     START")
     L.append(" " * 19 + "M1       M2")
-    L.append(row(" Last   ABS_RY -27210   ABS_Z 21580", ""))
-    L.append(THIN)
-    L.append(row(" HOME + START  BACK", ""))
+    # No footer: nothing here is a menu, and the way out is the one every
+    # program on the device has. The rows go to the last events instead.
+    L.append(" Last input")
+    L.append(" ABS_RY    -27210")
+    L.append(" ABS_Z      21580")
     return L
 
 gamepad = pad_screen()
@@ -397,7 +399,7 @@ if __name__ == "__main__":
                  ("PROPOSED - GAMES, A FAVOURITE SELECTED", games_fav),
                  ("PROPOSED - RECENTLY PLAYED", recent),
                  ("PROPOSED - FAVOURITES", favourites),
-                 ("PROPOSED - GAMEPAD TESTER", gamepad),
-                 ("PROPOSED - GAMEPAD TESTER, PS BUTTON STYLE", gamepad_ps)):
+                 ("PROPOSED - PORTSCOPE", gamepad),
+                 ("PROPOSED - PORTSCOPE, PS BUTTON STYLE", gamepad_ps)):
         print(screen(t, s))
         print()

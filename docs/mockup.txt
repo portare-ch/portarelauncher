@@ -382,9 +382,9 @@
      A LAUNCH   B BACK   Y REMOVE                  3 / 7 |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
-    PROPOSED - GAMEPAD TESTER
+    PROPOSED - PORTSCOPE
     .....................................................  <- 53 columns
-     Gamepad tester                               200 Hz |
+     PortScope                               RATE 200 Hz |
      ═══════════════════════════════════════════════════ |
       L1                                             R1  |
       L2  0.00                                 0.67  R2  |
@@ -401,14 +401,14 @@
          X +0.02 Y -0.01                  X -0.41 Y -0.83|
                 SELECT     HOME     START                |
                        M1       M2                       |
-     Last   ABS_RY -27210   ABS_Z 21580                  |
-     ─────────────────────────────────────────────────── |
-     HOME + START  BACK                                  |
+     Last input                                          |
+     ABS_RY    -27210                                    |
+     ABS_Z      21580                                    |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
-    PROPOSED - GAMEPAD TESTER, PS BUTTON STYLE
+    PROPOSED - PORTSCOPE, PS BUTTON STYLE
     .....................................................  <- 53 columns
-     Gamepad tester                               200 Hz |
+     PortScope                               RATE 200 Hz |
      ═══════════════════════════════════════════════════ |
       L1                                             R1  |
       L2  0.00                                 0.67  R2  |
@@ -425,8 +425,8 @@
          X +0.02 Y -0.01                  X -0.41 Y -0.83|
                 SELECT     HOME     START                |
                        M1       M2                       |
-     Last   ABS_RY -27210   ABS_Z 21580                  |
-     ─────────────────────────────────────────────────── |
-     HOME + START  BACK                                  |
+     Last input                                          |
+     ABS_RY    -27210                                    |
+     ABS_Z      21580                                    |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
