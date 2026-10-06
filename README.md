@@ -49,7 +49,11 @@ than set here, because the volume keys already set them.
 
 `docs/mockup.txt` is the layout at the real grid and `tools/mockup.py`
 regenerates it — the mockup is a program rather than a picture so it cannot
-drift from the dimensions it claims.
+drift from the dimensions it claims. `tools/mockup_png.py` draws the
+proposed screens from the same lists with the launcher's font, one image
+per screen in `docs/images/`; `make mockup` runs both. `docs/lists.md` is
+the current proposal: Quick Access, Recently played, Favourites and
+scrolling long titles.
 
 It is PortareOS's front-end: the image starts it as the UI service, and
 EmulationStation and sway are gone. What is still missing before the public

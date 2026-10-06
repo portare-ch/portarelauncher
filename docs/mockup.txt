@@ -262,3 +262,99 @@
                                                          |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
+    PROPOSED - SYSTEMS WITH QUICK ACCESS
+    .....................................................  <- 53 columns
+     PortareOS                            23:59  BAT 87% |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+      QUICK ACCESS                                       |
+      ▸ Recently played                              10  |
+        ♥ Favourites                                  7  |
+     ─────────────────────────────────────────────────── |
+      SYSTEMS                                  12 found  |
+        GameCube                                     24  |
+        Nintendo 64                                   9  |
+        PlayStation                                 112  |
+        PlayStation 2                                 2  |
+        PlayStation Portable                         31  |
+        SNES                                        204  |
+        Mega Drive                                   88  |
+        Game Boy Advance                            140  |
+        Dreamcast                                     6  |
+        Arcade                                       47  |
+     ─────────────────────────────────────────────────── |
+     A SELECT   X SETTINGS                       ↑↓ MOVE |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    PROPOSED - GAMES, LONG TITLES
+    .....................................................  <- 53 columns
+     PortareOS  ›  Super Nintendo              204 games |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+        Donkey Kong Country 2 - Diddy's Kong Quest...    |
+        Final Fantasy III (USA) (Rev 1)               ♥  |
+        Legend of Zelda, The - A Link to the Past ... ♥  |
+        Mega Man X (USA) (Rev 1)                         |
+        Secret of Mana (USA)                             |
+        Super Castlevania IV (USA)                       |
+        Super Mario World (USA)                       ♥  |
+        Super Metroid (Japan, USA) (En,Ja)               |
+      ▸ utant Ninja Turtles IV - Turtles in Time (USA    |
+        Yoshi's Island - Super Mario World 2 (USA)...    |
+                                                         |
+        snes9x                                 9 of 204  |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A LAUNCH   B BACK   Y FAVOURITE             ↑↓ MOVE |
+                                                         |
+                                                         |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    PROPOSED - RECENTLY PLAYED
+    .....................................................  <- 53 columns
+     PortareOS  ›  Recently played              10 games |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+      ▸ Super Mario World                SNES     today  |
+        Tekken 3                         PS1      today  |
+        Yoshi's Island - Super Mario ... SNES yesterday  |
+        Metroid (USA)                    NES  yesterday  |
+        Soulcalibur II                   GC         Mon  |
+        Pop'n Music Portable             PSP        Mon  |
+        Super Metroid                    SNES       Sun  |
+        Wipeout XL                       PS1        Sun  |
+        Mega Man X                       SNES       Sat  |
+        Xenogears                        PS1        Sat  |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A LAUNCH   B BACK   Y FAVOURITE             ↑↓ MOVE |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    PROPOSED - FAVOURITES
+    .....................................................  <- 53 columns
+     PortareOS  ›  ♥ Favourites                  7 games |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+        Final Fantasy III (USA) (Rev 1)            SNES  |
+        Legend of Zelda, The - A Link to the Pa... SNES  |
+      ▸ Super Mario World (USA)                    SNES  |
+        Tekken 3                                    PS1  |
+        Castlevania - Symphony of the Night         PS1  |
+        Soulcalibur II                               GC  |
+        Mario Kart 64                               N64  |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A LAUNCH   B BACK   Y REMOVE                ↑↓ MOVE |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
