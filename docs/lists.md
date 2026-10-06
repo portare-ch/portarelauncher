@@ -52,4 +52,9 @@ in view, 1.5 seconds there, back to the start, and again. No wrap, so the
 ending the reader was after is not followed by what they already read.
 Only the selected row ever moves.
 
+The position, `9 of 204`, sits at the right end of the footer where the
+`↑↓ MOVE` hint was; a d-pad needs no hint. The row the count had, and the
+blank rows around it, go to the list: fourteen games on screen instead of
+ten.
+
 ![Games, long titles](images/games-long-titles.png)

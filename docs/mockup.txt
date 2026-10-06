@@ -38,12 +38,12 @@
                                                          |
                                                          |
                                                          |
-                                               8 of 112  |
+                                                         |
+                                                         |
+                                                         |
                                                          |
      ─────────────────────────────────────────────────── |
-     A LAUNCH   B BACK                           ↑↓ MOVE |
-                                                         |
-                                                         |
+     A LAUNCH   B BACK                          8 of 112 |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     SETTINGS
@@ -291,23 +291,23 @@
      PortareOS  ›  Super Nintendo              204 games |
      ═══════════════════════════════════════════════════ |
                                                          |
+        Chrono Trigger (USA)                             |
         Donkey Kong Country 2 - Diddy's Kong Quest (...  |
+        EarthBound (USA)                                 |
         Final Fantasy III (USA) (Rev 1)                  |
+        Kirby Super Star (USA)                           |
         Legend of Zelda, The - A Link to the Past (USA)  |
         Mega Man X (USA) (Rev 1)                         |
         Secret of Mana (USA)                             |
+        Star Fox (USA)                                   |
         Super Castlevania IV (USA)                       |
         Super Mario World (USA)                          |
         Super Metroid (Japan, USA) (En,Ja)               |
       ▸ utant Ninja Turtles IV - Turtles in Time (USA)   |
         Yoshi's Island - Super Mario World 2 (USA) (...  |
                                                          |
-                                               9 of 204  |
-                                                         |
      ─────────────────────────────────────────────────── |
-     A LAUNCH   B BACK   Y FAVOURITE             ↑↓ MOVE |
-                                                         |
-                                                         |
+     A LAUNCH   B BACK   Y FAVOURITE           13 of 204 |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     PROPOSED - GAMES, A FAVOURITE SELECTED
@@ -315,23 +315,23 @@
      PortareOS  ›  Super Nintendo              204 games |
      ═══════════════════════════════════════════════════ |
                                                          |
+        Chrono Trigger (USA)                             |
         Donkey Kong Country 2 - Diddy's Kong Quest (...  |
+        EarthBound (USA)                                 |
         Final Fantasy III (USA) (Rev 1)                  |
+        Kirby Super Star (USA)                           |
         Legend of Zelda, The - A Link to the Past (USA)  |
         Mega Man X (USA) (Rev 1)                         |
         Secret of Mana (USA)                             |
+        Star Fox (USA)                                   |
         Super Castlevania IV (USA)                       |
       ▸ Super Mario World (USA)                          |
         Super Metroid (Japan, USA) (En,Ja)               |
         Teenage Mutant Ninja Turtles IV - Turtles in...  |
         Yoshi's Island - Super Mario World 2 (USA) (...  |
                                                          |
-                                               7 of 204  |
-                                                         |
      ─────────────────────────────────────────────────── |
-     A LAUNCH   B BACK   Y REMOVE                ↑↓ MOVE |
-                                                         |
-                                                         |
+     A LAUNCH   B BACK   Y REMOVE              11 of 204 |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     PROPOSED - RECENTLY PLAYED
@@ -355,7 +355,7 @@
                                                          |
                                                          |
      ─────────────────────────────────────────────────── |
-     A LAUNCH   B BACK   Y FAVOURITE             ↑↓ MOVE |
+     A LAUNCH   B BACK   Y FAVOURITE             1 of 10 |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
     PROPOSED - FAVOURITES
@@ -379,6 +379,6 @@
                                                          |
                                                          |
      ─────────────────────────────────────────────────── |
-     A LAUNCH   B BACK   Y REMOVE                ↑↓ MOVE |
+     A LAUNCH   B BACK   Y REMOVE                 3 of 7 |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 

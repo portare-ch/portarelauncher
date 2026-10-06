@@ -39,9 +39,8 @@ GAMES = ["Tekken 2", "Tekken 3", "Tomb Raider", "Tony Hawk's Pro Skater 2",
          "Vagrant Story", "Wipeout XL", "Xenogears"]
 games = [row(" PortareOS  \u203a  PlayStation", "112 games "), RULE, ""]
 games += [item(n == "Tekken 3", n) for n in GAMES]
-games += [""] * 4
-games += [row("", "8 of 112  "), "", THIN,
-          row(" A LAUNCH   B BACK", "\u2191\u2193 MOVE ")]
+games += [""] * (ROWS - 2 - len(games))
+games += [THIN, row(" A LAUNCH   B BACK", "8 of 112 ")]
 
 SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
        ("USB gadget mode", "network"), ("Button style", "Retroid"),
@@ -232,14 +231,21 @@ def game(sel, title, shift=0):
 
 # The footer is the favourite cue: Y FAVOURITE under a game that is not
 # one, Y REMOVE under one that is. Nothing in the list itself says so.
-def games_footer(fav):
+# Its right end carries the position, "9 of 204", where the MOVE hint
+# used to be: the d-pad needs no hint, and the row the count had, with
+# the blanks around it, goes to the list - 14 games on screen, not 10.
+def games_footer(fav, pos, total):
     return row(" A LAUNCH   B BACK   Y " + ("REMOVE" if fav else "FAVOURITE"),
-               "\u2191\u2193 MOVE ")
-SNES = [("Donkey Kong Country 2 - Diddy's Kong Quest (USA) (En,Fr)", False),
+               "%d of %d " % (pos, total))
+SNES = [("Chrono Trigger (USA)", False),
+        ("Donkey Kong Country 2 - Diddy's Kong Quest (USA) (En,Fr)", False),
+        ("EarthBound (USA)", False),
         ("Final Fantasy III (USA) (Rev 1)", True),
+        ("Kirby Super Star (USA)", False),
         ("Legend of Zelda, The - A Link to the Past (USA)", True),
         ("Mega Man X (USA) (Rev 1)", False),
         ("Secret of Mana (USA)", False),
+        ("Star Fox (USA)", False),
         ("Super Castlevania IV (USA)", False),
         ("Super Mario World (USA)", True),
         ("Super Metroid (Japan, USA) (En,Ja)", False),
@@ -249,8 +255,8 @@ def games_screen(selected, shift=0):
     lines = [row(" PortareOS  \u203a  Super Nintendo", "204 games "), RULE, ""]
     lines += [game(t == selected, t, shift=shift) for t, _ in SNES]
     n = 1 + [t for t, _ in SNES].index(selected)
-    fav = dict(SNES)[selected]
-    return lines + ["", row("", "%d of 204  " % n), "", THIN, games_footer(fav)]
+    lines += [""] * (ROWS - 2 - len(lines))
+    return lines + [THIN, games_footer(dict(SNES)[selected], n, 204)]
 
 games_long = games_screen("Teenage Mutant Ninja Turtles IV - Turtles in Time (USA)", shift=9)
 games_fav = games_screen("Super Mario World (USA)")
@@ -270,7 +276,7 @@ def across(sel, title, right):
 recent = [row(" PortareOS  \u203a  Recently played", "10 games "), RULE, ""]
 recent += [across(i == 0, t, "%-5s%9s" % (sy, d)) for i, (t, sy, d) in enumerate(RECENT)]
 recent += [""] * (ROWS - 2 - len(recent))
-recent += [THIN, row(" A LAUNCH   B BACK   Y FAVOURITE", "\u2191\u2193 MOVE ")]
+recent += [THIN, games_footer(False, 1, 10)]
 
 # One file, a game path per line, pruned of paths that no longer exist
 # when it is read. Y toggles the selected game wherever a game is listed;
@@ -284,7 +290,7 @@ FAVS = [("Final Fantasy III (USA) (Rev 1)", "SNES"),
 favourites = [row(" PortareOS  \u203a  Favourites", "7 games "), RULE, ""]
 favourites += [across(i == 2, t, sy) for i, (t, sy) in enumerate(FAVS)]
 favourites += [""] * (ROWS - 2 - len(favourites))
-favourites += [THIN, row(" A LAUNCH   B BACK   Y REMOVE", "\u2191\u2193 MOVE ")]
+favourites += [THIN, games_footer(True, 3, 7)]
 
 if __name__ == "__main__":
     for t, s in (("SYSTEMS", systems), ("GAMES", games),
