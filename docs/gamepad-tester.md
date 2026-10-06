@@ -4,38 +4,56 @@ A tool of our own to replace the SDL GamepadTester the image ships today,
 which needs SDL2_gfx and a controller database and looks like nothing else
 on the device. This one is a second binary in this repository, built from
 the launcher's own pieces: `kms.c` for the panel, the evdev reading of
-`input.c`, the 8x16 font. No SDL, no database: it shows the pad as the
-kernel reports it.
+`input.c`, the 8x16 font and the palette. No SDL, no database: it shows the
+pad as the kernel reports it, and it looks like one more launcher screen.
 
 ![Gamepad tester](images/gamepad-tester.png)
 
-The picture is `tools/mockup_gamepad.py`, a program like the other mockups,
-so the layout cannot drift from the dimensions it claims. The palette is
-PORTAMP's: the body blue with a light and a dark bevel, a name plate between
-two rails, a black LCD with a pale rim, green for what is lit and a dark
-green for what is not.
+The picture is `tools/mockup.py`'s `pad_screen`, at the launcher's 53x20
+grid, rendered by `tools/mockup_png.py` with the launcher's font; a program
+like the other mockups, so the layout cannot drift from what it claims.
+
+## The one concession
+
+A menu never needs a diagram; this does. The pad is drawn where its
+controls sit, in the font's own glyphs: arrows for the D-pad, the letters
+or marks for the face buttons, a box for each stick's travel with a dot
+for its position, plain words for the rest. Nothing decorative: no
+enclosure, no bevel, no second palette. A control is drawn with the
+launcher's bright attribute while it is held and the dim one while it is
+not, the values in body text, so whatever palette the launcher has, grey,
+amber, green, the tester has too.
+
+The face buttons follow the button style setting, `launcher.buttons`:
+the Retroid letters, or the PS marks the launcher already approximates out
+of CP437 (`G_CIRCLE`, `G_TRIANGLE`, `G_SQUARE`, a plain `X`).
+
+![PS button style](images/gamepad-tester-ps.png)
 
 ## What it shows
 
-Every control the Nova reports, where it sits on the pad:
+- **L1 / R1**, bright while held.
+- **L2 / R2** with their value, since the Nova's triggers are analog
+  (`ABS_Z`, `ABS_RZ`).
+- The **D-pad** arrows, the pressed one bright.
+- **A B X Y** in the Nova's diamond, A on the right, B at the bottom.
+- Each **stick** as a 9x4 box with a dot that moves with the position, and
+  the normalised `X` and `Y` beneath. The box gives the direction at a
+  glance; the numbers carry the precision, since a cell is coarse. The box
+  goes bright while the stick is clicked (`L3`, `R3`).
+- **SELECT, HOME, START** and the paddles **M1, M2**.
+- **Last**: the last two events as the kernel names them, code and value.
+- In the header, the pad's report rate, which is what a tester of this
+  device most often wants to know (the MCU reports at 200 Hz).
 
-- **L1 / R1** as pills along the top, lit while held.
-- **L2 / R2** as bars that fill with the pull, the value beside them, since
-  the triggers are analog (`ABS_Z`, `ABS_RZ`).
-- **D-pad** as a cross whose pressed arm lights.
-- **A B X Y** in the Nova's diamond: A on the right, B at the bottom.
-- **Both sticks** as a ring for the travel, a dot for the position, and the
-  normalised `X` and `Y` beneath; the ring lights when the stick is clicked
-  (`L3`, `R3`).
-- **SELECT, HOME, START** and the two back paddles **M1, M2** between the
-  sticks.
-- The LCD's bottom line: the last events as the kernel names them, code and
-  value, with the number of input devices read and the report rate of the
-  pad's MCU, which is what a tester of this device most often wants to know.
+## One layer at a time
 
-It reads every evdev device that has gamepad buttons, the MCU's own device
-and the virtual pad InputPlumber presents alike, and lights a control when
-any of them reports it. The header names the first pad found.
+There are two devices to look at: the MCU's own evdev device, and the
+virtual pad InputPlumber presents, which is what games get. Lighting a
+control when either reports it would leave the reader unsure which layer
+is under test, so the tester shows one: the virtual pad by default, the
+MCU's device when started with `--raw`. The footer says which, in a few
+words: `as games see it`, or `MCU, raw`. Tools can list both entries.
 
 ## What it does not do
 

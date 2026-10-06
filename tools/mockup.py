@@ -313,6 +313,65 @@ favourites += [across(i == 2, t, sy) for i, (t, sy) in enumerate(FAVS)]
 favourites += [""] * (ROWS - 2 - len(favourites))
 favourites += [THIN, games_footer(True, 3, 7)]
 
+# ---- proposed: the gamepad tester -----------------------------------------
+#
+# Tools > Test Gamepad, as one more launcher screen rather than a program
+# that looks like something else: the same grid, font and palette, nothing
+# decorative. The one thing a menu never needs and this does is a diagram
+# of the pad, drawn in line glyphs. A control is bright while it is held
+# and dim while it is not, so the tester takes whatever palette the launcher
+# has. The face buttons follow the button style setting: the Retroid letters
+# or the PS marks the launcher already approximates out of CP437.
+#
+# Sample state: A down, D-pad right, R1 held, R2 two thirds in, the right
+# stick up and left. One layer at a time: the virtual pad games see by
+# default, the MCU's raw device when started with --raw; the footer says
+# which, in three words, so nobody wonders what they are looking at.
+def pad_screen(ps=False, raw=False):
+    top, left, right, bottom = ("\u25b2", "\u25a0", "\u25cb", "\u00d7") if ps else ("X", "Y", "A", "B")
+    L = [row(" Gamepad tester", "200 Hz "), RULE]
+    L.append(row("  L1", "R1  "))
+    L.append(row("  L2  0.00", "0.67  R2  "))
+    L.append("")
+    L.append(" " * 10 + "\u2191" + " " * 29 + top)
+    L.append(" " * 7 + "\u2190  \u00b7  \u2192" + " " * 23 + left + "     " + right)
+    L.append(" " * 10 + "\u2193" + " " * 29 + bottom)
+    L.append("")
+    box = ["\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510",
+           "\u2502       \u2502", "\u2502       \u2502", "\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518"]
+    lstick = [box[0], "\u2502   \u00b7   \u2502", box[2], box[3]]
+    rstick = [box[0], "\u2502 \u2022     \u2502", box[2], box[3]]
+    for i in range(4):
+        L.append(" " * 5 + lstick[i] + " " * 24 + rstick[i])
+    L.append(" " * 5 + "X +0.02 Y -0.01" + " " * 18 + "X -0.41 Y -0.83")
+    L.append("")
+    L.append(" " * 12 + "SELECT     HOME     START")
+    L.append(" " * 19 + "M1       M2")
+    L.append(row(" Last   ABS_RY -27210   ABS_Z 21580", ""))
+    L.append(THIN)
+    L.append(row(" HOME + START  BACK", ("MCU, raw " if raw else "as games see it ")))
+    return L
+
+gamepad = pad_screen()
+gamepad_ps = pad_screen(ps=True)
+
+# Which cells are bright (held) and which dim (idle); the rest is text.
+# Rows and columns of pad_screen above; one list serves both variants.
+def pad_spans(ps=False):
+    bright, dim = [], []
+    dim += [(2, 2, 4)]                      # L1
+    bright += [(2, 49, 51)]                 # R1
+    dim += [(3, 2, 4), (3, 6, 10)]          # L2 and its 0.00
+    bright += [(3, 43, 47), (3, 49, 51)]    # 0.67 and R2
+    dim += [(5, 10, 11), (6, 7, 8), (7, 10, 11)]   # up, left, down
+    bright += [(6, 13, 14)]                 # right
+    dim += [(5, 40, 41), (6, 37, 38), (7, 40, 41)]   # top, left, bottom face
+    bright += [(6, 43, 44)]                 # A, or the circle
+    dim += [(r, 5, 14) for r in range(9, 13)] + [(r, 38, 47) for r in range(9, 13)]
+    bright += [(10, 9, 10), (10, 40, 41)]   # the two dots
+    dim += [(15, 12, 18), (15, 23, 27), (15, 32, 37), (16, 19, 21), (16, 28, 30)]
+    return bright, dim
+
 if __name__ == "__main__":
     for t, s in (("SYSTEMS", systems), ("GAMES", games),
                  ("SETTINGS", settings), ("SETTINGS - CONSOLES", consoles),
@@ -327,6 +386,8 @@ if __name__ == "__main__":
                  ("PROPOSED - GAMES, LONG TITLES", games_long),
                  ("PROPOSED - GAMES, A FAVOURITE SELECTED", games_fav),
                  ("PROPOSED - RECENTLY PLAYED", recent),
-                 ("PROPOSED - FAVOURITES", favourites)):
+                 ("PROPOSED - FAVOURITES", favourites),
+                 ("PROPOSED - GAMEPAD TESTER", gamepad),
+                 ("PROPOSED - GAMEPAD TESTER, PS BUTTON STYLE", gamepad_ps)):
         print(screen(t, s))
         print()

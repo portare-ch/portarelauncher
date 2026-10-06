@@ -17,8 +17,9 @@ COLS, ROWS = mockup.COLS, mockup.ROWS
 OX, OY = (W - COLS * 8 * SCALE) // 2, (H - ROWS * 16 * SCALE) // 2
 # color.c, "amber": background, dim, mid, text, bright
 BG, DIM, MID, TEXT, BRIGHT = (0, 0, 0), (0x66, 0x3d, 0), (0xb3, 0x74, 0), (0xff, 0xb0, 0), (0xff, 0xd9, 0x8a)
-CP437 = {"═": 0xCD, "─": 0xC4, "▸": 0x10, "↑": 0x18, "↓": 0x19,
-         "♥": 0x03, "›": 0x3E, "…": 0x2E}
+CP437 = {"═": 0xCD, "─": 0xC4, "▸": 0x10, "↑": 0x18, "↓": 0x19, "←": 0x1B, "→": 0x1A,
+         "♥": 0x03, "›": 0x3E, "…": 0x2E, "┌": 0xDA, "┐": 0xBF, "└": 0xC0, "┘": 0xD9,
+         "│": 0xB3, "·": 0xFA, "•": 0x07, "▲": 0x1E, "■": 0xFE, "○": 0x09, "×": 0x58}
 
 def font():
     src = open(os.path.join(os.path.dirname(__file__), "..", "src", "font8x16.h")).read()
@@ -35,8 +36,18 @@ def png(path, px):
         f.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", W, H, 8, 2, 0, 0, 0))
                 + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
 
-def render(lines, path, glyphs):
+def render(lines, path, glyphs, spans=None):
+    """spans: ([(row, c0, c1)] bright, [(row, c0, c1)] dim): cells coloured
+    by state rather than by their row, for the pad diagram."""
     px = bytearray(W * H * 3)
+    forced = {}
+    if spans:
+        for r, c0, c1 in spans[1]:
+            for c in range(c0, c1 + 1):
+                forced[(r, c)] = DIM
+        for r, c0, c1 in spans[0]:
+            for c in range(c0, c1 + 1):
+                forced[(r, c)] = BRIGHT
     def put(col, row, ch, color):
         g = CP437.get(ch, ord(ch) if ord(ch) < 128 else 0x3F)
         x0, y0 = OX + col * 8 * SCALE, OY + row * 16 * SCALE
@@ -55,6 +66,7 @@ def render(lines, path, glyphs):
             if ch == " ":
                 continue
             color = MID if rule else BRIGHT if selected else TEXT
+            color = forced.get((r, c), color)
             put(c, r, ch, color)
     png(path, px)
     print("wrote", os.path.relpath(path))
@@ -69,3 +81,5 @@ if __name__ == "__main__":
                         ("recently-played", mockup.recent),
                         ("favourites", mockup.favourites)):
         render(lines, os.path.join(out, name + ".png"), glyphs)
+    render(mockup.gamepad, os.path.join(out, "gamepad-tester.png"), glyphs, mockup.pad_spans())
+    render(mockup.gamepad_ps, os.path.join(out, "gamepad-tester-ps.png"), glyphs, mockup.pad_spans(True))
