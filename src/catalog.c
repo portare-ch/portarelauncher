@@ -1,6 +1,7 @@
 #include "catalog.h"
 #include "settings.h"
 #include "sheets.h"
+#include "text.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -10,17 +11,6 @@
 #include <strings.h>
 #include <sys/stat.h>
 
-/* Truncating is deliberate everywhere this is used: a name longer than its
- * field is clipped rather than rejected. */
-static void copy_str(char *dst, size_t dsz, const char *src)
-{
-	size_t n = strlen(src);
-	if (n >= dsz)
-		n = dsz - 1;
-	memcpy(dst, src, n);
-	dst[n] = '\0';
-}
-
 static void copy_trim(char *dst, size_t dsz, const char *src, size_t n)
 {
 	while (n && isspace((unsigned char)*src)) { src++; n--; }
@@ -29,33 +19,6 @@ static void copy_trim(char *dst, size_t dsz, const char *src, size_t n)
 		n = dsz - 1;
 	memcpy(dst, src, n);
 	dst[n] = '\0';
-}
-
-/* The five entities an XML generator will emit. Decoded in place. */
-static void unescape(char *s)
-{
-	static const struct { const char *ent; char ch; } map[] = {
-		{ "&amp;", '&' }, { "&lt;", '<' }, { "&gt;", '>' },
-		{ "&apos;", '\'' }, { "&quot;", '"' },
-	};
-	char *r = s, *w = s;
-	while (*r) {
-		if (*r == '&') {
-			size_t i;
-			for (i = 0; i < sizeof(map) / sizeof(map[0]); i++) {
-				size_t l = strlen(map[i].ent);
-				if (strncmp(r, map[i].ent, l) == 0) {
-					*w++ = map[i].ch;
-					r += l;
-					break;
-				}
-			}
-			if (i < sizeof(map) / sizeof(map[0]))
-				continue;
-		}
-		*w++ = *r++;
-	}
-	*w = '\0';
 }
 
 /* Pulls <tag>value</tag> out of one line, and <tag attr="x">value</tag> too.
@@ -84,7 +47,7 @@ static int tag_value(const char *line, const char *tag, char *out, size_t osz)
 	if (!b)
 		return 0;
 	copy_trim(out, osz, a, (size_t)(b - a));
-	unescape(out);
+	xml_unescape(out);
 	return 1;
 }
 
@@ -148,9 +111,9 @@ static void add_folder(struct psystem *s, const char *full, const char *name)
 	s->games = g;
 	g = &s->games[s->ngames];
 
-	copy_str(g->path, sizeof(g->path), full);
+	str_copy(g->path, sizeof(g->path), full);
 	/* One short, to leave room for the slash that says it is a folder. */
-	copy_str(g->name, sizeof(g->name) - 1, name);
+	str_copy(g->name, sizeof(g->name) - 1, name);
 	size_t n = strlen(g->name);
 	g->name[n] = '/';
 	g->name[n + 1] = '\0';
@@ -167,7 +130,7 @@ static void add_game(struct psystem *s, const char *path, const char *file)
 	g = &s->games[s->ngames];
 
 	snprintf(g->path, sizeof(g->path), "%s/%s", path, file);
-	copy_str(g->name, sizeof(g->name), file);
+	str_copy(g->name, sizeof(g->name), file);
 	g->folder = 0;
 	char *dot = strrchr(g->name, '.');
 	if (dot)
@@ -314,10 +277,10 @@ int catalog_load(struct catalog *c, const char *es_systems, const char *settings
 				char key[96], v[64];
 				snprintf(key, sizeof(key), "%s.core", cur.name);
 				if (settings_get(settings, key, v, sizeof(v)))
-					copy_str(cur.core, sizeof(cur.core), v);
+					str_copy(cur.core, sizeof(cur.core), v);
 				snprintf(key, sizeof(key), "%s.emulator", cur.name);
 				if (settings_get(settings, key, v, sizeof(v)))
-					copy_str(cur.emulator, sizeof(cur.emulator), v);
+					str_copy(cur.emulator, sizeof(cur.emulator), v);
 			}
 
 			scan(&cur, cur.path, 1);
@@ -340,13 +303,13 @@ int catalog_load(struct catalog *c, const char *es_systems, const char *settings
 
 		char v[512];
 		if (tag_value(line, "name", v, sizeof(v)) && !cur.name[0])
-			copy_str(cur.name, sizeof(cur.name), v);
+			str_copy(cur.name, sizeof(cur.name), v);
 		else if (tag_value(line, "fullname", v, sizeof(v)))
-			copy_str(cur.fullname, sizeof(cur.fullname), v);
+			str_copy(cur.fullname, sizeof(cur.fullname), v);
 		else if (tag_value(line, "path", v, sizeof(v)))
-			copy_str(cur.path, sizeof(cur.path), v);
+			str_copy(cur.path, sizeof(cur.path), v);
 		else if (tag_value(line, "extension", v, sizeof(v)))
-			copy_str(cur.exts, sizeof(cur.exts), v);
+			str_copy(cur.exts, sizeof(cur.exts), v);
 		else if (tag_value(line, "command", v, sizeof(v))) {
 			/* Only the binary is taken. The arguments are built as an
 			 * argv rather than by substituting into a shell string, so
@@ -354,10 +317,10 @@ int catalog_load(struct catalog *c, const char *es_systems, const char *settings
 			char *sp = strchr(v, ' ');
 			if (sp)
 				*sp = '\0';
-			copy_str(cur.launcher, sizeof(cur.launcher), v);
+			str_copy(cur.launcher, sizeof(cur.launcher), v);
 		} else if (tag_value(line, "core", v, sizeof(v))) {
 			if (!cur.core[0] && strstr(line, "default=\"true\""))
-				copy_str(cur.core, sizeof(cur.core), v);
+				str_copy(cur.core, sizeof(cur.core), v);
 		} else {
 			const char *a = strstr(line, "<emulator name=\"");
 			if (a && !cur.emulator[0]) {

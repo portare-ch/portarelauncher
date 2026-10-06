@@ -59,7 +59,7 @@ games += [""] * (ROWS - 2 - len(games))
 games += [THIN, row(" A LAUNCH   B BACK", "8 / 112 ")]
 
 SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
-       ("USB gadget mode", "network"), ("Button style", "Retroid"),
+       ("USB mode", "network"), ("Button style", "Retroid"),
        ("Consoles", "2 changed"),
        ("Color", "grey"), ("Color profile", "stock"), ("Charging LED", "on"),
        ("Time zone", "Europe/Zurich"), ("About", "v0.2.6 2026-09-26"),
@@ -84,8 +84,8 @@ def consoles_screen(sel):
     lines = [row(" Settings  \u203a  Consoles", ""), RULE, ""]
     lines += [item(i == sel, n, v) for i, (n, v) in enumerate(CONSOLES)]
     lines += [THIN, "    Experimental."]
-    lines += ["    PRMPT: Enables or disables 1 pre-emptive frame",
-              "    for lower input latency."]
+    lines += ["    PRMPT adds a pre-emptive frame to reduce",
+              "    input lag."]
     lines += [""] * (ROWS - 2 - len(lines))
     lines += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
     return lines
@@ -98,7 +98,7 @@ BT = [("WH-1000XM4", "connected"), ("DualSense Edge", "paired"),
       ("Bose QC35", "paired"), ("JBL Flip 5", "new")]
 bluetooth = [row(" Settings  \u203a  Bluetooth", ""), RULE, "",
              item(False, "Bluetooth", "on"),
-             item(False, "Auto-connect known devices", "yes"),
+             item(False, "Auto-connect paired devices", "yes"),
              THIN,
              row("  DEVICES", "4 found  ")]
 bluetooth += [item(i == 0, n, v) for i, (n, v) in enumerate(BT)]
@@ -166,7 +166,7 @@ RETROID_HINTS = " A TYPE  B DELETE  X SPACE  L1 SHIFT  START JOIN"
 PS_HINTS      = " X TYPE  ○ DELETE  ▲ SPACE  L1 SHIFT  START JOIN"
 
 def kb_screen(ssid, text, layer, sel=None, bottom_sel=None, hidden=False,
-              note="SELECT shows or hides the password", labels=None,
+              note="SELECT: show or hide password", labels=None,
               hints=RETROID_HINTS):
     n = len(text)
     count = f"{n} / 63" if n >= 8 else f"{n} / 63  at least 8"
@@ -191,7 +191,7 @@ kb_syms  = kb_screen("FRITZ!Box 7520 JI", "hunter2Hunter!", SYMS, bottom_sel="DO
 # A failed join keeps the keyboard up with the text intact - the likeliest
 # fix is one wrong character - and says why on the line under the keys.
 joining = kb_screen("FRITZ!Box 7520 JI", "hunter2Hunter!", LOWER, sel=(1, 2),
-                    note="Wrong password, or the network refused it.")
+                    note="Password rejected. Check and retry.")
 
 # Tools: whatever scripts are in the modules folder, named and described
 # from its gamelist.xml. The description gets fixed room under the list,
@@ -211,7 +211,7 @@ tools += [THIN, " B RUN   A BACK"]
 launching = [header("PortareOS"), RULE] + [""] * 4
 launching += ["           Tekken 3 (USA)", "",
               "           swanstation", "",
-              "           handing over the display\u2026"]
+              "           Starting..."]
 launching += [""] * 7
 
 # ---- proposed: quick access, recent, favourites, long titles -----------
