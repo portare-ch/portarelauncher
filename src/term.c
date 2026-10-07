@@ -1,6 +1,7 @@
 #include "term.h"
 #include "font8x16.h"
 #include "glyph.h"
+#include "ja26.h"
 #include "pix.h"
 
 #include <stdlib.h>
@@ -190,6 +191,49 @@ static int is_mark(uint16_t g)
 	return g >= G_MARK_CROSS && g <= G_MARK_CIRCLE;
 }
 
+static uint32_t mix(uint32_t bg, uint32_t fg, unsigned a)   /* a: 0..255 */
+{
+	uint32_t out = 0;
+	for (int sh = 0; sh <= 16; sh += 8) {
+		int b = (int)(bg >> sh & 0xFF), f = (int)(fg >> sh & 0xFF);
+		out |= (uint32_t)(b + (f - b) * (int)a / 255) << sh;
+	}
+	return out;
+}
+
+/* A two-cell glyph the PS2's way: 26 x 26 with 16 grey levels, scaled to
+ * the 48 x 48 of two cells with bilinear filtering, the GS's
+ * GS_FILTER_LINEAR, and blended between the cell's colour and black. */
+static void draw_ja26(struct term *t, unsigned px0, unsigned py0,
+                      const unsigned char *g, uint32_t fg, uint32_t bg)
+{
+	enum { OUT = 48 };
+	static int i0[OUT], w1[OUT], ready;
+	if (!ready) {
+		/* The source position of each output pixel's centre, in 1/256. */
+		for (int o = 0; o < OUT; o++) {
+			int f = (2 * o + 1) * JA26_SIZE * 128 / OUT - 128;
+			i0[o] = f >= 0 ? f / 256 : -1;
+			w1[o] = f - i0[o] * 256;
+		}
+		ready = 1;
+	}
+#define L(y, x) ((y) < 0 || (y) >= JA26_SIZE || (x) < 0 || (x) >= JA26_SIZE ? 0 : \
+	((x) & 1 ? g[(y) * 13 + (x) / 2] & 0x0F : g[(y) * 13 + (x) / 2] >> 4))
+	for (int oy = 0; oy < OUT; oy++) {
+		int y = i0[oy], wy = w1[oy];
+		uint32_t *out = t->fb + (size_t)(py0 + (unsigned)oy) * t->pitch_px + px0;
+		for (int ox = 0; ox < OUT; ox++) {
+			int x = i0[ox], wx = w1[ox];
+			int top = L(y, x) * (256 - wx) + L(y, x + 1) * wx;
+			int bot = L(y + 1, x) * (256 - wx) + L(y + 1, x + 1) * wx;
+			int a = top * (256 - wy) + bot * wy;    /* 0 .. 15 * 65536 */
+			*out++ = a ? mix(bg, fg, (unsigned)(a / 3855)) : bg;
+		}
+	}
+#undef L
+}
+
 /* A Unifont glyph from its left cell: 8 or 16 pixels by 16, at scale. */
 static void draw_unifont(struct term *t, unsigned px0, unsigned py0,
                          const struct cell *c, uint32_t fg, uint32_t bg)
@@ -197,6 +241,13 @@ static void draw_unifont(struct term *t, unsigned px0, unsigned py0,
 	int wide;
 	const unsigned char *bits = glyph_bits(c->g, &wide);
 	const unsigned s = t->scale;
+	if (wide && s == 3) {
+		const unsigned char *g = ja26_find(glyph_cp(c->g));
+		if (g) {
+			draw_ja26(t, px0, py0, g, fg, bg);
+			return;
+		}
+	}
 	const unsigned w = wide ? 16 : 8;
 	for (unsigned gy = 0; gy < FONT_H; gy++) {
 		unsigned row = wide ? (unsigned)(bits[gy * 2] << 8 | bits[gy * 2 + 1])

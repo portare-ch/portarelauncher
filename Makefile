@@ -47,7 +47,7 @@ ifeq ($(PL_VERSION),)
 PL_VERSION := dev
 endif
 
-SRC  := src/text.c src/proc.c src/update.c src/osinfo.c src/tz.c src/quit.c src/sheets.c src/color.c src/net.c src/bt.c src/osk.c src/tools.c src/settings.c src/status.c src/notify.c src/term.c src/pix.c src/glyph.c src/unifont.c src/lang.c src/kms.c \
+SRC  := src/text.c src/proc.c src/update.c src/osinfo.c src/tz.c src/quit.c src/sheets.c src/color.c src/net.c src/bt.c src/osk.c src/tools.c src/settings.c src/status.c src/notify.c src/term.c src/pix.c src/glyph.c src/unifont.c src/ja26.c src/lang.c src/kms.c \
         src/input.c src/catalog.c src/lists.c src/main.c
 OBJ  := $(SRC:.c=.o)
 BIN  := portarelauncher
@@ -55,7 +55,7 @@ BIN  := portarelauncher
 # PortScope, the input diagnostics the launcher opens from Settings: the
 # launcher's panel, grid and palette, and its own model of the pad.
 SCOPE_SRC := src/portscope.c src/scope.c src/pix.c src/term.c src/kms.c \
-             src/color.c src/quit.c src/settings.c src/glyph.c src/unifont.c
+             src/color.c src/quit.c src/settings.c src/glyph.c src/unifont.c src/ja26.c
 SCOPE_OBJ := $(SCOPE_SRC:.c=.o)
 SCOPE_BIN := portscope
 
@@ -118,7 +118,7 @@ tests/test_catalog:  src/catalog.c src/settings.c src/sheets.c src/text.c src/gl
 tests/test_tools:    src/tools.c src/text.c
 tests/test_net:      src/net.c src/text.c tests/fake_proc.c
 tests/test_bt:       src/bt.c src/text.c src/settings.c tests/fake_proc.c
-tests/test_osk:      src/osk.c src/term.c src/pix.c src/glyph.c src/unifont.c
+tests/test_osk:      src/osk.c src/term.c src/pix.c src/glyph.c src/unifont.c src/ja26.c
 tests/test_update:   src/update.c src/text.c src/settings.c tests/fake_proc.c
 tests/test_osinfo:   src/osinfo.c src/text.c
 tests/test_tz:       src/tz.c src/text.c src/settings.c tests/fake_proc.c
@@ -128,7 +128,7 @@ tests/test_color:   src/color.c
 tests/test_lists:    src/lists.c src/text.c
 tests/test_scope:    src/scope.c
 tests/test_pix:      src/pix.c
-tests/test_term:     src/term.c src/pix.c src/glyph.c src/unifont.c
+tests/test_term:     src/term.c src/pix.c src/glyph.c src/unifont.c src/ja26.c
 tests/test_glyph:    src/glyph.c src/unifont.c
 tests/test_lang:     src/lang.c src/glyph.c src/unifont.c
 

@@ -190,6 +190,12 @@ const unsigned char *glyph_bits(uint16_t code, int *wide)
 	return uni_bits[i];
 }
 
+uint32_t glyph_cp(uint16_t code)
+{
+	unsigned i = (unsigned)code - GLYPH_UNI;
+	return code >= GLYPH_UNI && i < UNI_N ? uni_key[i] & ~UNI_WIDE : 0;
+}
+
 int text_width(const char *s)
 {
 	int w = 0;

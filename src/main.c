@@ -9,6 +9,7 @@
 #include "color.h"
 #include "input.h"
 #include "glyph.h"
+#include "ja26.h"
 #include "kms.h"
 #include "lang.h"
 #include "net.h"
@@ -42,6 +43,9 @@
 #define PORTSCOPE   "/usr/bin/portscope"   /* a test build points elsewhere */
 #endif
 #define SETTINGS    "/storage/.config/system/configs/system.cfg"
+#ifndef JA26_PATH
+#define JA26_PATH   "/usr/share/portarelauncher/ja26.bin"
+#endif
 
 /* The panel's color profile. "stock" leaves the display controller's color
  * blocks off; the others load a measured correction shipped with the image,
@@ -2615,6 +2619,10 @@ int main(void)
 	char lang[16] = "";
 	settings_get(SETTINGS, LANG_KEY, lang, sizeof(lang));
 	lang_set(lang_parse(lang));
+	/* The kana and kanji the PS2's way; Unifont's when the file is not
+	 * there. */
+	if (ja26_load(JA26_PATH) < 0)
+		fprintf(stderr, "ja26: no %s, Unifont's glyphs it is\n", JA26_PATH);
 	/* Read what is cheap now and leave the scan until the Wi-Fi screen is
 	 * opened: a rescan takes seconds and nothing on the first screen shows
 	 * it. */

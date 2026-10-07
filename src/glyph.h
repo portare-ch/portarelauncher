@@ -39,6 +39,9 @@ struct glyph glyph_of(uint32_t cp);
  * when it is not; *wide says which. */
 const unsigned char *glyph_bits(uint16_t code, int *wide);
 
+/* The code point a Unifont glyph code stands for; 0 for a VGA one. */
+uint32_t glyph_cp(uint16_t code);
+
 /* Columns s takes. */
 int text_width(const char *s);
 
