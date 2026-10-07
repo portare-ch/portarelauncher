@@ -229,11 +229,13 @@ static long long midnight(long long t)
 	return (long long)mktime(&tm);
 }
 
-void day_label(long long when, long long now, char *out, size_t osz)
+void day_label(long long when, long long now, int ja, char *out, size_t osz)
 {
 	static const char *const days[7] = {
 		"SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY",
 		"FRIDAY", "SATURDAY" };
+	static const char *const days_ja[7] = {
+		"日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日" };
 	static const char *const months[12] = {
 		"JAN", "FEB", "MAR", "APR", "MAY", "JUN",
 		"JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
@@ -247,17 +249,29 @@ void day_label(long long when, long long now, char *out, size_t osz)
 	localtime_r(&tt, &tm);
 
 	if (ago <= 0)
-		snprintf(out, osz, "TODAY");
+		snprintf(out, osz, "%s", ja ? "今日" : "TODAY");
 	else if (ago == 1)
-		snprintf(out, osz, "YESTERDAY");
+		snprintf(out, osz, "%s", ja ? "昨日" : "YESTERDAY");
 	else if (ago < 7)
-		snprintf(out, osz, "%s", days[tm.tm_wday]);
+		snprintf(out, osz, "%s", ja ? days_ja[tm.tm_wday] : days[tm.tm_wday]);
+	else if (ja)
+		snprintf(out, osz, "%d月%d日", tm.tm_mon + 1, tm.tm_mday);
 	else
 		snprintf(out, osz, "%d %s", tm.tm_mday, months[tm.tm_mon]);
 }
 
-void short_system(const char *name, char *out, size_t osz)
+void short_system(const char *name, int ja, char *out, size_t osz)
 {
+	static const struct { const char *name, *label; } table_ja[] = {
+		{ "snes", "SFC" }, { "snesh", "SFC" }, { "snesmsu1", "SFC" },
+		{ "satellaview", "SFC" }, { "nes", "FC" }, { "psx", "PS" },
+	};
+	for (size_t i = 0; ja && i < sizeof(table_ja) / sizeof(table_ja[0]); i++) {
+		if (strcmp(table_ja[i].name, name) == 0) {
+			snprintf(out, osz, "%s", table_ja[i].label);
+			return;
+		}
+	}
 	static const struct { const char *name, *label; } table[] = {
 		{ "snes", "SNES" }, { "snesh", "SNES" }, { "snesmsu1", "SNES" },
 		{ "sfc", "SFC" }, { "satellaview", "SNES" },

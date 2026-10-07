@@ -115,33 +115,49 @@ static void test_day_label(void)
 	char out[16];
 	/* 2026-10-06 is a Tuesday; noon UTC, with the test's clock in UTC. */
 	long long now = 1791288000LL;
-	day_label(now - 3600, now, out, sizeof(out));
+	day_label(now - 3600, now, 0, out, sizeof(out));
 	CHECK_STR(out, "TODAY");
-	day_label(now - 13 * 3600, now, out, sizeof(out));   /* 23:00 the day before */
+	day_label(now - 13 * 3600, now, 0, out, sizeof(out));   /* 23:00 the day before */
 	CHECK_STR(out, "YESTERDAY");
-	day_label(now - 2 * 86400, now, out, sizeof(out));
+	day_label(now - 2 * 86400, now, 0, out, sizeof(out));
 	CHECK_STR(out, "SUNDAY");
-	day_label(now - 6 * 86400, now, out, sizeof(out));
+	day_label(now - 6 * 86400, now, 0, out, sizeof(out));
 	CHECK_STR(out, "WEDNESDAY");
-	day_label(now - 7 * 86400, now, out, sizeof(out));
+	day_label(now - 7 * 86400, now, 0, out, sizeof(out));
 	CHECK_STR(out, "29 SEP");
-	day_label(now - 40 * 86400, now, out, sizeof(out));
+	day_label(now - 40 * 86400, now, 0, out, sizeof(out));
 	CHECK_STR(out, "27 AUG");
 	/* A clock that went backwards still files the game under today. */
-	day_label(now + 3600, now, out, sizeof(out));
+	day_label(now + 3600, now, 0, out, sizeof(out));
 	CHECK_STR(out, "TODAY");
+
+	/* Japanese: today, yesterday, the weekday, then month and day. */
+	char ja[32];
+	day_label(now - 3600, now, 1, ja, sizeof(ja));
+	CHECK_STR(ja, "\xe4\xbb\x8a\xe6\x97\xa5");                     /* 今日 */
+	day_label(now - 13 * 3600, now, 1, ja, sizeof(ja));
+	CHECK_STR(ja, "\xe6\x98\xa8\xe6\x97\xa5");                     /* 昨日 */
+	day_label(now - 2 * 86400, now, 1, ja, sizeof(ja));
+	CHECK_STR(ja, "\xe6\x97\xa5\xe6\x9b\x9c\xe6\x97\xa5");         /* 日曜日 */
+	day_label(now - 7 * 86400, now, 1, ja, sizeof(ja));
+	CHECK_STR(ja, "9\xe6\x9c\x88" "29\xe6\x97\xa5");                   /* 9月29日 */
 }
 
 static void test_short_system(void)
 {
 	char out[8];
-	short_system("snes", out, sizeof(out));      CHECK_STR(out, "SNES");
-	short_system("psx", out, sizeof(out));       CHECK_STR(out, "PS1");
-	short_system("gamecube", out, sizeof(out));  CHECK_STR(out, "GC");
-	short_system("dreamcast", out, sizeof(out)); CHECK_STR(out, "DC");
-	short_system("snesmsu1", out, sizeof(out));  CHECK_STR(out, "SNES");
-	short_system("wonderswan", out, sizeof(out)); CHECK_STR(out, "WOND");
-	short_system("c64", out, sizeof(out));       CHECK_STR(out, "C64");
+	short_system("snes", 0, out, sizeof(out));      CHECK_STR(out, "SNES");
+	short_system("psx", 0, out, sizeof(out));       CHECK_STR(out, "PS1");
+	short_system("gamecube", 0, out, sizeof(out));  CHECK_STR(out, "GC");
+	short_system("dreamcast", 0, out, sizeof(out)); CHECK_STR(out, "DC");
+	short_system("snesmsu1", 0, out, sizeof(out));  CHECK_STR(out, "SNES");
+	short_system("wonderswan", 0, out, sizeof(out)); CHECK_STR(out, "WOND");
+	short_system("c64", 0, out, sizeof(out));       CHECK_STR(out, "C64");
+	/* The names used in Japan where they differ, the rest the same. */
+	short_system("snes", 1, out, sizeof(out));      CHECK_STR(out, "SFC");
+	short_system("nes", 1, out, sizeof(out));       CHECK_STR(out, "FC");
+	short_system("psx", 1, out, sizeof(out));       CHECK_STR(out, "PS");
+	short_system("gamecube", 1, out, sizeof(out));  CHECK_STR(out, "GC");
 }
 
 int main(void)

@@ -336,6 +336,49 @@ static void test_empty(void)
 	catalog_free(&c);
 }
 
+/* A file copied from a Mac is named decomposed: e and U+0301. Composed on
+ * load, it reads and sorts with its precomposed neighbours. Uncomposed,
+ * "Poke\xcc\x81mon Gold" would sort before "Pok\xc3\xa9mon Blue". */
+static void test_composed(void)
+{
+	char r[32], p[160], es[128];
+	snprintf(r, sizeof(r), "%s", fixture_dir());
+	snprintf(p, sizeof(p), "%s/roms", r);
+	fixture_mkdir(p);
+	snprintf(p, sizeof(p), "%s/roms/gbc", r);
+	fixture_mkdir(p);
+	const char *files[] = { "Pokemon Zebra.gbc", "Pok\xc3\xa9mon Blue.gbc",
+	                        "Poke\xcc\x81mon Gold.gbc" };
+	for (int i = 0; i < 3; i++) {
+		snprintf(p, sizeof(p), "%s/roms/gbc/%s", r, files[i]);
+		fixture_write(p, "");
+	}
+	snprintf(es, sizeof(es), "%s/es_systems.cfg", r);
+	char xml[512];
+	snprintf(xml, sizeof(xml),
+	         "<systemList>\n<system>\n<name>gbc</name>\n"
+	         "<fullname>Game Boy Color</fullname>\n<path>%s/roms/gbc</path>\n"
+	         "<extension>.gbc</extension>\n<command>x %%ROM%%</command>\n"
+	         "</system>\n</systemList>\n", r);
+	fixture_write(es, xml);
+
+	struct catalog c;
+	snprintf(p, sizeof(p), "%s/system.cfg", r);
+	CHECK_INT(catalog_load(&c, es, p), 0);
+	CHECK_INT(c.n, 1);
+	if (c.n == 1 && c.sys[0].ngames == 3) {
+		CHECK_STR(c.sys[0].games[0].name, "Pokemon Zebra");
+		CHECK_STR(c.sys[0].games[1].name, "Pok\xc3\xa9mon Blue");
+		CHECK_STR(c.sys[0].games[2].name, "Pok\xc3\xa9mon Gold");
+		/* The path is the file's, as it is on disk. */
+		CHECK(strstr(c.sys[0].games[2].path, "Poke\xcc\x81mon Gold.gbc") != NULL);
+	} else {
+		CHECK(0);
+	}
+	catalog_free(&c);
+	fixture_cleanup(r);
+}
+
 int main(void)
 {
 	snprintf(root, sizeof(root), "%s", fixture_dir());
@@ -350,6 +393,7 @@ int main(void)
 	test_empty();
 	test_overrides();
 	test_failures();
+	test_composed();
 
 	fixture_cleanup(root);
 	return check_report("catalog");

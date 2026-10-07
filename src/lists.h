@@ -52,11 +52,13 @@ int  favs_prune(struct favs *f, int (*exists)(const char *path));
 
 /* The heading a launch at `when` sits under, as the clock reads `now`:
  * TODAY, YESTERDAY, the weekday for the six days before that, and the
- * date, "29 SEP", for anything older. Local time, like the clock. */
-void day_label(long long when, long long now, char *out, size_t osz);
+ * date, "29 SEP", for anything older. Local time, like the clock. With
+ * ja, the same in Japanese: 今日, 昨日, 月曜日, 9月29日. */
+void day_label(long long when, long long now, int ja, char *out, size_t osz);
 
 /* What a system is called in a list that mixes them: "snes" is SNES,
- * "psx" is PS1. A name not in the table is upper-cased and cut to four. */
-void short_system(const char *name, char *out, size_t osz);
+ * "psx" is PS1. A name not in the table is upper-cased and cut to four.
+ * With ja, the names used in Japan where they differ: SFC, FC, PS. */
+void short_system(const char *name, int ja, char *out, size_t osz);
 
 #endif

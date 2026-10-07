@@ -8,7 +8,9 @@
 #include "lists.h"
 #include "color.h"
 #include "input.h"
+#include "glyph.h"
 #include "kms.h"
+#include "lang.h"
 #include "net.h"
 #include "notify.h"
 #include "osinfo.h"
@@ -98,7 +100,7 @@ static int console_latency(int i)
 static const char *console_mode_name(int i, int latency)
 {
 	(void)i;
-	return latency ? "PRMPT on" : "PRMPT off";
+	return tr(latency ? S_PRMPT_ON : S_PRMPT_OFF);
 }
 
 static void console_set_latency(int i, int latency)
@@ -133,7 +135,7 @@ enum { QUICK_RECENT = 0, QUICK_FAVS = 1 };
 enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI, SCR_BT,
               SCR_KEYBOARD, SCR_TOOLS, SCR_ABOUT, SCR_UPDATE,
               SCR_TZ, SCR_POWER, SCR_CONSOLES, SCR_RECENT, SCR_FAVS,
-              SCR_DIAG };
+              SCR_DIAG, SCR_REGION };
 
 struct ui {
 	struct term term;
@@ -178,6 +180,7 @@ struct ui {
 	int power_sel;
 	int power_armed;     /* the row pressed once, waiting for a second; -1 */
 	int console_sel;     /* Settings > Consoles                            */
+	int region_sel;      /* Settings > Language & region                   */
 	int going_down;      /* reboot or poweroff accepted, panel off         */
 	int panel_lost;      /* master not yet back after a child; retrying    */
 
@@ -193,7 +196,7 @@ struct ui {
 	/* One line of news for the screen that is up, kept until the next
 	 * press. Drawn by the screen itself, because anything drawn beside
 	 * the screen is gone in the redraw that follows every action. */
-	char note[64];
+	char note[192];
 	char usb[24];
 	char usb_opts[8][24];
 	int n_usb;
@@ -221,25 +224,28 @@ struct ui {
 /* Thirteen rows fill 2..14, straight under the rule, leaving the rule
  * under them, two lines of description, the bottom rule and the hint.
  * That is the last one that fits: a new setting goes in a submenu. */
+/* Language & region holds the language and the time zone, which had a row
+ * of their own, so a language costs no row here. */
 enum { SET_WIFI = 0, SET_SSH, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_CONSOLES,
-       SET_COLOR, SET_PROFILE, SET_CHARGING, SET_TIMEZONE, SET_DIAGNOSTICS,
+       SET_COLOR, SET_PROFILE, SET_CHARGING, SET_REGION, SET_DIAGNOSTICS,
        SET_ABOUT, SET_POWER, N_SETTINGS };
 
-static const char *const settings_labels[N_SETTINGS] = {
-	"Wi-Fi",
-	"SSH",
-	"Bluetooth",
-	"USB mode",
-	"Button style",
-	"Consoles",
-	"Color",
-	"Color profile",
-	"Charging LED",
-	"Time zone",
-	"Diagnostics",
-	"About",
-	"Power",
+static const enum str settings_labels[N_SETTINGS] = {
+	S_SET_WIFI, S_SET_SSH, S_SET_BT, S_SET_USB, S_SET_BUTTONS, S_SET_CONSOLES,
+	S_SET_COLOR, S_SET_PROFILE, S_SET_CHARGING, S_SET_REGION, S_SET_DIAG,
+	S_SET_ABOUT, S_SET_POWER,
 };
+
+/* "Settings  >  Wi-Fi": the path to a screen, from strings of the table. */
+static const char *crumb_of(char *buf, size_t n, const char *a, const char *b,
+                            const char *c)
+{
+	if (c)
+		snprintf(buf, n, "%s  >  %s  >  %s", a, b, c);
+	else
+		snprintf(buf, n, "%s  >  %s", a, b);
+	return buf;
+}
 
 static volatile sig_atomic_t stop_requested;
 static volatile sig_atomic_t blank_requested;   /* -1 off, 1 on, 0 nothing */
@@ -289,12 +295,12 @@ static void draw_frame_right(struct ui *u, const char *crumb, int status)
 	 * it is a step down from the Systems screen, where the state is. */
 	int n = 0;
 	if (status && u->st.volume >= 0)
-		n += snprintf(right + n, sizeof(right) - n, "VOL %d%%  ", u->st.volume);
+		n += snprintf(right + n, sizeof(right) - n, "%s %d%%  ", tr(S_VOL), u->st.volume);
 	if (status && u->st.brightness >= 0)
-		n += snprintf(right + n, sizeof(right) - n, "BRI %d%%  ", u->st.brightness);
+		n += snprintf(right + n, sizeof(right) - n, "%s %d%%  ", tr(S_BRI), u->st.brightness);
 	if (status && u->st.capacity >= 0)
 		n += snprintf(right + n, sizeof(right) - n, "%s %d%%  ",
-		              u->st.charging ? "CHG" : "BAT", u->st.capacity);
+		              tr(u->st.charging ? S_CHG : S_BAT), u->st.capacity);
 	snprintf(right + n, sizeof(right) - n, "%s", u->st.clock);
 	term_puts_right(t, t->cols - 1, 0, right, ATTR_MID);
 
@@ -302,12 +308,10 @@ static void draw_frame_right(struct ui *u, const char *crumb, int status)
 	 * at 100%, which reaches back past "Settings  >  Bluetooth". It is the
 	 * part that changes and has to stay legible, so the crumb yields: cut
 	 * to end two columns short of it. */
-	int room = (int)t->cols - 1 - (int)strlen(right) - 2 - 1;
-	char c[64];
-	if (room > (int)sizeof(c) - 1)
-		room = (int)sizeof(c) - 1;
+	int room = (int)t->cols - 1 - text_width(right) - 2 - 1;
+	char c[192];
 	if (room > 0) {
-		snprintf(c, (size_t)room + 1, "%s", crumb);
+		snprintf(c, sizeof(c), "%.*s", (int)text_fit(crumb, room), crumb);
 		term_puts(t, 1, 0, c, ATTR_TEXT);
 	}
 
@@ -350,22 +354,20 @@ static struct face face_of(int retroid)
 static void row_label(const char *name, int width, int selected, int off,
                       char *buf, size_t bsz)
 {
-	int len = (int)strlen(name);
 	if (width < 4)
 		width = 4;
-	if (len <= width) {
+	if (text_width(name) <= width) {
 		str_copy(buf, bsz, name);
 		return;
 	}
 	if (!selected) {
-		snprintf(buf, bsz, "%.*s...", width - 3, name);
+		snprintf(buf, bsz, "%.*s...", (int)text_fit(name, width - 3), name);
 		return;
 	}
-	if (off > len - width)
-		off = len - width;
-	if (off < 0)
-		off = 0;
-	snprintf(buf, bsz, "%.*s", width, name + off);
+	/* off is in columns, one a tick: the view starts at the character
+	 * the column falls in, so a kanji holds two ticks and leaves whole. */
+	const char *from = text_at_col(name, off);
+	snprintf(buf, bsz, "%.*s", (int)text_fit(from, width), from);
 }
 
 /* ---- the cross-system lists -------------------------------------------- */
@@ -436,6 +438,7 @@ static void name_from_path(const char *path, char *out, size_t osz)
 	char *dot = strrchr(out, '.');
 	if (dot && dot != out)
 		*dot = '\0';
+	text_compose(out);          /* a Mac names files decomposed */
 }
 
 static struct xrow *add_game_row(struct xlist *l, const struct ui *u,
@@ -454,7 +457,7 @@ static struct xrow *add_game_row(struct xlist *l, const struct ui *u,
 		str_copy(x->label, sizeof(x->label), x->game->name);
 	else
 		name_from_path(path, x->label, sizeof(x->label));
-	short_system(x->sysname, x->right, sizeof(x->right));
+	short_system(x->sysname, lang_get() == LANG_JA, x->right, sizeof(x->right));
 	l->ngames++;
 	return x;
 }
@@ -464,11 +467,11 @@ static void build_list(const struct ui *u, enum screen which, struct xlist *l)
 	l->n = l->ngames = 0;
 	if (which == SCR_RECENT) {
 		long long now = (long long)time(NULL);
-		char last[16] = "";
+		char last[32] = "";
 		for (int i = 0; i < u->recent.n; i++) {
 			const struct recent *e = &u->recent.e[i];
-			char day[16];
-			day_label(e->when, now, day, sizeof(day));
+			char day[32];
+			day_label(e->when, now, lang_get() == LANG_JA, day, sizeof(day));
 			if (strcmp(day, last) != 0 && l->n < XROWS_MAX) {
 				struct xrow *h = &l->r[l->n++];
 				memset(h, 0, sizeof(*h));
@@ -538,22 +541,22 @@ static int selected_label(const struct ui *u, const char **name, int *width)
 		if (!x)
 			return 0;
 		*name = x->label;
-		*width = (int)t->cols - 4 - (int)strlen(x->right) - 3;
+		*width = (int)t->cols - 4 - text_width(x->right) - 3;
 		return 1;
 	}
 	return 0;
 }
 
-/* How many columns the selected title is wider than its column; 0 when it
- * fits, which is also "nothing to scroll". */
+/* The column the selected title's scroll stops at, with its end in view;
+ * 0 when it fits, which is also "nothing to scroll". A boundary, so the
+ * last step never leaves half a kanji at the left. */
 static int marquee_overflow(const struct ui *u)
 {
 	const char *name;
 	int width;
 	if (!selected_label(u, &name, &width))
 		return 0;
-	int over = (int)strlen(name) - width;
-	return over > 0 ? over : 0;
+	return text_scroll_end(name, width);
 }
 
 static void marquee_reset(struct ui *u)
@@ -629,20 +632,20 @@ static int sys_index(const struct ui *u)
 static void draw_systems(struct ui *u)
 {
 	struct term *t = &u->term;
-	char buf[64];
+	char buf[192];
 
 	draw_frame(u, "PortareOS");
 
 	/* Quick Access first, a category of its own: the cross-system lists,
 	 * then a thin rule, then the systems under their title. No blank row
 	 * between; on twenty rows a blank is the expensive thing. */
-	term_puts(t, 2, 3, "QUICK ACCESS", ATTR_MID);
+	term_puts(t, 2, 3, tr(S_QUICK), ATTR_MID);
 	snprintf(buf, sizeof(buf), "%d", u->recent.n);
-	draw_row(u, 4, u->sys_sel == QUICK_RECENT, "Recently played", buf);
+	draw_row(u, 4, u->sys_sel == QUICK_RECENT, tr(S_RECENT), buf);
 	snprintf(buf, sizeof(buf), "%d", u->favs.n);
-	draw_row(u, 5, u->sys_sel == QUICK_FAVS, "Favourites", buf);
+	draw_row(u, 5, u->sys_sel == QUICK_FAVS, tr(S_FAVS), buf);
 	term_hline(t, 6, G_HLINE, ATTR_DIM);
-	term_puts(t, 2, 7, "SYSTEMS", ATTR_MID);
+	term_puts(t, 2, 7, tr(S_SYSTEMS), ATTR_MID);
 
 	const unsigned top = 8;
 	int rows = system_rows(u) - QUICK_ROWS;
@@ -654,26 +657,26 @@ static void draw_systems(struct ui *u)
 		int idx = u->sys_top + i;
 		if (idx == u->cat.n) {
 			snprintf(buf, sizeof(buf), "%d", u->tools.n);
-			draw_row(u, top + (unsigned)i, idx == sel, "Tools", buf);
+			draw_row(u, top + (unsigned)i, idx == sel, tr(S_TOOLS), buf);
 			continue;
 		}
 		const struct psystem *s = &u->cat.sys[idx];
 		snprintf(buf, sizeof(buf), "%d", s->ngames);
 		draw_row(u, top + (unsigned)i, idx == sel,
-		         s->fullname[0] ? s->fullname : s->name, buf);
+		         lang_system(s->name, s->fullname), buf);
 	}
 
 	if (u->cat.n == 0) {
 		unsigned y = top + (u->tools.n > 0 ? 2 : 0);
-		term_puts(t, 4, y, "No games found.", ATTR_BRIGHT);
-		term_puts(t, 4, y + 2, "Add games to roms/<system>.", ATTR_MID);
+		term_puts(t, 4, y, tr(S_NO_GAMES), ATTR_BRIGHT);
+		term_puts(t, 4, y + 2, tr(S_ADD_GAMES), ATTR_MID);
 		struct face f = face_of(u->retroid);
-		snprintf(buf, sizeof(buf), "Press %c to refresh.", f.confirm);
+		snprintf(buf, sizeof(buf), tr(S_PRESS_REFRESH), f.confirm);
 		term_puts(t, 4, y + 3, buf, ATTR_MID);
 	}
 
 	struct face f = face_of(u->retroid);
-	snprintf(buf, sizeof(buf), "%c SELECT   %c SETTINGS", f.confirm, f.menu);
+	snprintf(buf, sizeof(buf), tr(S_HINT_SYSTEMS), f.confirm, f.menu);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -683,10 +686,10 @@ static void draw_games_footer(struct ui *u, int fav, const char *right)
 {
 	struct term *t = &u->term;
 	struct face f = face_of(u->retroid);
-	char buf[64];
+	char buf[192];
 
-	snprintf(buf, sizeof(buf), "%c LAUNCH   %c BACK   %c %s",
-	         f.confirm, f.back, f.fav, fav ? "REMOVE" : "FAVOURITE");
+	snprintf(buf, sizeof(buf), tr(S_HINT_GAMES),
+	         f.confirm, f.back, f.fav, tr(fav ? S_REMOVE : S_FAVOURITE));
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 	if (right && *right)
 		term_puts_right(t, t->cols - 2, t->rows - 1, right, ATTR_MID);
@@ -696,10 +699,10 @@ static void draw_games(struct ui *u)
 {
 	struct term *t = &u->term;
 	const struct psystem *s = &u->cat.sys[sys_index(u)];
-	char crumb[96], buf[64];
+	char crumb[192], buf[192];
 
 	snprintf(crumb, sizeof(crumb), "PortareOS  >  %s",
-	         s->fullname[0] ? s->fullname : s->name);
+	         lang_system(s->name, s->fullname));
 	draw_frame_right(u, crumb, 0);
 
 	/* The list starts two rows above LIST_TOP, under the rule, and runs
@@ -729,10 +732,10 @@ static void draw_list(struct ui *u)
 {
 	struct term *t = &u->term;
 	int recent = u->screen == SCR_RECENT;
-	char crumb[64];
+	char crumb[192];
 
 	snprintf(crumb, sizeof(crumb), "PortareOS  >  %s",
-	         recent ? "Recently played" : "Favourites");
+	         tr(recent ? S_RECENT : S_FAVS));
 	draw_frame_right(u, crumb, 0);
 
 	build_list(u, u->screen, &xl);
@@ -753,20 +756,18 @@ static void draw_list(struct ui *u)
 			continue;
 		}
 		int selected = x == cur;
-		int width = (int)t->cols - 4 - (int)strlen(x->right) - 3;
+		int width = (int)t->cols - 4 - text_width(x->right) - 3;
 		char label[192];
 		row_label(x->label, width, selected, u->mq_off, label, sizeof(label));
 		draw_row(u, y, selected, label, x->right);
 	}
 
 	if (xl.ngames == 0) {
-		term_puts(t, 4, top + 1, recent ? "No games played yet."
-		                                : "No favourites yet.", ATTR_BRIGHT);
+		term_puts(t, 4, top + 1, tr(recent ? S_NO_PLAYED : S_NO_FAVS), ATTR_BRIGHT);
 		if (!recent) {
 			struct face f = face_of(u->retroid);
-			char hint[64];
-			snprintf(hint, sizeof(hint), "Press %c on a game to add a favourite.",
-			         f.fav);
+			char hint[192];
+			snprintf(hint, sizeof(hint), tr(S_ADD_FAV), f.fav);
 			term_puts(t, 4, top + 3, hint, ATTR_MID);
 		}
 	}
@@ -791,11 +792,11 @@ static void draw_face(struct ui *u, unsigned y, int retroid)
 #undef FACE_ATTR
 
 	term_putc(t, 20, y,     f.confirm, ATTR_BRIGHT);
-	term_puts(t, 22, y,     "confirm", ATTR_MID);
+	term_puts(t, 22, y,     tr(S_FACE_CONFIRM), ATTR_MID);
 	term_putc(t, 20, y + 1, f.back,    ATTR_TEXT);
-	term_puts(t, 22, y + 1, "back", ATTR_MID);
+	term_puts(t, 22, y + 1, tr(S_FACE_BACK), ATTR_MID);
 	term_putc(t, 20, y + 2, f.menu,    ATTR_TEXT);
-	term_puts(t, 22, y + 2, "settings", ATTR_MID);
+	term_puts(t, 22, y + 2, tr(S_FACE_SETTINGS), ATTR_MID);
 }
 
 static unsigned wrap_puts(struct term *t, unsigned x, unsigned y, unsigned width,
@@ -805,7 +806,7 @@ static void draw_settings(struct ui *u)
 {
 	struct term *t = &u->term;
 
-	draw_frame(u, "Settings");
+	draw_frame(u, tr(S_SETTINGS));
 
 	char val[64];
 	for (int i = 0; i < N_SETTINGS; i++) {
@@ -817,15 +818,16 @@ static void draw_settings(struct ui *u)
 				if (u->nets.e[k].active)
 					ssid = u->nets.e[k].name;
 			/* The list is from the last scan; the address is live. */
-			value = ssid ? ssid : u->addr[0] ? "connected"
-			      : (net_wifi_enabled() ? "disconnected" : "off");
+			value = ssid ? ssid : u->addr[0] ? tr(S_CONNECTED)
+			      : tr(net_wifi_enabled() ? S_DISCONNECTED : S_OFF);
 			break;
 		}
 		case SET_SSH:
-			value = u->ssh_on ? "on" : "off";
+			value = tr(u->ssh_on ? S_ON : S_OFF);
 			break;
 		case SET_USB:
-			snprintf(val, sizeof(val), "%s", u->usb[0] ? u->usb : "unknown");
+			snprintf(val, sizeof(val), "%s",
+			         u->usb[0] ? lang_usb_mode(u->usb) : tr(S_UNKNOWN));
 			value = val;
 			break;
 		case SET_BLUETOOTH: {
@@ -833,54 +835,53 @@ static void draw_settings(struct ui *u)
 			for (int k = 0; k < u->bt.n; k++)
 				if (u->bt.d[k].connected)
 					dev = u->bt.d[k].name;
-			value = dev ? dev : (u->bt_on ? "no devices" : "off");
+			value = dev ? dev : tr(u->bt_on ? S_NO_DEVICES : S_OFF);
 			break;
 		}
 		case SET_BUTTONS:
-			value = u->retroid ? "Retroid" : "Shapes";
+			value = u->retroid ? "Retroid" : tr(S_SHAPES);
 			break;
 		case SET_CONSOLES: {
 			int n = 0;
 			for (int k = 0; k < N_CONSOLES; k++)
 				n += console_latency(k);
 			if (n == 0)
-				value = "defaults";
+				value = tr(S_DEFAULTS);
 			else {
-				snprintf(val, sizeof(val), "%d changed", n);
+				snprintf(val, sizeof(val), tr(S_N_CHANGED), n);
 				value = val;
 			}
 			break;
 		}
 		case SET_COLOR:
-			value = u->pal_name;
+			value = lang_palette(u->pal_name);
 			break;
 		case SET_PROFILE:
-			value = profile_names[u->profile].label;
+			value = u->profile ? profile_names[u->profile].label : tr(S_STOCK);
 			break;
 		case SET_CHARGING:
-			value = u->charging_led ? "on" : "off";
+			value = tr(u->charging_led ? S_ON : S_OFF);
 			break;
 		case SET_POWER:
 			value = "";
 			break;
-		case SET_TIMEZONE:
-			if (settings_get(SETTINGS, TZ_KEY, val, sizeof(val)))
-				value = val;
-			else
-				value = "UTC";
+		case SET_REGION:
+			/* The language, named in itself: what whoever looks
+			 * for this row can read, whichever it is. */
+			value = lang_name(lang_get());
 			break;
 		case SET_ABOUT:
 			if (u->upd_staged)
-				value = "restart to install";
+				value = tr(S_RESTART_TO_INSTALL);
 			else if (u->os.version[0]) {
 				snprintf(val, sizeof(val), "%s %s", u->os.version, u->os.build);
 				value = val;
 			} else
-				value = "unknown";
+				value = tr(S_UNKNOWN);
 			break;
 		}
 		draw_row(u, (unsigned)(2 + i), i == u->set_sel,
-		         settings_labels[i], value);
+		         tr(settings_labels[i]), value);
 	}
 
 	/* The settings leave two rows under the rule before the bottom rule
@@ -896,13 +897,13 @@ static void draw_settings(struct ui *u)
 		break;
 	case SET_CONSOLES:
 		wrap_puts(t, 4, y + 1, t->cols - 8, 2,
-		          "Experimental: reduce input lag per console.", ATTR_DIM);
+		          tr(S_DESC_CONSOLES), ATTR_DIM);
 		break;
 	case SET_WIFI: {
 		char addr[40] = "";
 		net_address(addr, sizeof(addr));
 		if (addr[0]) {
-			snprintf(val, sizeof(val), "address  %s", addr);
+			snprintf(val, sizeof(val), tr(S_ADDRESS_FMT), addr);
 			term_puts(t, 4, y + 1, val, ATTR_MID);
 		}
 		break;
@@ -926,32 +927,32 @@ static void draw_settings(struct ui *u)
 		/* Both corrections crush the dark greys on the device today
 		 * (PortareOS BUGS.md), so stock is the standard for now. */
 		wrap_puts(t, 4, y + 1, t->cols - 8, 2,
-		          "Experimental: may lose detail in dark areas.", ATTR_DIM);
+		          tr(S_DESC_PROFILE), ATTR_DIM);
 		if (!u->profile_ok[1] && !u->profile_ok[2])
-			term_puts(t, 4, y + 1, "No colour profiles installed.", ATTR_MID);
+			term_puts(t, 4, y + 1, tr(S_NO_PROFILES), ATTR_MID);
 		break;
 	case SET_CHARGING:
 		wrap_puts(t, 4, y + 1, t->cols - 8, 2,
-		          "Experimental: yellow thumbsticks when charging.", ATTR_DIM);
+		          tr(S_DESC_CHARGING), ATTR_DIM);
 		break;
 	case SET_BLUETOOTH:
-		term_puts(t, 4, y + 1, "Scan and connect devices.", ATTR_DIM);
+		term_puts(t, 4, y + 1, tr(S_DESC_BT), ATTR_DIM);
 		break;
-	case SET_TIMEZONE:
-		term_puts(t, 4, y + 1, "Choose a region, then a city.", ATTR_DIM);
+	case SET_REGION:
+		term_puts(t, 4, y + 1, tr(S_DESC_REGION), ATTR_DIM);
 		break;
 	case SET_POWER:
-		term_puts(t, 4, y + 1, "Restart or power off.", ATTR_DIM);
+		term_puts(t, 4, y + 1, tr(S_DESC_POWER), ATTR_DIM);
 		break;
 	case SET_ABOUT:
-		term_puts(t, 4, y + 1, "Version, address, updates.", ATTR_DIM);
+		term_puts(t, 4, y + 1, tr(S_DESC_ABOUT), ATTR_DIM);
 		break;
 	case SET_USB: {
 		char addr[40] = "";
 		usb_address(addr, sizeof(addr));
-		term_puts(t, 4, y + 1, "USB networking or file transfer.", ATTR_DIM);
+		term_puts(t, 4, y + 1, tr(S_DESC_USB), ATTR_DIM);
 		if (addr[0] && strcmp(u->usb, "network") == 0) {
-			snprintf(val, sizeof(val), "address  %s", addr);
+			snprintf(val, sizeof(val), tr(S_ADDRESS_FMT), addr);
 			term_puts(t, 4, y + 2, val, ATTR_MID);
 		}
 		break;
@@ -962,8 +963,8 @@ static void draw_settings(struct ui *u)
 
 	{
 		struct face f = face_of(u->retroid);
-		char hint[64];
-		snprintf(hint, sizeof(hint), "%c CHANGE   %c BACK", f.confirm, f.back);
+		char hint[192];
+		snprintf(hint, sizeof(hint), tr(S_HINT_SETTINGS), f.confirm, f.back);
 		term_puts(t, 1, t->rows - 1, hint, ATTR_MID);
 	}
 }
@@ -974,26 +975,47 @@ static void draw_settings(struct ui *u)
 static void draw_consoles(struct ui *u)
 {
 	struct term *t = &u->term;
-	char buf[64];
+	char buf[192];
 
-	draw_frame(u, "Settings  >  Consoles");
+	draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SETTINGS), tr(S_SET_CONSOLES), NULL));
 	for (int i = 0; i < N_CONSOLES; i++)
-		draw_row(u, (unsigned)(3 + i), i == u->console_sel, consoles[i].label,
+		draw_row(u, (unsigned)(3 + i), i == u->console_sel,
+		         lang_system(consoles[i].key, consoles[i].label),
 		         console_mode_name(i, console_latency(i)));
 
 	unsigned y = 3 + N_CONSOLES;
 	term_hline(t, y, G_HLINE, ATTR_DIM);
 	/* The rows between the rule and the bottom rule, and no more. */
 	unsigned width = t->cols - 8, room = t->rows - 2 - (y + 1);
-	unsigned r = wrap_puts(t, 4, y + 1, width, room, "Experimental.", ATTR_DIM);
-	wrap_puts(t, 4, y + 1 + r, width, room - r,
-	          "PRMPT adds a pre-emptive frame to reduce input lag.", ATTR_DIM);
+	unsigned r = wrap_puts(t, 4, y + 1, width, room, tr(S_EXPERIMENTAL), ATTR_DIM);
+	wrap_puts(t, 4, y + 1 + r, width, room - r, tr(S_PRMPT_DESC), ATTR_DIM);
 
 	if (u->note[0])
 		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
 
 	struct face f = face_of(u->retroid);
-	snprintf(buf, sizeof(buf), "%c CHANGE   %c BACK", f.confirm, f.back);
+	snprintf(buf, sizeof(buf), tr(S_HINT_CHANGE), f.confirm, f.back);
+	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
+}
+
+/* Settings > Language & region: the language and the time zone. The
+ * language row names itself in both languages, the one place that does:
+ * whoever switched by mistake has to find the way back without reading
+ * the language they switched to. Its values are each language named in
+ * itself. A, left or right switches, and everything redraws at once. */
+static void draw_region(struct ui *u)
+{
+	struct term *t = &u->term;
+	char buf[192], zone[48];
+
+	draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SETTINGS), tr(S_SET_REGION), NULL));
+	draw_row(u, 3, u->region_sel == 0, tr(S_LANGUAGE_ROW), lang_name(lang_get()));
+	if (!settings_get(SETTINGS, TZ_KEY, zone, sizeof(zone)))
+		str_copy(zone, sizeof(zone), "UTC");
+	draw_row(u, 4, u->region_sel == 1, tr(S_TIMEZONE), zone);
+
+	struct face f = face_of(u->retroid);
+	snprintf(buf, sizeof(buf), tr(S_HINT_CHANGE), f.confirm, f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -1003,13 +1025,13 @@ static void draw_consoles(struct ui *u)
 static void draw_diag(struct ui *u)
 {
 	struct term *t = &u->term;
-	char buf[64];
+	char buf[192];
 
-	draw_frame(u, "Settings  >  Diagnostics");
+	draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SETTINGS), tr(S_SET_DIAG), NULL));
 	draw_row(u, 3, 1, "PortScope", NULL);
 
 	struct face f = face_of(u->retroid);
-	snprintf(buf, sizeof(buf), "%c OPEN   %c BACK", f.confirm, f.back);
+	snprintf(buf, sizeof(buf), tr(S_HINT_OPEN), f.confirm, f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -1019,20 +1041,20 @@ static void draw_diag(struct ui *u)
 static void draw_wifi(struct ui *u)
 {
 	struct term *t = &u->term;
-	char buf[64];
+	char buf[192];
 
-	draw_frame(u, "Settings  >  Wi-Fi");
+	draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SETTINGS), tr(S_SET_WIFI), NULL));
 
 	/* The switch first. An official image boots with Wi-Fi off, and until
 	 * this row there was no way to turn it on from the device - no network
 	 * to join, and no update. */
-	draw_row(u, 3, u->wifi_sel == 0, "Wi-Fi", u->wifi_on ? "on" : "off");
+	draw_row(u, 3, u->wifi_sel == 0, "Wi-Fi", tr(u->wifi_on ? S_ON : S_OFF));
 
 	if (!u->wifi_on) {
-		term_puts(t, 4, LIST_TOP + 1, "Turn on Wi-Fi to find networks.", ATTR_DIM);
+		term_puts(t, 4, LIST_TOP + 1, tr(S_WIFI_TURN_ON), ATTR_DIM);
 	} else {
-		term_puts(t, 2, LIST_TOP - 1, "NETWORKS", ATTR_MID);
-		snprintf(buf, sizeof(buf), "%d found", u->nets.n);
+		term_puts(t, 2, LIST_TOP - 1, tr(S_NETWORKS), ATTR_MID);
+		snprintf(buf, sizeof(buf), tr(S_N_FOUND), u->nets.n);
 		term_puts_right(t, t->cols - 2, LIST_TOP - 1, buf, ATTR_MID);
 	}
 
@@ -1043,9 +1065,9 @@ static void draw_wifi(struct ui *u)
 	for (int i = 0; u->wifi_on && i < visible && u->wifi_top + i < u->nets.n; i++) {
 		const struct net_entry *e = &u->nets.e[u->wifi_top + i];
 		if (e->active)
-			snprintf(buf, sizeof(buf), "connected");
+			snprintf(buf, sizeof(buf), "%s", tr(S_CONNECTED));
 		else if (e->saved)
-			snprintf(buf, sizeof(buf), "saved");
+			snprintf(buf, sizeof(buf), "%s", tr(S_SAVED));
 		else if (e->signal >= 0)
 			snprintf(buf, sizeof(buf), "%d%%", e->signal);
 		else
@@ -1059,10 +1081,9 @@ static void draw_wifi(struct ui *u)
 
 	struct face f = face_of(u->retroid);
 	if (u->wifi_sel == 0)
-		snprintf(buf, sizeof(buf), "%c SWITCH   %c BACK", f.confirm, f.back);
+		snprintf(buf, sizeof(buf), tr(S_HINT_WIFI_SWITCH), f.confirm, f.back);
 	else
-		snprintf(buf, sizeof(buf), "%c CONNECT   %c BACK   %c RESCAN",
-		         f.confirm, f.back, f.menu);
+		snprintf(buf, sizeof(buf), tr(S_HINT_WIFI), f.confirm, f.back, f.menu);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -1083,17 +1104,16 @@ static int bt_rows(const struct ui *u)
 static void draw_bt(struct ui *u)
 {
 	struct term *t = &u->term;
-	char buf[64];
+	char buf[192];
 
-	draw_frame(u, "Settings  >  Bluetooth");
+	draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SETTINGS), tr(S_SET_BT), NULL));
 
-	draw_row(u, 3, u->bt_sel == 0, "Bluetooth", u->bt_on ? "on" : "off");
-	draw_row(u, 4, u->bt_sel == 1, "Auto-connect paired devices",
-	         u->bt_auto ? "yes" : "no");
+	draw_row(u, 3, u->bt_sel == 0, "Bluetooth", tr(u->bt_on ? S_ON : S_OFF));
+	draw_row(u, 4, u->bt_sel == 1, tr(S_AUTOCONNECT), tr(u->bt_auto ? S_YES : S_NO));
 	term_hline(t, 5, G_HLINE, ATTR_DIM);
 
-	term_puts(t, 2, 6, "DEVICES", ATTR_MID);
-	snprintf(buf, sizeof(buf), "%d found", u->bt.n);
+	term_puts(t, 2, 6, tr(S_DEVICES), ATTR_MID);
+	snprintf(buf, sizeof(buf), tr(S_N_FOUND), u->bt.n);
 	term_puts_right(t, t->cols - 2, 6, buf, ATTR_MID);
 
 	int visible = bt_rows(u);
@@ -1102,50 +1122,52 @@ static void draw_bt(struct ui *u)
 
 	if (u->bt.n == 0)
 		term_puts(t, 4, BT_LIST_TOP,
-		          u->bt_on ? "No devices found. Scan to find devices."
-		                   : "Bluetooth is off.", ATTR_DIM);
+		          tr(u->bt_on ? S_BT_NONE : S_BT_OFF), ATTR_DIM);
 
 	for (int i = 0; i < visible && u->bt_top + i < u->bt.n; i++) {
 		const struct bt_device *d = &u->bt.d[u->bt_top + i];
 		if (d->connected)
-			snprintf(buf, sizeof(buf), "connected");
+			snprintf(buf, sizeof(buf), "%s", tr(S_CONNECTED));
 		else if (d->paired)
-			snprintf(buf, sizeof(buf), "%s",
-			         d->trusted ? "paired" : "not trusted");
+			snprintf(buf, sizeof(buf), "%s", tr(d->trusted ? S_PAIRED : S_NOT_TRUSTED));
 		else
-			snprintf(buf, sizeof(buf), "new");
+			snprintf(buf, sizeof(buf), "%s", tr(S_NEW));
 		draw_row(u, (unsigned)(BT_LIST_TOP + i), u->bt_top + i == sel,
 		         d->name, buf);
 	}
 
 	struct face f = face_of(u->retroid);
-	const char *verb = "CHANGE";
+	const char *verb = tr(S_BT_CHANGE);
 	if (sel >= 0 && sel < u->bt.n)
-		verb = u->bt.d[sel].connected ? "DISCONNECT" : "CONNECT";
-	snprintf(buf, sizeof(buf), "%c %s   %c BACK   %c SCAN",
-	         f.confirm, verb, f.back, f.menu);
+		verb = tr(u->bt.d[sel].connected ? S_BT_DISCONNECT : S_BT_CONNECT);
+	snprintf(buf, sizeof(buf), tr(S_HINT_BT), f.confirm, verb, f.back, f.menu);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
 /* Writes text into a box of `width` columns and up to `lines` rows,
- * breaking at spaces. Returns the rows used. */
+ * breaking at spaces. Japanese has none between words, so a line of it
+ * breaks after the last whole character that fits. Returns the rows used. */
 static unsigned wrap_puts(struct term *t, unsigned x, unsigned y, unsigned width,
                           unsigned lines, const char *text, int attr)
 {
 	unsigned row = 0;
-	char buf[128];
+	char buf[384];
 	while (*text && row < lines) {
 		while (*text == ' ')
 			text++;
 		size_t len = strlen(text);
-		size_t take = len < width ? len : width;
-		if (take < len) {
+		size_t take = text_fit(text, (int)width);
+		if (take < len && text[take] != ' ') {
 			size_t sp = take;
 			while (sp > 0 && text[sp] != ' ')
 				sp--;
-			if (sp > 0)
-				take = sp;             /* else one long word: hard break */
+			/* A space to break at, unless the line would end in the
+			 * middle of Japanese, where any character is a break. */
+			if (sp > 0 && (unsigned char)text[take] < 0x80)
+				take = sp;
 		}
+		if (take == 0)
+			take = 1;                  /* never stall on a glyph too wide */
 		if (take >= sizeof(buf))
 			take = sizeof(buf) - 1;
 		memcpy(buf, text, take);
@@ -1161,11 +1183,11 @@ static unsigned wrap_puts(struct term *t, unsigned x, unsigned y, unsigned width
 static void draw_tools(struct ui *u)
 {
 	struct term *t = &u->term;
-	char buf[64];
+	char buf[192];
 
-	draw_frame(u, "Tools");
-	snprintf(buf, sizeof(buf), "%d found", u->tools.n);
-	term_puts(t, 2, 3, "TOOLS", ATTR_MID);
+	draw_frame(u, tr(S_TOOLS));
+	snprintf(buf, sizeof(buf), tr(S_N_FOUND), u->tools.n);
+	term_puts(t, 2, 3, tr(S_TOOLS_HEAD), ATTR_MID);
 	term_puts_right(t, t->cols - 2, 3, buf, ATTR_MID);
 
 	/* The description is what says how to get back out of a tool, so it
@@ -1184,7 +1206,7 @@ static void draw_tools(struct ui *u)
 		          u->tools.t[u->tool_sel].desc, ATTR_TEXT);
 
 	struct face f = face_of(u->retroid);
-	snprintf(buf, sizeof(buf), "%c RUN   %c BACK", f.confirm, f.back);
+	snprintf(buf, sizeof(buf), tr(S_HINT_TOOLS), f.confirm, f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -1194,15 +1216,17 @@ static void draw_tools(struct ui *u)
 static void draw_keyboard(struct ui *u)
 {
 	struct term *t = &u->term;
-	char buf[80];
+	char buf[192];
 
-	draw_frame(u, "Settings  >  Wi-Fi");
-	term_puts(t, 2, 2, "NETWORK", ATTR_MID);
-	term_puts(t, 11, 2, u->join_ssid, ATTR_TEXT);
+	draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SETTINGS), tr(S_SET_WIFI), NULL));
+	/* The network's name two columns after its label, however wide the
+	 * label is in this language. */
+	unsigned lw = term_puts(t, 2, 2, tr(S_NETWORK), ATTR_MID);
+	term_puts(t, 2 + (lw + 2 > 9 ? lw + 2 : 9), 2, u->join_ssid, ATTR_TEXT);
 
-	term_puts(t, 2, 3, "PASSWORD", ATTR_MID);
+	term_puts(t, 2, 3, tr(S_PASSWORD), ATTR_MID);
 	if (u->osk.len < u->osk.min_len)
-		snprintf(buf, sizeof(buf), "%d / %d  at least %d", u->osk.len,
+		snprintf(buf, sizeof(buf), tr(S_PW_COUNT_MIN), u->osk.len,
 		         OSK_MAX, u->osk.min_len);
 	else
 		snprintf(buf, sizeof(buf), "%d / %d", u->osk.len, OSK_MAX);
@@ -1212,13 +1236,12 @@ static void draw_keyboard(struct ui *u)
 	if (u->note[0])
 		term_puts(t, 4, y + 1, u->note, ATTR_BRIGHT);
 	else
-		term_puts(t, 4, y + 1, "SELECT: show or hide password", ATTR_DIM);
+		term_puts(t, 4, y + 1, tr(S_PW_SHOW), ATTR_DIM);
 
 	/* Built from the pad's own printing, like every other hint line, so
 	 * it names the buttons the user is actually holding. */
 	struct face f = face_of(u->retroid);
-	snprintf(buf, sizeof(buf), "%c TYPE  %c DELETE  %c SPACE  L1 SHIFT  START JOIN",
-	         f.confirm, f.back, f.menu);
+	snprintf(buf, sizeof(buf), tr(S_HINT_KEYBOARD), f.confirm, f.back, f.menu);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -1240,8 +1263,8 @@ static void power(struct ui *u, const char *verb)
 	}
 	kms_present(&u->kms);
 	term_invalidate(&u->term);
-	snprintf(u->note, sizeof(u->note), "Could not %s (%d).",
-	         strcmp(verb, "reboot") == 0 ? "restart" : "switch off", rc);
+	snprintf(u->note, sizeof(u->note),
+	         tr(strcmp(verb, "reboot") == 0 ? S_FAIL_RESTART : S_FAIL_OFF), rc);
 }
 
 /* Row 0 is a setting and cycles; rows 1 and 2 are the armed actions, and
@@ -1250,43 +1273,43 @@ static void power(struct ui *u, const char *verb)
 #define POW_RESTART 1
 #define POW_OFF     2
 #define N_POWER_ROWS 3
-static const char *const power_rows[] = { "Screen off", "Restart", "Power off" };
+static const enum str power_rows[] = { S_SCREEN_OFF, S_RESTART, S_POWER_OFF };
 static const char *const power_verbs[] = { "reboot", "poweroff" };
 
 static void draw_power(struct ui *u)
 {
 	struct term *t = &u->term;
 	struct face f = face_of(u->retroid);
-	char buf[64];
+	char buf[192];
 
-	draw_frame(u, "Settings  >  Power");
+	draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SETTINGS), tr(S_SET_POWER), NULL));
 	for (int i = 0; i < N_POWER_ROWS; i++) {
 		char v[16];
 		const char *value = NULL;
 		if (i == POW_BLANK) {
-			snprintf(v, sizeof(v), "%d min", blank_minutes[u->blank_idx]);
+			snprintf(v, sizeof(v), tr(S_MIN), blank_minutes[u->blank_idx]);
 			value = v;
 		}
-		draw_row(u, (unsigned)(3 + i), i == u->power_sel, power_rows[i], value);
+		draw_row(u, (unsigned)(3 + i), i == u->power_sel, tr(power_rows[i]), value);
 	}
 	term_hline(t, 3 + N_POWER_ROWS, G_HLINE, ATTR_DIM);
 
 	if (u->power_sel == POW_BLANK)
 		wrap_puts(t, 4, 3 + N_POWER_ROWS + 1, t->cols - 8, 3,
-		          "Screen timeout while in menus. Press any button to wake. "
-		          "Does not affect games.", ATTR_DIM);
+		          tr(S_DESC_BLANK), ATTR_DIM);
 
 	/* One press arms it and says so; the second does it. Anything else
 	 * disarms, so a stray press on the way through never switches off. */
 	if (u->power_armed >= 0) {
-		snprintf(buf, sizeof(buf), "Press %c again to %s.", f.confirm,
-		         u->power_armed == POW_RESTART ? "restart" : "switch off");
+		snprintf(buf, sizeof(buf),
+		         tr(u->power_armed == POW_RESTART ? S_ARMED_RESTART : S_ARMED_OFF),
+		         f.confirm);
 		term_puts(t, 4, 3 + N_POWER_ROWS + 2, buf, ATTR_BRIGHT);
 	}
 	if (u->note[0])
 		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
 
-	snprintf(buf, sizeof(buf), "%c SELECT   %c BACK", f.confirm, f.back);
+	snprintf(buf, sizeof(buf), tr(S_HINT_SELECT), f.confirm, f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -1297,12 +1320,12 @@ static void draw_power(struct ui *u)
 static void draw_tz(struct ui *u)
 {
 	struct term *t = &u->term;
-	char buf[96], now[8];
+	char buf[192], now[8];
 	int visible = (int)list_rows(u);
 
 	if (u->tz_level == 0) {
-		draw_frame(u, "Settings  >  Time zone");
-		term_puts(t, 2, 3, "REGION", ATTR_MID);
+		draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SET_REGION), tr(S_TIMEZONE), NULL));
+		term_puts(t, 2, 3, tr(S_REGION_HEAD), ATTR_MID);
 		term_puts_right(t, t->cols - 2, 3, u->tz_cur, ATTR_MID);
 		scroll_to(u->tz_sel, &u->tz_top, u->tz.nregions, visible);
 		for (int i = 0; i < visible && u->tz_top + i < u->tz.nregions; i++) {
@@ -1311,13 +1334,12 @@ static void draw_tz(struct ui *u)
 			int here = strncmp(u->tz_cur, r, n) == 0 &&
 			           (u->tz_cur[n] == '/' || u->tz_cur[n] == '\0');
 			draw_row(u, (unsigned)(LIST_TOP + i), u->tz_top + i == u->tz_sel,
-			         r, here ? "current" : NULL);
+			         r, here ? tr(S_CURRENT) : NULL);
 		}
 	} else {
-		snprintf(buf, sizeof(buf), "Settings  >  Time zone  >  %s",
-		         u->tz.region[u->tz_region]);
-		draw_frame(u, buf);
-		term_puts(t, 2, 3, "CITY", ATTR_MID);
+		draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SET_REGION), tr(S_TIMEZONE),
+		                       u->tz.region[u->tz_region]));
+		term_puts(t, 2, 3, tr(S_CITY), ATTR_MID);
 		snprintf(buf, sizeof(buf), "%d", u->tz_nidx);
 		term_puts_right(t, t->cols - 2, 3, buf, ATTR_MID);
 		scroll_to(u->tz_sel, &u->tz_top, u->tz_nidx, visible);
@@ -1326,8 +1348,9 @@ static void draw_tz(struct ui *u)
 			char city[48];
 			tz_city(zone, city, sizeof(city));
 			tz_clock(zone, now, sizeof(now));
-			snprintf(buf, sizeof(buf), "%s%s", now,
-			         strcmp(zone, u->tz_cur) == 0 ? "  current" : "");
+			snprintf(buf, sizeof(buf), "%s%s%s", now,
+			         strcmp(zone, u->tz_cur) == 0 ? "  " : "",
+			         strcmp(zone, u->tz_cur) == 0 ? tr(S_CURRENT) : "");
 			draw_row(u, (unsigned)(LIST_TOP + i), u->tz_top + i == u->tz_sel,
 			         city, buf);
 		}
@@ -1337,8 +1360,8 @@ static void draw_tz(struct ui *u)
 		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
 
 	struct face f = face_of(u->retroid);
-	snprintf(buf, sizeof(buf), "%c %s   %c BACK", f.confirm,
-	         u->tz_level ? "SET" : "OPEN", f.back);
+	snprintf(buf, sizeof(buf), tr(u->tz_level ? S_HINT_SET : S_HINT_OPEN),
+	         f.confirm, f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -1380,10 +1403,10 @@ static void draw_busy(struct ui *u, const char *what);
 static const char *update_action(const struct ui *u)
 {
 	if (u->upd_staged)
-		return "Restart to install";
+		return tr(S_ACT_RESTART);
 	if (u->upd.state == UPD_AVAILABLE)
-		return "Download and install";
-	return "Check again";
+		return tr(S_ACT_DOWNLOAD);
+	return tr(S_ACT_CHECK);
 }
 
 /* What is installed and where it can be reached, then Update. The version is
@@ -1392,56 +1415,56 @@ static const char *update_action(const struct ui *u)
 static void draw_about(struct ui *u)
 {
 	struct term *t = &u->term;
-	char buf[96], val[16];
+	char buf[192], val[16];
 	const struct osinfo *o = &u->os;
 
-	draw_frame(u, "Settings  >  About");
+	draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SETTINGS), tr(S_SET_ABOUT), NULL));
 
 	const char *upd;
 	if (u->upd_staged)
-		upd = "restart to install";
+		upd = tr(S_RESTART_TO_INSTALL);
 	else if (settings_get(SETTINGS, "updates.branch", val, sizeof(val)) &&
 	         (!strcmp(val, "nightly") || !strcmp(val, "release")))
 		upd = val;
 	else
-		upd = "automatic";
-	draw_row(u, 3, u->about_sel == 0, "Update", upd);
+		upd = tr(S_AUTOMATIC);
+	draw_row(u, 3, u->about_sel == 0, tr(S_UPDATE), upd);
 	term_hline(t, 5, G_HLINE, ATTR_DIM);
 
-	term_puts(t, 4, 7, "version", ATTR_MID);
-	snprintf(buf, sizeof(buf), "%s  %s", o->version[0] ? o->version : "unknown",
+	term_puts(t, 4, 7, tr(S_VERSION), ATTR_MID);
+	snprintf(buf, sizeof(buf), "%s  %s", o->version[0] ? o->version : tr(S_UNKNOWN),
 	         o->build);
 	term_puts(t, 15, 7, buf, ATTR_TEXT);
 
-	term_puts(t, 4, 8, "commit", ATTR_MID);
+	term_puts(t, 4, 8, tr(S_COMMIT), ATTR_MID);
 	snprintf(buf, sizeof(buf), "%.7s  %s", o->commit[0] ? o->commit : "-",
 	         o->branch);
 	term_puts(t, 15, 8, buf, ATTR_TEXT);
 
-	term_puts(t, 4, 9, "built", ATTR_MID);
+	term_puts(t, 4, 9, tr(S_BUILT), ATTR_MID);
 	term_puts(t, 15, 9, o->date[0] ? o->date : "-", ATTR_TEXT);
 
-	term_puts(t, 4, 10, "device", ATTR_MID);
+	term_puts(t, 4, 10, tr(S_DEVICE), ATTR_MID);
 	snprintf(buf, sizeof(buf), "%s  %s", o->device, o->cpu);
 	term_puts(t, 15, 10, buf, ATTR_TEXT);
 
-	term_puts(t, 4, 11, "address", ATTR_MID);
-	term_puts(t, 15, 11, u->addr[0] ? u->addr : "offline", ATTR_TEXT);
+	term_puts(t, 4, 11, tr(S_ADDRESS), ATTR_MID);
+	term_puts(t, 15, 11, u->addr[0] ? u->addr : tr(S_OFFLINE), ATTR_TEXT);
 
 	/* The root password, which ssh asks for. Every device makes its own
 	 * on first boot (portareos 007-rootpw), so this is the only place to
 	 * learn it without already being logged in. */
 	char pw[40];
-	term_puts(t, 4, 12, "password", ATTR_MID);
+	term_puts(t, 4, 12, tr(S_PASSWORD_L), ATTR_MID);
 	term_puts(t, 15, 12,
 	          settings_get(SETTINGS, "root.password", pw, sizeof(pw)) ? pw : "-",
 	          ATTR_TEXT);
 
-	term_puts(t, 4, 13, "launcher", ATTR_MID);
+	term_puts(t, 4, 13, tr(S_LAUNCHER), ATTR_MID);
 	term_puts(t, 15, 13, PL_VERSION, ATTR_TEXT);
 
 	struct face f = face_of(u->retroid);
-	snprintf(buf, sizeof(buf), "%c OPEN   %c BACK", f.confirm, f.back);
+	snprintf(buf, sizeof(buf), tr(S_HINT_OPEN), f.confirm, f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -1451,18 +1474,18 @@ static void draw_about(struct ui *u)
 static void draw_update(struct ui *u)
 {
 	struct term *t = &u->term;
-	char buf[128];
+	char buf[192];
 
-	draw_frame(u, "Settings  >  About  >  Update");
-	draw_row(u, 3, u->upd_sel == 0, "Channel",
-	         u->upd.channel[0] ? u->upd.channel : "unknown");
+	draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SETTINGS), tr(S_SET_ABOUT), tr(S_UPDATE)));
+	draw_row(u, 3, u->upd_sel == 0, tr(S_CHANNEL),
+	         u->upd.channel[0] ? u->upd.channel : tr(S_UNKNOWN));
 	draw_row(u, 4, u->upd_sel == 1, update_action(u), NULL);
 	term_hline(t, 6, G_HLINE, ATTR_DIM);
 
-	term_puts(t, 4, 8, "installed", ATTR_MID);
+	term_puts(t, 4, 8, tr(S_INSTALLED), ATTR_MID);
 	term_puts(t, 16, 8, u->upd.installed[0] ? u->upd.installed : "-", ATTR_TEXT);
 	if (u->upd.tag[0]) {
-		term_puts(t, 4, 9, "latest", ATTR_MID);
+		term_puts(t, 4, 9, tr(S_LATEST), ATTR_MID);
 		snprintf(buf, sizeof(buf), "%s  %lld MB", u->upd.tag,
 		         u->upd.size / (1024 * 1024));
 		term_puts(t, 16, 9, buf, ATTR_TEXT);
@@ -1470,13 +1493,13 @@ static void draw_update(struct ui *u)
 
 	const char *l1 = "", *l2 = "";
 	if (u->upd_staged) {
-		l1 = "Update verified. Restart to install.";
+		l1 = tr(S_UPD_VERIFIED);
 		l2 = "";
 	} else switch (u->upd.state) {
-	case UPD_AVAILABLE: l1 = "An update is available."; break;
-	case UPD_CURRENT:   l1 = "Up to date on this channel."; break;
-	case UPD_NEWER:     l1 = "Installed build is newer than this channel."; break;
-	case UPD_NONE:      l1 = "No builds for this device on this channel."; break;
+	case UPD_AVAILABLE: l1 = tr(S_UPD_AVAILABLE); break;
+	case UPD_CURRENT:   l1 = tr(S_UPD_CURRENT); break;
+	case UPD_NEWER:     l1 = tr(S_UPD_NEWER); break;
+	case UPD_NONE:      l1 = tr(S_UPD_NONE); break;
 	case UPD_ERROR:     l1 = u->upd.error; break;
 	case UPD_UNKNOWN:   break;
 	}
@@ -1484,18 +1507,18 @@ static void draw_update(struct ui *u)
 	term_puts(t, 4, 12, l2, ATTR_BRIGHT);
 
 	if (!strcmp(u->upd.channel, "release")) {
-		term_puts(t, 4, 14, "Release: monthly builds.", ATTR_DIM);
-		term_puts(t, 4, 15, "Fewer changes; longer testing.", ATTR_DIM);
+		term_puts(t, 4, 14, tr(S_REL_1), ATTR_DIM);
+		term_puts(t, 4, 15, tr(S_REL_2), ATTR_DIM);
 	} else {
-		term_puts(t, 4, 14, "Nightly: latest builds.", ATTR_DIM);
-		term_puts(t, 4, 15, "Latest fixes; may be less stable.", ATTR_DIM);
+		term_puts(t, 4, 14, tr(S_NIGHT_1), ATTR_DIM);
+		term_puts(t, 4, 15, tr(S_NIGHT_2), ATTR_DIM);
 	}
 
 	if (u->note[0])
 		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
 
 	struct face f = face_of(u->retroid);
-	snprintf(buf, sizeof(buf), "%c SELECT   %c BACK", f.confirm, f.back);
+	snprintf(buf, sizeof(buf), tr(S_HINT_SELECT), f.confirm, f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -1505,11 +1528,10 @@ static void draw_download(int pct, int verifying, void *ctx)
 {
 	struct ui *u = ctx;
 	struct term *t = &u->term;
-	char buf[64];
+	char buf[192];
 
-	draw_frame(u, "Settings  >  About  >  Update");
-	term_puts(t, 4, 4, verifying ? "Verifying download..." : "Downloading",
-	          ATTR_BRIGHT);
+	draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SETTINGS), tr(S_SET_ABOUT), tr(S_UPDATE)));
+	term_puts(t, 4, 4, tr(verifying ? S_VERIFYING : S_DOWNLOADING), ATTR_BRIGHT);
 	term_puts(t, 4, 5, u->upd.tag, ATTR_MID);
 
 	unsigned width = t->cols - 8 - 6;
@@ -1522,12 +1544,12 @@ static void draw_download(int pct, int verifying, void *ctx)
 
 	if (u->upd.size > 0) {
 		long long mb = u->upd.size / (1024 * 1024);
-		snprintf(buf, sizeof(buf), "%lld of %lld MB", mb * pct / 100, mb);
+		snprintf(buf, sizeof(buf), tr(S_MB_OF), (int)(mb * pct / 100), (int)mb);
 		term_puts(t, 4, 10, buf, ATTR_MID);
 	}
 
-	term_puts(t, 4, 13, "Keep your network connected.", ATTR_DIM);
-	term_puts(t, 4, 14, "Retry an interrupted download to resume.", ATTR_DIM);
+	term_puts(t, 4, 13, tr(S_KEEP_NET), ATTR_DIM);
+	term_puts(t, 4, 14, tr(S_RETRY_RESUME), ATTR_DIM);
 	term_flush(t);
 }
 
@@ -1544,7 +1566,7 @@ static void open_about(struct ui *u)
 
 static void open_update(struct ui *u)
 {
-	draw_busy(u, "checking for updates...");
+	draw_busy(u, tr(S_CHECKING));
 	update_check(&u->upd);
 	u->upd_staged = update_staged(STAGE_DIR);
 	u->upd_sel = 1;
@@ -1572,6 +1594,7 @@ static void redraw(struct ui *u)
 	case SCR_POWER:    draw_power(u);    break;
 	case SCR_CONSOLES: draw_consoles(u); break;
 	case SCR_DIAG:     draw_diag(u);     break;
+	case SCR_REGION:   draw_region(u);   break;
 	case SCR_UPDATE:   draw_update(u);   break;
 	case SCR_RECENT:
 	case SCR_FAVS:     draw_list(u);     break;
@@ -1595,7 +1618,7 @@ static void draw_launching(struct ui *u, const char *what)
 
 	draw_frame(u, "PortareOS");
 	term_puts(t, 6, 6, what, ATTR_BRIGHT);
-	term_puts(t, 6, 8, "Starting...", ATTR_DIM);
+	term_puts(t, 6, 8, tr(S_STARTING), ATTR_DIM);
 	term_flush(t);
 }
 
@@ -1825,8 +1848,8 @@ static void launch(struct ui *u, const struct psystem *s, const struct game *g)
 	if (!s->core[0] || !s->emulator[0]) {
 		struct term *t = &u->term;
 		draw_frame(u, "PortareOS");
-		term_puts(t, 4, 6, "Cannot launch this game.", ATTR_BRIGHT);
-		term_puts(t, 4, 7, s->core[0] ? "No emulator configured." : "No core configured.", ATTR_BRIGHT);
+		term_puts(t, 4, 6, tr(S_CANNOT_LAUNCH), ATTR_BRIGHT);
+		term_puts(t, 4, 7, tr(s->core[0] ? S_NO_EMULATOR : S_NO_CORE), ATTR_BRIGHT);
 		term_puts(t, 4, 10, s->name, ATTR_MID);
 		term_flush(t);
 		return;
@@ -1906,8 +1929,8 @@ static void run_portscope(struct ui *u)
  * the likeliest fix is one wrong character. */
 static void join(struct ui *u, const char *password)
 {
-	char busy[96];
-	snprintf(busy, sizeof(busy), "joining %s...", u->join_ssid);
+	char busy[192];
+	snprintf(busy, sizeof(busy), tr(S_JOINING), u->join_ssid);
 	draw_busy(u, busy);
 
 	int rc = net_join(u->join_ssid, password);
@@ -1922,19 +1945,17 @@ static void join(struct ui *u, const char *password)
 		u->screen = SCR_WIFI;
 		return;
 	case 4:
-		str_copy(u->note, sizeof(u->note),
-		         "Password rejected. Check and retry.");
+		str_copy(u->note, sizeof(u->note), tr(S_PW_REJECTED));
 		break;
 	case 10:
-		str_copy(u->note, sizeof(u->note), "Network out of range.");
+		str_copy(u->note, sizeof(u->note), tr(S_OUT_OF_RANGE));
 		break;
 	case 3:
 	case PROC_TIMEOUT:
-		str_copy(u->note, sizeof(u->note),
-		         "No response. Move closer and retry.");
+		str_copy(u->note, sizeof(u->note), tr(S_NO_RESPONSE));
 		break;
 	default:
-		snprintf(u->note, sizeof(u->note), "Connection failed (error %d).", rc);
+		snprintf(u->note, sizeof(u->note), tr(S_CONN_FAILED), rc);
 		break;
 	}
 }
@@ -2110,7 +2131,7 @@ static void on_action(struct ui *u, enum action a)
 		if (a == ACT_UP && u->set_sel > 0) u->set_sel--;
 		else if (a == ACT_DOWN && u->set_sel < N_SETTINGS - 1) u->set_sel++;
 		else if (a == ACT_CONFIRM && u->set_sel == SET_WIFI) {
-			draw_busy(u, "scanning...");
+			draw_busy(u, tr(S_SCANNING));
 			u->wifi_on = net_wifi_enabled();
 			if (u->wifi_on)
 				net_scan(&u->nets, 1);
@@ -2124,8 +2145,10 @@ static void on_action(struct ui *u, enum action a)
 		}
 		else if (a == ACT_CONFIRM && u->set_sel == SET_ABOUT)
 			open_about(u);
-		else if (a == ACT_CONFIRM && u->set_sel == SET_TIMEZONE)
-			open_tz(u);
+		else if (a == ACT_CONFIRM && u->set_sel == SET_REGION) {
+			u->region_sel = 0;
+			u->screen = SCR_REGION;
+		}
 		else if (a == ACT_CONFIRM && u->set_sel == SET_POWER) {
 			u->power_sel = 0;
 			u->power_armed = -1;
@@ -2138,7 +2161,7 @@ static void on_action(struct ui *u, enum action a)
 		else if (a == ACT_CONFIRM && u->set_sel == SET_DIAGNOSTICS)
 			u->screen = SCR_DIAG;
 		else if (a == ACT_CONFIRM && u->set_sel == SET_BLUETOOTH) {
-			draw_busy(u, "reading devices...");
+			draw_busy(u, tr(S_READING_DEVICES));
 			u->bt_on = bt_powered();
 			u->bt_auto = bt_autoconnect();
 			if (u->bt_on)
@@ -2149,7 +2172,7 @@ static void on_action(struct ui *u, enum action a)
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
 		         u->set_sel == SET_SSH) {
 			int on = !u->ssh_on;
-			draw_busy(u, on ? "starting ssh..." : "stopping ssh...");
+			draw_busy(u, tr(on ? S_SSH_STARTING : S_SSH_STOPPING));
 			net_ssh_set(on);
 			/* Written as well, so the next boot agrees with the switch:
 			 * the boot starts or stops sshd from this setting. */
@@ -2167,7 +2190,7 @@ static void on_action(struct ui *u, enum action a)
 			int next = (a == ACT_LEFT)
 			         ? (cur + u->n_usb - 1) % u->n_usb
 			         : (cur + 1) % u->n_usb;
-			draw_busy(u, "switching...");
+			draw_busy(u, tr(S_SWITCHING));
 			usb_set_mode(u->usb_opts[next]);
 			usb_mode(u->usb, sizeof(u->usb));
 		}
@@ -2194,7 +2217,7 @@ static void on_action(struct ui *u, enum action a)
 					u->profile = next;
 					settings_set(SETTINGS, KEY_PROFILE, profile_names[next].key);
 				} else {
-					snprintf(u->note, sizeof(u->note), "Could not apply colour profile.");
+					str_copy(u->note, sizeof(u->note), tr(S_PROFILE_FAIL));
 				}
 			}
 		}
@@ -2224,7 +2247,7 @@ static void on_action(struct ui *u, enum action a)
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
 		         u->wifi_sel == 0) {
 			int on = !u->wifi_on;
-			draw_busy(u, on ? "switching Wi-Fi on..." : "switching Wi-Fi off...");
+			draw_busy(u, tr(on ? S_WIFI_ON_BUSY : S_WIFI_OFF_BUSY));
 			net_wifi_set(on);
 			/* Kept, because 080-network applies it at every boot. */
 			settings_set(SETTINGS, "wifi.enabled", on ? "1" : "0");
@@ -2235,7 +2258,7 @@ static void on_action(struct ui *u, enum action a)
 					struct timespec ts = { 0, 250 * 1000000L };
 					nanosleep(&ts, NULL);
 				}
-				draw_busy(u, "scanning...");
+				draw_busy(u, tr(S_SCANNING));
 				struct timespec settle = { 1, 500 * 1000000L };
 				nanosleep(&settle, NULL);
 			}
@@ -2245,11 +2268,11 @@ static void on_action(struct ui *u, enum action a)
 			else
 				memset(&u->nets, 0, sizeof(u->nets));
 			if (on && !u->wifi_on)
-				str_copy(u->note, sizeof(u->note), "Could not enable Wi-Fi.");
+				str_copy(u->note, sizeof(u->note), tr(S_WIFI_FAIL));
 			u->wifi_top = 0;
 		}
 		else if (a == ACT_MENU && u->wifi_on) {
-			draw_busy(u, "rescanning...");
+			draw_busy(u, tr(S_RESCANNING));
 			net_scan(&u->nets, 1);
 			if (u->wifi_sel > u->nets.n) u->wifi_sel = u->nets.n;
 		}
@@ -2257,8 +2280,7 @@ static void on_action(struct ui *u, enum action a)
 			const struct net_entry *e = &u->nets.e[u->wifi_sel - 1];
 			int min = net_min_password(e->security);
 			if (!e->saved && min < 0) {
-				str_copy(u->note, sizeof(u->note),
-				         "Networks requiring a username are unsupported.");
+				str_copy(u->note, sizeof(u->note), tr(S_NO_ENTERPRISE));
 			} else if (!e->saved) {
 				str_copy(u->join_ssid, sizeof(u->join_ssid), e->name);
 				osk_init(&u->osk, min);
@@ -2267,7 +2289,7 @@ static void on_action(struct ui *u, enum action a)
 				else
 					u->screen = SCR_KEYBOARD;
 			} else {
-				draw_busy(u, "connecting...");
+				draw_busy(u, tr(S_CONNECTING));
 				net_connect(e->name);
 				net_scan(&u->nets, 0);
 			}
@@ -2334,13 +2356,13 @@ static void on_action(struct ui *u, enum action a)
 			tz_show_region(u, u->tz_sel);
 		else if (a == ACT_CONFIRM && u->tz_level == 1 && u->tz_sel < count) {
 			const char *zone = u->tz.zone[u->tz_idx[u->tz_sel]];
-			draw_busy(u, "Saving time zone...");
+			draw_busy(u, tr(S_SAVING_TZ));
 			if (tz_apply(zone, SETTINGS, TZ_CACHE) == 0) {
 				str_copy(u->tz_cur, sizeof(u->tz_cur), zone);
 				status_read(&u->st);        /* the header clock, now */
-				u->screen = SCR_SETTINGS;
+				u->screen = SCR_REGION;
 			} else {
-				str_copy(u->note, sizeof(u->note), "Could not save time zone.");
+				str_copy(u->note, sizeof(u->note), tr(S_TZ_FAIL));
 			}
 		}
 		else if (a == ACT_BACK && u->tz_level == 1) {
@@ -2348,10 +2370,28 @@ static void on_action(struct ui *u, enum action a)
 			u->tz_sel = u->tz_region;
 			u->tz_top = 0;
 		}
-		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
+		else if (a == ACT_BACK) u->screen = SCR_REGION;
 		else if (a == ACT_QUIT) u->running = 0;
 		break;
 	}
+
+	case SCR_REGION:
+		if (a == ACT_UP && u->region_sel > 0) u->region_sel--;
+		else if (a == ACT_DOWN && u->region_sel < 1) u->region_sel++;
+		else if (u->region_sel == 0 &&
+		         (a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT)) {
+			/* Two languages, so any press is the other one. Written
+			 * straight away, like the button style. */
+			enum lang next = lang_get() == LANG_JA ? LANG_EN : LANG_JA;
+			lang_set(next);
+			settings_set(SETTINGS, LANG_KEY, lang_value(next));
+			term_invalidate(&u->term);
+		}
+		else if (a == ACT_CONFIRM && u->region_sel == 1)
+			open_tz(u);
+		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
+		else if (a == ACT_QUIT) u->running = 0;
+		break;
 
 	case SCR_DIAG:
 		if (a == ACT_CONFIRM) run_portscope(u);
@@ -2375,7 +2415,7 @@ static void on_action(struct ui *u, enum action a)
 			const char *next = strcmp(u->upd.channel, "release") == 0
 			                 ? "nightly" : "release";
 			update_set_channel(SETTINGS, next);
-			draw_busy(u, "checking for updates...");
+			draw_busy(u, tr(S_CHECKING));
 			update_check(&u->upd);
 		}
 		else if (a == ACT_CONFIRM && u->upd_sel == 1) {
@@ -2386,7 +2426,7 @@ static void on_action(struct ui *u, enum action a)
 				if (update_fetch(draw_download, u, u->note, sizeof(u->note)) == 0)
 					u->upd_staged = 1;
 			} else {
-				draw_busy(u, "checking for updates...");
+				draw_busy(u, tr(S_CHECKING));
 				update_check(&u->upd);
 			}
 		}
@@ -2402,21 +2442,21 @@ static void on_action(struct ui *u, enum action a)
 		else if (a == ACT_DOWN && u->bt_sel < last) u->bt_sel++;
 		else if (a == ACT_MENU) {
 			if (!u->bt_on) {
-				draw_busy(u, "Bluetooth is off.");
+				draw_busy(u, tr(S_BT_OFF));
 				break;
 			}
 			/* Eight seconds with the panel frozen. Long enough for
 			 * headphones to announce themselves, short enough that
 			 * nobody thinks this has crashed - which is why the
 			 * message says how long. */
-			draw_busy(u, "scanning for 8 seconds...");
+			draw_busy(u, tr(S_SCANNING_8));
 			bt_scan(&u->bt, 8);
 			if (u->bt_sel > BT_HEAD + u->bt.n - 1)
 				u->bt_sel = BT_HEAD;
 		}
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
 		         u->bt_sel == 0) {
-			draw_busy(u, u->bt_on ? "switching off..." : "switching on...");
+			draw_busy(u, tr(u->bt_on ? S_TURNING_OFF : S_TURNING_ON));
 			bt_power(!u->bt_on);
 			u->bt_on = bt_powered();
 			memset(&u->bt, 0, sizeof(u->bt));
@@ -2426,7 +2466,7 @@ static void on_action(struct ui *u, enum action a)
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
 		         u->bt_sel == 1) {
 			u->bt_auto = !u->bt_auto;
-			draw_busy(u, "applying...");
+			draw_busy(u, tr(S_APPLYING));
 			bt_set_autoconnect(u->bt_auto);
 			if (u->bt_on)
 				bt_list(&u->bt);
@@ -2434,10 +2474,10 @@ static void on_action(struct ui *u, enum action a)
 		else if (a == ACT_CONFIRM && sel >= 0 && sel < u->bt.n) {
 			struct bt_device d = u->bt.d[sel];
 			if (d.connected) {
-				draw_busy(u, "disconnecting...");
+				draw_busy(u, tr(S_DISCONNECTING));
 				bt_disconnect(d.addr);
 			} else {
-				draw_busy(u, "connecting...");
+				draw_busy(u, tr(S_CONNECTING));
 				bt_connect(d.addr);
 			}
 			bt_list(&u->bt);
@@ -2572,6 +2612,9 @@ int main(void)
 	              (strcmp(style, "shapes") == 0 || strcmp(style, "ps") == 0 ||
 	               strcmp(style, "sony") == 0));
 	input_set_layout(u.retroid);
+	char lang[16] = "";
+	settings_get(SETTINGS, LANG_KEY, lang, sizeof(lang));
+	lang_set(lang_parse(lang));
 	/* Read what is cheap now and leave the scan until the Wi-Fi screen is
 	 * opened: a rescan takes seconds and nothing on the first screen shows
 	 * it. */
