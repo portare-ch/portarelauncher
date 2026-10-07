@@ -1,5 +1,7 @@
 #include "term.h"
 #include "font8x16.h"
+#include "glyph.h"
+#include "ja26.h"
 #include "pix.h"
 
 #include <stdlib.h>
@@ -90,10 +92,8 @@ void term_free(struct term *t)
 void term_clear(struct term *t)
 {
 	size_t n = (size_t)t->cols * t->rows;
-	for (size_t i = 0; i < n; i++) {
-		t->cur[i].ch = ' ';
-		t->cur[i].attr = ATTR_TEXT;
-	}
+	for (size_t i = 0; i < n; i++)
+		t->cur[i] = (struct cell){ ' ', ATTR_TEXT, HALF_NONE };
 }
 
 void term_invalidate(struct term *t)
@@ -103,27 +103,57 @@ void term_invalidate(struct term *t)
 	memset(t->prev, 0xff, (size_t)t->cols * t->rows * sizeof(*t->prev));
 }
 
-void term_putc(struct term *t, unsigned x, unsigned y, unsigned char ch, int attr)
+/* Whatever cell x was half of, the other half is blank now. */
+static void unpair(struct term *t, unsigned x, unsigned y)
 {
-	if (x >= t->cols || y >= t->rows)
-		return;
-	struct cell *c = &t->cur[(size_t)y * t->cols + x];
-	c->ch = ch;
-	c->attr = (unsigned char)attr;
+	struct cell *row = &t->cur[(size_t)y * t->cols];
+	if (row[x].half == HALF_LEFT && x + 1 < t->cols)
+		row[x + 1] = (struct cell){ ' ', row[x].attr, HALF_NONE };
+	else if (row[x].half == HALF_RIGHT && x > 0)
+		row[x - 1] = (struct cell){ ' ', row[x].attr, HALF_NONE };
+	row[x].half = HALF_NONE;
 }
 
-void term_puts(struct term *t, unsigned x, unsigned y, const char *s, int attr)
+static void put_glyph(struct term *t, unsigned x, unsigned y, struct glyph g, int attr)
 {
-	for (; *s && x < t->cols; s++, x++)
-		term_putc(t, x, y, (unsigned char)*s, attr);
+	if (x + g.width > t->cols || y >= t->rows)
+		return;
+	struct cell *row = &t->cur[(size_t)y * t->cols];
+	unpair(t, x, y);
+	if (g.width == 2) {
+		unpair(t, x + 1, y);
+		row[x] = (struct cell){ g.code, (uint8_t)attr, HALF_LEFT };
+		row[x + 1] = (struct cell){ g.code, (uint8_t)attr, HALF_RIGHT };
+	} else {
+		row[x] = (struct cell){ g.code, (uint8_t)attr, HALF_NONE };
+	}
+}
+
+void term_putc(struct term *t, unsigned x, unsigned y, unsigned char ch, int attr)
+{
+	put_glyph(t, x, y, (struct glyph){ ch, 1 }, attr);
+}
+
+unsigned term_puts(struct term *t, unsigned x, unsigned y, const char *s, int attr)
+{
+	unsigned x0 = x;
+	uint32_t c;
+	while ((c = text_next(&s))) {
+		struct glyph g = glyph_of(c);
+		if (x + g.width > t->cols)
+			break;
+		put_glyph(t, x, y, g, attr);
+		x += g.width;
+	}
+	return x - x0;
 }
 
 void term_puts_right(struct term *t, unsigned x_end, unsigned y, const char *s, int attr)
 {
-	size_t len = strlen(s);
-	if (len > x_end)
+	int w = text_width(s);
+	if (w > (int)x_end)
 		return;
-	term_puts(t, (unsigned)(x_end - len), y, s, attr);
+	term_puts(t, x_end - (unsigned)w, y, s, attr);
 }
 
 void term_hline(struct term *t, unsigned y, unsigned char glyph, int attr)
@@ -156,14 +186,86 @@ static void draw_mark(struct term *t, unsigned px0, unsigned py0,
 	}
 }
 
-static int is_mark(unsigned char ch)
+static int is_mark(uint16_t g)
 {
-	return ch >= G_MARK_CROSS && ch <= G_MARK_CIRCLE;
+	return g >= G_MARK_CROSS && g <= G_MARK_CIRCLE;
+}
+
+static uint32_t mix(uint32_t bg, uint32_t fg, unsigned a)   /* a: 0..255 */
+{
+	uint32_t out = 0;
+	for (int sh = 0; sh <= 16; sh += 8) {
+		int b = (int)(bg >> sh & 0xFF), f = (int)(fg >> sh & 0xFF);
+		out |= (uint32_t)(b + (f - b) * (int)a / 255) << sh;
+	}
+	return out;
+}
+
+/* A two-cell glyph the PS2's way: 26 x 26 with 16 grey levels, scaled to
+ * the 48 x 48 of two cells with bilinear filtering, the GS's
+ * GS_FILTER_LINEAR, and blended between the cell's colour and black. */
+static void draw_ja26(struct term *t, unsigned px0, unsigned py0,
+                      const unsigned char *g, uint32_t fg, uint32_t bg)
+{
+	enum { OUT = 48 };
+	static int i0[OUT], w1[OUT], ready;
+	if (!ready) {
+		/* The source position of each output pixel's centre, in 1/256. */
+		for (int o = 0; o < OUT; o++) {
+			int f = (2 * o + 1) * JA26_SIZE * 128 / OUT - 128;
+			i0[o] = f >= 0 ? f / 256 : -1;
+			w1[o] = f - i0[o] * 256;
+		}
+		ready = 1;
+	}
+#define L(y, x) ((y) < 0 || (y) >= JA26_SIZE || (x) < 0 || (x) >= JA26_SIZE ? 0 : \
+	((x) & 1 ? g[(y) * 13 + (x) / 2] & 0x0F : g[(y) * 13 + (x) / 2] >> 4))
+	for (int oy = 0; oy < OUT; oy++) {
+		int y = i0[oy], wy = w1[oy];
+		uint32_t *out = t->fb + (size_t)(py0 + (unsigned)oy) * t->pitch_px + px0;
+		for (int ox = 0; ox < OUT; ox++) {
+			int x = i0[ox], wx = w1[ox];
+			int top = L(y, x) * (256 - wx) + L(y, x + 1) * wx;
+			int bot = L(y + 1, x) * (256 - wx) + L(y + 1, x + 1) * wx;
+			int a = top * (256 - wy) + bot * wy;    /* 0 .. 15 * 65536 */
+			*out++ = a ? mix(bg, fg, (unsigned)(a / 3855)) : bg;
+		}
+	}
+#undef L
+}
+
+/* A Unifont glyph from its left cell: 8 or 16 pixels by 16, at scale. */
+static void draw_unifont(struct term *t, unsigned px0, unsigned py0,
+                         const struct cell *c, uint32_t fg, uint32_t bg)
+{
+	int wide;
+	const unsigned char *bits = glyph_bits(c->g, &wide);
+	const unsigned s = t->scale;
+	if (wide && s == 3) {
+		const unsigned char *g = ja26_find(glyph_cp(c->g));
+		if (g) {
+			draw_ja26(t, px0, py0, g, fg, bg);
+			return;
+		}
+	}
+	const unsigned w = wide ? 16 : 8;
+	for (unsigned gy = 0; gy < FONT_H; gy++) {
+		unsigned row = wide ? (unsigned)(bits[gy * 2] << 8 | bits[gy * 2 + 1])
+		                    : bits[gy];
+		for (unsigned sy = 0; sy < s; sy++) {
+			uint32_t *out = t->fb + (size_t)(py0 + gy * s + sy) * t->pitch_px + px0;
+			for (unsigned gx = 0; gx < w; gx++) {
+				uint32_t v = (row & (1u << (w - 1 - gx))) ? fg : bg;
+				for (unsigned sx = 0; sx < s; sx++)
+					*out++ = v;
+			}
+		}
+	}
 }
 
 static void draw_cell(struct term *t, unsigned cx, unsigned cy, const struct cell *c)
 {
-	const unsigned char *glyph = &font8x16[(size_t)c->ch * FONT_H];
+	const unsigned char *glyph = &font8x16[(size_t)(c->g & 0xFF) * FONT_H];
 	const uint32_t *pal = palettes[t->pal].c;
 	const uint32_t fg = pal[c->attr < ATTR_COUNT ? c->attr : ATTR_TEXT];
 	const uint32_t bg = pal[ATTR_BG];
@@ -172,8 +274,12 @@ static void draw_cell(struct term *t, unsigned cx, unsigned cy, const struct cel
 	unsigned px0 = t->ox + cx * FONT_W * s;
 	unsigned py0 = t->oy + cy * FONT_H * s;
 
-	if (is_mark(c->ch)) {
-		draw_mark(t, px0, py0, c->ch, fg, bg);
+	if (is_mark(c->g)) {
+		draw_mark(t, px0, py0, (unsigned char)c->g, fg, bg);
+		return;
+	}
+	if (c->g >= GLYPH_UNI) {
+		draw_unifont(t, px0, py0, c, fg, bg);
 		return;
 	}
 
@@ -190,13 +296,23 @@ static void draw_cell(struct term *t, unsigned cx, unsigned cy, const struct cel
 	}
 }
 
+static int same(const struct cell *a, const struct cell *b)
+{
+	return a->g == b->g && a->attr == b->attr && a->half == b->half;
+}
+
 void term_flush(struct term *t)
 {
 	size_t n = (size_t)t->cols * t->rows;
 	for (size_t i = 0; i < n; i++) {
-		if (t->cur[i].ch == t->prev[i].ch && t->cur[i].attr == t->prev[i].attr)
+		if (same(&t->cur[i], &t->prev[i]))
 			continue;
-		draw_cell(t, (unsigned)(i % t->cols), (unsigned)(i / t->cols), &t->cur[i]);
-		t->prev[i] = t->cur[i];
+		/* A two-cell glyph is drawn whole from its left cell, whichever
+		 * half changed. */
+		size_t at = t->cur[i].half == HALF_RIGHT ? i - 1 : i;
+		draw_cell(t, (unsigned)(at % t->cols), (unsigned)(at / t->cols), &t->cur[at]);
+		t->prev[at] = t->cur[at];
+		if (t->cur[at].half == HALF_LEFT)
+			t->prev[at + 1] = t->cur[at + 1];
 	}
 }

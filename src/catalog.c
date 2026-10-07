@@ -1,4 +1,5 @@
 #include "catalog.h"
+#include "glyph.h"
 #include "settings.h"
 #include "sheets.h"
 #include "text.h"
@@ -114,6 +115,7 @@ static void add_folder(struct psystem *s, const char *full, const char *name)
 	str_copy(g->path, sizeof(g->path), full);
 	/* One short, to leave room for the slash that says it is a folder. */
 	str_copy(g->name, sizeof(g->name) - 1, name);
+	text_compose(g->name);
 	size_t n = strlen(g->name);
 	g->name[n] = '/';
 	g->name[n + 1] = '\0';
@@ -135,6 +137,9 @@ static void add_game(struct psystem *s, const char *path, const char *file)
 	char *dot = strrchr(g->name, '.');
 	if (dot)
 		*dot = '\0';
+	/* Composed before the list is sorted: a file copied from a Mac is
+	 * named e + U+0301 and would sort apart from its é neighbours. */
+	text_compose(g->name);
 	s->ngames++;
 }
 

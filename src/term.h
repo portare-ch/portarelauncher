@@ -42,9 +42,16 @@ enum {
 #define G_MARK_TRIANGLE  0x1E
 #define G_MARK_CIRCLE    0x1F
 
+/* A glyph code as glyph.h has it, CP437 below GLYPH_UNI and Unifont from
+ * it. A two-cell glyph fills two cells, the left one HALF_LEFT and the
+ * right HALF_RIGHT, the same code in both; nothing ever holds half of
+ * one, so writing either half clears the other. */
+enum { HALF_NONE = 0, HALF_LEFT, HALF_RIGHT };
+
 struct cell {
-	unsigned char ch;
-	unsigned char attr;
+	uint16_t g;
+	uint8_t attr;
+	uint8_t half;
 };
 
 struct term {
@@ -64,9 +71,12 @@ int  term_init(struct term *t, uint32_t *fb, unsigned pitch_px,
 void term_free(struct term *t);
 
 void term_clear(struct term *t);
+/* One CP437 glyph: the box drawing, the caret, the shape marks. */
 void term_putc(struct term *t, unsigned x, unsigned y, unsigned char ch, int attr);
-void term_puts(struct term *t, unsigned x, unsigned y, const char *s, int attr);
-/* Right-aligned so the last character lands on column x_end - 1. */
+/* UTF-8 text, drawn as glyph.h says. Stops at the right edge rather than
+ * draw half a character there. Returns the columns it took. */
+unsigned term_puts(struct term *t, unsigned x, unsigned y, const char *s, int attr);
+/* Right-aligned by width, so the last character ends on column x_end - 1. */
 void term_puts_right(struct term *t, unsigned x_end, unsigned y, const char *s, int attr);
 void term_hline(struct term *t, unsigned y, unsigned char glyph, int attr);
 
