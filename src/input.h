@@ -65,7 +65,7 @@ void input_close(struct input *in);
 
 /* Which face button does what. The top button opens settings in both
  * styles. retroid=1: the right button confirms and the bottom one goes
- * back. retroid=0, the PS style: bottom confirms, right goes back. Takes
+ * back. retroid=0, the shape marks: bottom confirms, right goes back. Takes
  * effect on the next press. */
 void input_set_layout(int retroid);
 
