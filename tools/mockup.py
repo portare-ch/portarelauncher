@@ -174,8 +174,9 @@ def field(text, hidden=False, cursor=True):
             "  └" + "─" * (FIELD_W - 2) + "┘"]
 
 RETROID_HINTS = " A TYPE  B DELETE  X SPACE  L1 SHIFT  START JOIN"
-# The shape marks, approximated out of CP437 as the launcher draws it.
-SHAPE_HINTS   = " X TYPE  ○ DELETE  ▲ SPACE  L1 SHIFT  START JOIN"
+# The shape marks: the launcher draws them as outlines (term.h), and so
+# does tools/mockup_png.py for these four characters wherever they stand.
+SHAPE_HINTS   = " × TYPE  ○ DELETE  ▲ SPACE  L1 SHIFT  START JOIN"
 
 def kb_screen(ssid, text, layer, sel=None, bottom_sel=None, hidden=False,
               note="SELECT: show or hide password", labels=None,
@@ -386,19 +387,11 @@ def pad_spans(shapes=False):
     return bright, dim
 
 # What is drawn rather than typed: the two stick rings with their dots,
-# centred on rows 9-13, and with the shape marks the four face cells as
-# plain geometric outlines, a circle, a triangle, a square and a cross,
-# thin and never filled. Held is bright, idle is dim.
+# centred on rows 9-13. The shape marks are characters in the text, drawn
+# as outlines like everywhere else.
 def pad_shapes(shapes=False):
-    rings = [dict(row=11, col=9.5, rows=5, x=0.02, y=-0.01, clicked=False),
-             dict(row=11, col=41.5, rows=5, x=-0.41, y=-0.83, clicked=False)]
-    marks = []
-    if shapes:
-        marks = [dict(row=5, col=40, shape="triangle", held=False),
-                 dict(row=6, col=37, shape="square", held=False),
-                 dict(row=6, col=43, shape="circle", held=True),
-                 dict(row=7, col=40, shape="cross", held=False)]
-    return dict(rings=rings, marks=marks)
+    return dict(rings=[dict(row=11, col=9.5, rows=5, x=0.02, y=-0.01, clicked=False),
+                       dict(row=11, col=41.5, rows=5, x=-0.41, y=-0.83, clicked=False)])
 
 if __name__ == "__main__":
     for t, s in (("SYSTEMS", systems), ("GAMES", games),

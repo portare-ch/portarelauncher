@@ -31,6 +31,17 @@ enum {
 #define G_HLINE    0xC4  /* single horizontal                             */
 #define G_HLINE_D  0xCD  /* double horizontal                             */
 
+/* The shape marks of the face buttons. The VGA font has nothing close to
+ * them, so these four codes are not drawn from it: a cell holding one gets
+ * the mark as a thin outline in the cell's colour (pix.h), the size of a
+ * capital. Control codes, so no title, network name or typed text ever
+ * holds one. Everything that names a face button goes through them: the
+ * hints, the Button style diagram, PortScope. */
+#define G_MARK_CROSS     0x1C
+#define G_MARK_SQUARE    0x1D
+#define G_MARK_TRIANGLE  0x1E
+#define G_MARK_CIRCLE    0x1F
+
 struct cell {
 	unsigned char ch;
 	unsigned char attr;
@@ -64,6 +75,9 @@ void term_hline(struct term *t, unsigned y, unsigned char glyph, int attr);
 const char *term_set_palette(struct term *t, int idx);
 int term_palette_count(void);
 int term_palette(const struct term *t);
+/* The colour an attribute has in the palette in use, for what is drawn
+ * beside the grid rather than in it. */
+uint32_t term_color(const struct term *t, int attr);
 
 /* Writes the cells that changed since the last flush. */
 void term_flush(struct term *t);

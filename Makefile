@@ -47,15 +47,25 @@ ifeq ($(PL_VERSION),)
 PL_VERSION := dev
 endif
 
-SRC  := src/text.c src/proc.c src/update.c src/osinfo.c src/tz.c src/quit.c src/sheets.c src/color.c src/net.c src/bt.c src/osk.c src/tools.c src/settings.c src/status.c src/notify.c src/term.c src/kms.c \
+SRC  := src/text.c src/proc.c src/update.c src/osinfo.c src/tz.c src/quit.c src/sheets.c src/color.c src/net.c src/bt.c src/osk.c src/tools.c src/settings.c src/status.c src/notify.c src/term.c src/pix.c src/kms.c \
         src/input.c src/catalog.c src/lists.c src/main.c
 OBJ  := $(SRC:.c=.o)
 BIN  := portarelauncher
 
-all: $(BIN)
+# PortScope, the input diagnostics the launcher opens from Settings: the
+# launcher's panel, grid and palette, and its own model of the pad.
+SCOPE_SRC := src/portscope.c src/scope.c src/pix.c src/term.c src/kms.c \
+             src/color.c src/quit.c src/settings.c
+SCOPE_OBJ := $(SCOPE_SRC:.c=.o)
+SCOPE_BIN := portscope
+
+all: $(BIN) $(SCOPE_BIN)
 
 $(BIN): $(OBJ)
 	$(CC) $(CFLAGS) $(PL_CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(DRM_LIBS)
+
+$(SCOPE_BIN): $(SCOPE_OBJ)
+	$(CC) $(CFLAGS) $(PL_CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(DRM_LIBS) -lm
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(PL_CFLAGS) $(PL_WARN) -c -o $@ $<
@@ -66,7 +76,7 @@ src/term.o: src/font8x16.h
 src/main.o: PL_CFLAGS += -DPL_VERSION='"$(PL_VERSION)"'
 
 clean:
-	rm -f $(OBJ) $(BIN) $(TESTS)
+	rm -f $(OBJ) $(SCOPE_OBJ) $(BIN) $(SCOPE_BIN) $(TESTS)
 
 # Regenerates the font from the kernel's VGA console font. Needs the source
 # file; see tools/mkfont.py for where it comes from.
@@ -98,7 +108,8 @@ endif
 
 TESTS := tests/test_text tests/test_settings tests/test_proc \
          tests/test_catalog tests/test_tools tests/test_net tests/test_bt \
-         tests/test_osk tests/test_update tests/test_osinfo tests/test_tz tests/test_quit tests/test_sheets tests/test_color tests/test_lists
+         tests/test_osk tests/test_update tests/test_osinfo tests/test_tz tests/test_quit tests/test_sheets tests/test_color tests/test_lists \
+         tests/test_scope tests/test_pix tests/test_term
 
 tests/test_text:     src/text.c
 tests/test_settings: src/settings.c
@@ -107,7 +118,7 @@ tests/test_catalog:  src/catalog.c src/settings.c src/sheets.c src/text.c
 tests/test_tools:    src/tools.c src/text.c
 tests/test_net:      src/net.c src/text.c tests/fake_proc.c
 tests/test_bt:       src/bt.c src/text.c src/settings.c tests/fake_proc.c
-tests/test_osk:      src/osk.c src/term.c
+tests/test_osk:      src/osk.c src/term.c src/pix.c
 tests/test_update:   src/update.c src/text.c src/settings.c tests/fake_proc.c
 tests/test_osinfo:   src/osinfo.c src/text.c
 tests/test_tz:       src/tz.c src/text.c src/settings.c tests/fake_proc.c
@@ -115,6 +126,9 @@ tests/test_quit:     src/quit.c
 tests/test_sheets:   src/sheets.c
 tests/test_color:   src/color.c
 tests/test_lists:    src/lists.c src/text.c
+tests/test_scope:    src/scope.c
+tests/test_pix:      src/pix.c
+tests/test_term:     src/term.c src/pix.c
 
 $(TESTS): %: %.c tests/check.h
 	$(CC) $(TEST_CFLAGS) $(PL_WARN) -o $@ $(filter %.c,$^)

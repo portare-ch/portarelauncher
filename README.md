@@ -6,6 +6,7 @@ Written in C, it draws directly to the display through KMS using libc and libdrm
 - Browse consoles and games, favourites and recently played games.
 - Launch games through `runemu.sh` and tools such as PortMaster.
 - Manage Wi-Fi, Bluetooth, display settings, power and system updates.
+- Check every button and stick with PortScope, under Settings > Diagnostics.
 
 ## Build
 
