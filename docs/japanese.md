@@ -46,13 +46,14 @@ take one.
 | Glyphs | Width | Source | Licence |
 |---|---|---|---|
 | 9,966 | 16 | Izumi16 | public domain |
-| 3,671 | 16 | Unifont's own | GPL 2.0 or later with the GNU font embedding exception |
-| 712 | 8 | Unifont's own | the same |
+| 3,670 | 16 | Unifont's own | GPL 2.0 or later with the GNU font embedding exception |
+| 664 | 8 | Unifont's own | the same |
 
 Unifont's own glyphs are dual-licensed, also under the SIL OFL 1.1; the
-launcher takes the GPL option, which matches its own licence. The 14,349
-glyphs are generated into a header the way `font8x16.h` is, 437 KB in the
-binary. [FONTS.md](../FONTS.md) is the notice for both fonts.
+launcher takes the GPL option, which matches its own licence. The 14,300
+glyphs are generated into `src/unifont.c` by `tools/mkunifont.py`, 446 KB
+of bitmaps. Combining marks are left out, since they are always composed
+or dropped. [FONTS.md](../FONTS.md) is the notice for both fonts.
 
 The mockups carry only the glyphs they use, in `tools/unifont-mockup.hex`,
 cut from the full font by `tools/mkjafont.py` with the same rule. Its
@@ -105,7 +106,8 @@ decoded characters.
 
 Lists sort by code point: Latin first, then kana in their own order, then
 kanji in no order a reader would expect, as in the games mockup. Readings
-are not in the data, so a gamelist `<sortname>` decides where it has one.
+are not in the data: the catalog names a game by its file and does not
+read gamelists.
 
 ## Words
 

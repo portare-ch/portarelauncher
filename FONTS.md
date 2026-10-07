@@ -10,10 +10,10 @@ Linux, `lib/fonts/font_8x16.c`, under the GPL 2.0 like the launcher.
 
 ## Japanese, from Unifont
 
-`tools/unifont-mockup.hex` carries the Unifont glyphs the mockups use. The
-launcher's own header, once Japanese is built (docs/japanese.md), carries
-the full set the same way. Both come from the Japanese build of GNU
-Unifont, `unifont_jp` 18.0.01, cut by `tools/mkjafont.py`:
+`src/unifont.c` carries the full set the launcher draws with, generated
+by `tools/mkunifont.py`; `tools/unifont-mockup.hex` carries the glyphs the
+mockups use, cut by `tools/mkjafont.py`. Both come from the Japanese build
+of GNU Unifont, `unifont_jp` 18.0.01:
 https://unifoundry.com/pub/unifont/unifont-18.0.01/
 
 Unifont's notice, from the font's own COPYRIGHT property:
@@ -29,8 +29,8 @@ Unifont's notice, from the font's own COPYRIGHT property:
   (`font/plane00/izmg16-plane00.hex` in Unifont's source).
 - **Unifont's own glyphs** are used under the GPL 2.0 or later with the GNU
   Font Embedding Exception, the one of Unifont's two licences that matches
-  this program's. `tools/unifont-mockup.hex` lists them in its header, and the
-  generated header will too.
+  this program's. `src/unifont.c` and `tools/unifont-mockup.hex` list them
+  in their headers.
 
 The exception, as Unifont states it:
 

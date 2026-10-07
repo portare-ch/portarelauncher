@@ -64,8 +64,8 @@ def cw(ch):
 def width(s):
     return sum(cw(c) for c in s)
 
-# Titles come from file names and gamelists, and a file copied from a Mac
-# is named in decomposed form, e + U+0301. The catalog composes on load.
+# Titles are file names, and a file copied from a Mac is named in
+# decomposed form, e + U+0301. The catalog composes on load.
 def nfc(s):
     return unicodedata.normalize("NFC", s)
 def fit(s, w):
@@ -491,10 +491,9 @@ def pad_shapes(shapes=False):
 # English and Japanese, nothing else. Kana and kanji are 16x16 glyphs from
 # the Japanese build of GNU Unifont, two cells wide: the launcher's 8x16
 # grid becomes a PC-98 text screen, ASCII from the VGA font as now, the
-# rest full width. Titles render in either language, since a gamelist can
-# hold Japanese names whatever the menus say; the setting changes the
-# menus, the hints and the console names. It is system.language, which
-# the scraper already reads, en_US or ja_JP.
+# rest full width. Titles render in either language, since a file can be
+# named in Japanese whatever the menus say; the setting changes the menus,
+# the hints and the console names. It is system.language, en_US or ja_JP.
 #
 # Console names are the ones Nintendo, Sony and Sega use in Japan. The
 # short names in the cross-system lists follow: SFC and FC, not SNES and
@@ -524,9 +523,9 @@ ja_systems += [THIN, row("  \u30b2\u30fc\u30e0\u6a5f", "")]
 ja_systems += [item(False, n, str(c)) for n, c in JA_SYS]
 ja_systems += [THIN, row(" A \u6c7a\u5b9a   X \u8a2d\u5b9a", "")]
 
-# A Super Famicom list as a Japanese gamelist names it, in code point
+# A Super Famicom list with its files named in Japanese, in code point
 # order: Latin, then kana in their own order, then kanji in no order a
-# reader would expect. A gamelist <sortname> decides when it has one.
+# reader would expect. Readings are not in the data.
 # The selected title is past the column, so it scrolls; a step is one
 # character, so a kanji leaves the edge whole.
 JA_SFC = sorted([
@@ -614,8 +613,8 @@ def lang_screen(ja):
 ja_language = lang_screen(True)
 en_language = lang_screen(False)
 
-# Titles in any script, under English menus. Pokémon twice: once as the
-# gamelist wrote it, once decomposed, e and U+0301, the way a file copied
+# Titles in any script, under English menus. Pokémon twice: once
+# precomposed, once decomposed, e and U+0301, the way a file copied
 # from a Mac is named; both read the same once composed. The Japanese
 # title renders in the 16x16 font whatever the menu language. The Korean
 # one has no glyphs in either font, so each syllable is a ?.
