@@ -35,9 +35,9 @@ amber, green, PortScope has too.
 
 The face buttons follow the button style setting, `launcher.buttons`:
 the Retroid letters from the font, or the shape marks drawn as outlines.
-The launcher's hint lines approximate those marks out of CP437 today;
-drawing them gives both PortScope and the hints one proper set, two-pixel
-lines in the current attribute.
+The marks are four reserved cell codes the grid draws as two-pixel
+outlines in the cell's colour (`term.h`), so PortScope, every hint line
+and the Button style diagram show the same ones.
 
 ![Shape marks](images/portscope-shapes.png)
 

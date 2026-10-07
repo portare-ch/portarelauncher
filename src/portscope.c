@@ -2,9 +2,9 @@
  *
  * Started by the launcher from Settings > Diagnostics, with the panel
  * handed over the way a game gets it. One more launcher screen on the
- * launcher's own pieces: kms.c, the 8x16 grid, the palette. Two things
- * the font cannot draw are drawn in pixels: a round ring per stick with
- * a dot at the panel's resolution, and the shape marks as outlines.
+ * launcher's own pieces: kms.c, the 8x16 grid, the palette, the shape
+ * marks the grid draws for every screen. The sticks are drawn in pixels:
+ * a round ring each, with a dot at the panel's resolution.
  *
  * One layer at a time. By default the virtual pad InputPlumber presents,
  * which is what games read. Holding SELECT for a second switches to the
@@ -207,7 +207,6 @@ struct view {
 	/* What the pixel layer last drew, so only what changed is redrawn. */
 	int valid;
 	int dot_x[2], dot_y[2], ring_lit[2];
-	int mark_lit[4];
 	int shown_rate;
 };
 
@@ -240,8 +239,10 @@ static void glyph(struct view *v, const struct scope *s, unsigned x, unsigned y,
 static const enum scope_ctl face_ctl[4] = { CTL_TOP, CTL_WEST, CTL_EAST, CTL_BOTTOM };
 static const unsigned face_x[4] = { 40, 37, 43, 40 };
 static const unsigned face_y[4] = { 5, 6, 6, 7 };
-/* What a Retroid has printed on them. */
-static const char face_letter[4] = { 'X', 'Y', 'A', 'B' };
+/* What a Retroid has printed on them, or the shape marks (term.h). */
+static const unsigned char face_letter[4] = { 'X', 'Y', 'A', 'B' };
+static const unsigned char face_mark[4] = { G_MARK_TRIANGLE, G_MARK_SQUARE,
+                                            G_MARK_CIRCLE, G_MARK_CROSS };
 
 static void draw_text(struct view *v, const struct scope *s, long long now)
 {
@@ -277,10 +278,9 @@ static void draw_text(struct view *v, const struct scope *s, long long now)
 	glyph(v, s, 13, 6, 0x1A, CTL_RIGHT);
 	glyph(v, s, 10, 7, 0x19, CTL_DOWN);
 
-	if (!v->shapes)
-		for (int i = 0; i < 4; i++)
-			glyph(v, s, face_x[i], face_y[i], (unsigned char)face_letter[i],
-			      face_ctl[i]);
+	for (int i = 0; i < 4; i++)
+		glyph(v, s, face_x[i], face_y[i],
+		      v->shapes ? face_mark[i] : face_letter[i], face_ctl[i]);
 
 	snprintf(buf, sizeof(buf), "X %+.2f Y %+.2f",
 	         shown(scope_axis(s, AX_LX)), shown(scope_axis(s, AX_LY)));
@@ -349,25 +349,6 @@ static void draw_pixels(struct view *v, const struct scope *s)
 		}
 	}
 
-	if (v->shapes) {
-		for (int i = 0; i < 4; i++) {
-			int lit = scope_lit(s, face_ctl[i]);
-			if (v->valid && v->mark_lit[i] == lit)
-				continue;
-			int x0 = (int)t->ox + (int)face_x[i] * cw;
-			int y0 = (int)t->oy + (int)face_y[i] * ch;
-			int cx = x0 + cw / 2, cy = y0 + ch / 2, sz = 11;
-			uint32_t c = lit ? bright : dim;
-			pix_fill(&v->px, x0, y0, cw, ch, bg);
-			switch (face_ctl[i]) {
-			case CTL_TOP:    pix_triangle(&v->px, cx, cy, sz, 2, c); break;
-			case CTL_WEST:   pix_square(&v->px, cx, cy, sz, 2, c);   break;
-			case CTL_EAST:   pix_circle(&v->px, cx, cy, sz, 2, c);   break;
-			default:         pix_cross(&v->px, cx, cy, sz, 2, c);    break;
-			}
-			v->mark_lit[i] = lit;
-		}
-	}
 	v->valid = 1;
 }
 
@@ -375,9 +356,8 @@ static void draw(struct view *v, const struct scope *s, long long now)
 {
 	draw_text(v, s, now);
 	/* Cells first: a cell repainted after the pixels would black out
-	 * whatever was drawn across it. The ring rows and the mark cells stay
-	 * blank in the grid, so only a full repaint touches them, and that
-	 * clears v->valid. */
+	 * whatever was drawn across it. The ring rows stay blank in the grid,
+	 * so only a full repaint touches them, and that clears v->valid. */
 	term_flush(v->t);
 	draw_pixels(v, s);
 }

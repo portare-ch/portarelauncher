@@ -1,5 +1,6 @@
 #include "term.h"
 #include "font8x16.h"
+#include "pix.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -131,6 +132,35 @@ void term_hline(struct term *t, unsigned y, unsigned char glyph, int attr)
 		term_putc(t, x, y, glyph, attr);
 }
 
+/* A shape mark across the whole cell: background first, then the outline.
+ * Centred where the font's capitals are, rows 2 to 11 of 16, so a mark
+ * sits on the line with the word beside it; half the size of the box it
+ * fits in is 11 pixels at scale 3, two-pixel lines. */
+static void draw_mark(struct term *t, unsigned px0, unsigned py0,
+                      unsigned char ch, uint32_t fg, uint32_t bg)
+{
+	struct pix p = { t->fb, t->pitch_px, t->fb_w, t->fb_h };
+	const int s = (int)t->scale;
+	const int x = (int)px0, y = (int)py0;
+	int size = 11 * s / 3, thick = (2 * s + 2) / 3;
+	if (size < 3)
+		size = 3;
+
+	pix_fill(&p, x, y, FONT_W * s, FONT_H * s, bg);
+	const int cx = x + FONT_W * s / 2, cy = y + 7 * s;
+	switch (ch) {
+	case G_MARK_CROSS:    pix_cross(&p, cx, cy, size, thick, fg);    break;
+	case G_MARK_SQUARE:   pix_square(&p, cx, cy, size, thick, fg);   break;
+	case G_MARK_TRIANGLE: pix_triangle(&p, cx, cy, size, thick, fg); break;
+	default:              pix_circle(&p, cx, cy, size, thick, fg);   break;
+	}
+}
+
+static int is_mark(unsigned char ch)
+{
+	return ch >= G_MARK_CROSS && ch <= G_MARK_CIRCLE;
+}
+
 static void draw_cell(struct term *t, unsigned cx, unsigned cy, const struct cell *c)
 {
 	const unsigned char *glyph = &font8x16[(size_t)c->ch * FONT_H];
@@ -141,6 +171,11 @@ static void draw_cell(struct term *t, unsigned cx, unsigned cy, const struct cel
 
 	unsigned px0 = t->ox + cx * FONT_W * s;
 	unsigned py0 = t->oy + cy * FONT_H * s;
+
+	if (is_mark(c->ch)) {
+		draw_mark(t, px0, py0, c->ch, fg, bg);
+		return;
+	}
 
 	for (unsigned gy = 0; gy < FONT_H; gy++) {
 		unsigned char bits = glyph[gy];

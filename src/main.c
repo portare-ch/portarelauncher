@@ -218,12 +218,6 @@ struct ui {
 #define KEY_BUTTONS "launcher.buttons"
 #define KEY_PALETTE "launcher.palette"
 
-/* The shape marks approximated out of CP437, which is all the VGA font
- * has. Close enough to be recognised, and not the real symbols. */
-#define G_CIRCLE    0x09   /* O   */
-#define G_TRIANGLE  0x1E   /* /\  */
-#define G_SQUARE    0xFE   /* []  */
-
 /* Thirteen rows fill 2..14, straight under the rule, leaving the rule
  * under them, two lines of description, the bottom rule and the hint.
  * That is the last one that fits: a new setting goes in a submenu. */
@@ -343,8 +337,8 @@ static struct face face_of(int retroid)
 		f.confirm = f.right; f.back = f.bottom;
 		f.menu = f.top; f.fav = f.left;
 	} else {
-		f.bottom = 'X'; f.right = G_CIRCLE;
-		f.top = G_TRIANGLE; f.left = G_SQUARE;
+		f.bottom = G_MARK_CROSS; f.right = G_MARK_CIRCLE;
+		f.top = G_MARK_TRIANGLE; f.left = G_MARK_SQUARE;
 		f.confirm = f.bottom; f.back = f.right;
 		f.menu = f.top; f.fav = f.left;
 	}

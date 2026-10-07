@@ -36,62 +36,85 @@ def png(path, px):
         f.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", W, H, 8, 2, 0, 0, 0))
                 + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
 
+# src/pix.c, line for line, so a mockup has the device's pixels.
+def _put(px, x, y, c):
+    if 0 <= x < W and 0 <= y < H:
+        px[(y * W + x) * 3:(y * W + x) * 3 + 3] = bytes(c)
+
+def pix_disc(px, cx, cy, r, c):
+    for dy in range(-r, r + 1):
+        for dx in range(-r, r + 1):
+            if dx * dx + dy * dy < r * r:
+                _put(px, cx + dx, cy + dy, c)
+
+def pix_ring(px, cx, cy, r, t, c):
+    ri = max(r - t, 0)
+    for dy in range(-r, r + 1):
+        for dx in range(-r, r + 1):
+            d2 = dx * dx + dy * dy
+            if ri * ri <= d2 < r * r:
+                _put(px, cx + dx, cy + dy, c)
+
+def pix_line(px, x0, y0, x1, y1, t, c):
+    half = t // 2
+    vx, vy = x1 - x0, y1 - y0
+    len2, lim2 = vx * vx + vy * vy, t * t
+    for y in range(min(y0, y1) - half - 1, max(y0, y1) + half + 2):
+        for x in range(min(x0, x1) - half - 1, max(x0, x1) + half + 2):
+            qx, qy = 2 * x + 1 - 2 * x0, 2 * y + 1 - 2 * y0
+            tn = qx * vx + qy * vy
+            if len2 == 0 or tn <= 0:
+                dx, dy = qx, qy
+            elif tn >= 2 * len2:
+                dx, dy = qx - 2 * vx, qy - 2 * vy
+            else:
+                cr = qx * vy - qy * vx
+                if cr * cr <= lim2 * len2:
+                    _put(px, x, y, c)
+                continue
+            if dx * dx + dy * dy <= lim2:
+                _put(px, x, y, c)
+
+# term.c's draw_mark: the four characters that stand for the shape marks,
+# drawn as two-pixel outlines on the capitals' centre line.
+MARKS = {"\u25b2": "triangle", "\u25a0": "square", "\u25cb": "circle", "\u00d7": "cross"}
+
+def mark(px, col, row, shape, c):
+    cx = OX + col * 8 * SCALE + 8 * SCALE // 2
+    cy = OY + row * 16 * SCALE + 7 * SCALE
+    s, t = 11 * SCALE // 3, (2 * SCALE + 2) // 3
+    h = s * 4 // 5
+    if shape == "circle":
+        pix_ring(px, cx, cy, s, t, c)
+    elif shape == "square":
+        for a, b in (((cx - h, cy - h), (cx + h, cy - h)), ((cx + h, cy - h), (cx + h, cy + h)),
+                     ((cx + h, cy + h), (cx - h, cy + h)), ((cx - h, cy + h), (cx - h, cy - h))):
+            pix_line(px, *a, *b, t, c)
+    elif shape == "triangle":
+        a, b, d = (cx, cy - s), (cx - s, cy + s * 3 // 4), (cx + s, cy + s * 3 // 4)
+        pix_line(px, *a, *b, t, c); pix_line(px, *b, *d, t, c); pix_line(px, *d, *a, t, c)
+    else:
+        pix_line(px, cx - h, cy - h, cx + h, cy + h, t, c)
+        pix_line(px, cx - h, cy + h, cx + h, cy - h, t, c)
+
 def shapes_draw(px, shapes):
-    """Geometry at the panel's resolution: rings for the sticks, thin
-    outlines for the PS marks. Lines two pixels wide, nothing filled but
-    the stick's dot."""
-    def put(x, y, c):
-        if 0 <= x < W and 0 <= y < H:
-            px[(y * W + x) * 3:(y * W + x) * 3 + 3] = bytes(c)
-    def disc(cx, cy, r, c):
-        for yy in range(-r, r + 1):
-            half = int((r * r - yy * yy) ** 0.5)
-            for xx in range(-half, half + 1):
-                put(cx + xx, cy + yy, c)
-    def ring(cx, cy, r, c, t=2):
-        for yy in range(-r, r + 1):
-            for xx in range(-r, r + 1):
-                d2 = xx * xx + yy * yy
-                if (r - t) * (r - t) <= d2 <= r * r:
-                    put(cx + xx, cy + yy, c)
-    def line(x0, y0, x1, y1, c, t=2):
-        n = max(abs(x1 - x0), abs(y1 - y0), 1)
-        for i in range(n + 1):
-            x = x0 + (x1 - x0) * i // n
-            y = y0 + (y1 - y0) * i // n
-            for dx in range(t):
-                for dy in range(t):
-                    put(x + dx, y + dy, c)
+    """The stick rings and their dots, as portscope.c places them."""
     cell_w, cell_h = 8 * SCALE, 16 * SCALE
     for g in shapes.get("rings", []):
         cx = OX + int(g["col"] * cell_w)
         cy = OY + int(g["row"] * cell_h) + cell_h // 2
-        r = g["rows"] * cell_h // 2 - 6
-        ring(cx, cy, r, BRIGHT if g["clicked"] else DIM)
-        disc(cx + int(g["x"] * (r - 12)), cy + int(g["y"] * (r - 12)), 8, BRIGHT)
-    for m in shapes.get("marks", []):
-        c = BRIGHT if m["held"] else DIM
-        cx = OX + m["col"] * cell_w + cell_w // 2
-        cy = OY + m["row"] * cell_h + cell_h // 2
-        s = 11                                  # half size, in pixels: the letters' cap height
-        if m["shape"] == "circle":
-            ring(cx, cy, s, c)
-        elif m["shape"] == "square":
-            line(cx - s, cy - s, cx + s, cy - s, c); line(cx - s, cy + s, cx + s, cy + s, c)
-            line(cx - s, cy - s, cx - s, cy + s, c); line(cx + s, cy - s, cx + s, cy + s, c)
-        elif m["shape"] == "triangle":
-            line(cx, cy - s, cx - s, cy + s, c); line(cx, cy - s, cx + s, cy + s, c)
-            line(cx - s, cy + s, cx + s, cy + s, c)
-        elif m["shape"] == "cross":
-            line(cx - s, cy - s, cx + s, cy + s, c); line(cx + s, cy - s, cx - s, cy + s, c)
+        r = g["rows"] * cell_h // 2 - 8
+        travel = r - 12
+        pix_ring(px, cx, cy, r, 2, BRIGHT if g["clicked"] else DIM)
+        rnd = lambda v: int(v * travel + (-0.5 if v < 0 else 0.5))
+        pix_disc(px, cx + rnd(g["x"]), cy + rnd(g["y"]), 8, BRIGHT)
 
 def render(lines, path, glyphs, spans=None, shapes=None):
     """spans: ([(row, c0, c1)] bright, [(row, c0, c1)] dim): cells coloured
-    by state rather than by their row, for the pad diagram. shapes: drawn
-    over the text afterwards, see shapes_draw; a cell a mark sits in is
-    left blank of its glyph."""
+    by state rather than by their row, for the pad diagram. shapes: the
+    stick rings, drawn over the text afterwards, see shapes_draw. A shape
+    mark character is drawn as its outline, in the colour its cell has."""
     px = bytearray(W * H * 3)
-    skip = {(m["row"], m["col"]) for m in (shapes or {}).get("marks", [])}
     forced = {}
     if spans:
         for r, c0, c1 in spans[1]:
@@ -115,11 +138,14 @@ def render(lines, path, glyphs, spans=None, shapes=None):
         rule = line.strip() and set(line.strip()) <= {"═", "─"}
         selected = "▸" in line
         for c, ch in enumerate(line[:COLS]):
-            if ch == " " or (r, c) in skip:
+            if ch == " ":
                 continue
             color = MID if rule else BRIGHT if selected else TEXT
             color = forced.get((r, c), color)
-            put(c, r, ch, color)
+            if ch in MARKS:
+                mark(px, c, r, MARKS[ch], color)
+            else:
+                put(c, r, ch, color)
     if shapes:
         shapes_draw(px, shapes)
     png(path, px)
