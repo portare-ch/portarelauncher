@@ -34,6 +34,11 @@ static const struct palette palettes[] = {
 int term_palette_count(void) { return N_PALETTES; }
 int term_palette(const struct term *t) { return t->pal; }
 
+uint32_t term_color(const struct term *t, int attr)
+{
+	return palettes[t->pal].c[attr >= 0 && attr < ATTR_COUNT ? attr : ATTR_TEXT];
+}
+
 const char *term_set_palette(struct term *t, int idx)
 {
 	t->pal = ((idx % N_PALETTES) + N_PALETTES) % N_PALETTES;

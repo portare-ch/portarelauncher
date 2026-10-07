@@ -36,6 +36,7 @@
 
 #define CARD        "/dev/dri/card0"
 #define ES_SYSTEMS  "/usr/config/emulationstation/es_systems.cfg"
+#define PORTSCOPE   "/usr/bin/portscope"
 #define SETTINGS    "/storage/.config/system/configs/system.cfg"
 
 /* The panel's color profile. "stock" leaves the display controller's color
@@ -129,7 +130,8 @@ enum { QUICK_RECENT = 0, QUICK_FAVS = 1 };
 
 enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI, SCR_BT,
               SCR_KEYBOARD, SCR_TOOLS, SCR_ABOUT, SCR_UPDATE,
-              SCR_TZ, SCR_POWER, SCR_CONSOLES, SCR_RECENT, SCR_FAVS };
+              SCR_TZ, SCR_POWER, SCR_CONSOLES, SCR_RECENT, SCR_FAVS,
+              SCR_DIAG };
 
 struct ui {
 	struct term term;
@@ -220,12 +222,12 @@ struct ui {
 #define G_TRIANGLE  0x1E   /* /\  */
 #define G_SQUARE    0xFE   /* []  */
 
-/* Thirteen rows do not fit: twelve fill 3..14, leaving the rule, two lines
- * of description, the bottom rule and the hint. A new setting goes in a
- * submenu, not here. */
+/* Thirteen rows fill 2..14, straight under the rule, leaving the rule
+ * under them, two lines of description, the bottom rule and the hint.
+ * That is the last one that fits: a new setting goes in a submenu. */
 enum { SET_WIFI = 0, SET_SSH, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_CONSOLES,
-       SET_COLOR, SET_PROFILE, SET_CHARGING, SET_TIMEZONE, SET_ABOUT, SET_POWER,
-       N_SETTINGS };
+       SET_COLOR, SET_PROFILE, SET_CHARGING, SET_TIMEZONE, SET_DIAGNOSTICS,
+       SET_ABOUT, SET_POWER, N_SETTINGS };
 
 static const char *const settings_labels[N_SETTINGS] = {
 	"Wi-Fi",
@@ -238,6 +240,7 @@ static const char *const settings_labels[N_SETTINGS] = {
 	"Color profile",
 	"Charging LED",
 	"Time zone",
+	"Diagnostics",
 	"About",
 	"Power",
 };
@@ -880,14 +883,14 @@ static void draw_settings(struct ui *u)
 				value = "unknown";
 			break;
 		}
-		draw_row(u, (unsigned)(3 + i), i == u->set_sel,
+		draw_row(u, (unsigned)(2 + i), i == u->set_sel,
 		         settings_labels[i], value);
 	}
 
-	/* Twelve rows of settings leave two under the rule before the
-	 * bottom rule and the hint line: y + 1 and y + 2. The button
-	 * diagram needs three, so it takes the rule's row as well. */
-	unsigned y = 3 + N_SETTINGS;
+	/* The settings leave two rows under the rule before the bottom rule
+	 * and the hint line: y + 1 and y + 2. The button diagram needs
+	 * three, so it takes the rule's row as well. */
+	unsigned y = 2 + N_SETTINGS;
 	if (u->set_sel != SET_BUTTONS)
 		term_hline(t, y, G_HLINE, ATTR_DIM);
 
@@ -995,6 +998,22 @@ static void draw_consoles(struct ui *u)
 
 	struct face f = face_of(u->retroid);
 	snprintf(buf, sizeof(buf), "%c CHANGE   %c BACK", f.confirm, f.back);
+	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
+}
+
+/* Settings > Diagnostics: the tools that show what the hardware does. One
+ * so far. Nothing is written under it: the name says what it opens, and
+ * Home + START is the way out of everything on the device. */
+static void draw_diag(struct ui *u)
+{
+	struct term *t = &u->term;
+	char buf[64];
+
+	draw_frame(u, "Settings  >  Diagnostics");
+	draw_row(u, 3, 1, "PortScope", NULL);
+
+	struct face f = face_of(u->retroid);
+	snprintf(buf, sizeof(buf), "%c OPEN   %c BACK", f.confirm, f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -1556,6 +1575,7 @@ static void redraw(struct ui *u)
 	case SCR_TZ:       draw_tz(u);       break;
 	case SCR_POWER:    draw_power(u);    break;
 	case SCR_CONSOLES: draw_consoles(u); break;
+	case SCR_DIAG:     draw_diag(u);     break;
 	case SCR_UPDATE:   draw_update(u);   break;
 	case SCR_RECENT:
 	case SCR_FAVS:     draw_list(u);     break;
@@ -1870,6 +1890,20 @@ static void run_tool(struct ui *u, const struct tool *tl)
 	hand_over(u, argv, u->tools.dir);
 }
 
+/* PortScope with the panel, like a game. Its raw layer stops InputPlumber
+ * and it starts it again on every way out it controls; a SIGKILL from the
+ * quit combo's last stage runs none of that, so it is started here too.
+ * Starting a unit that runs is a no-op. */
+static void run_portscope(struct ui *u)
+{
+	char *const argv[] = { (char *)PORTSCOPE, NULL };
+	hand_over(u, argv, NULL);
+
+	char *const ip[] = { (char *)"systemctl", (char *)"start",
+	                     (char *)"inputplumber.service", NULL };
+	proc_run_for(ip, NULL, NULL, 10000);
+}
+
 /* Joins the network the keyboard is for, or says why not. On success the
  * password is scrubbed from memory and the Wi-Fi list comes back showing it
  * connected; on failure the keyboard stays up with the text intact, because
@@ -2105,6 +2139,8 @@ static void on_action(struct ui *u, enum action a)
 			u->console_sel = 0;
 			u->screen = SCR_CONSOLES;
 		}
+		else if (a == ACT_CONFIRM && u->set_sel == SET_DIAGNOSTICS)
+			u->screen = SCR_DIAG;
 		else if (a == ACT_CONFIRM && u->set_sel == SET_BLUETOOTH) {
 			draw_busy(u, "reading devices...");
 			u->bt_on = bt_powered();
@@ -2320,6 +2356,12 @@ static void on_action(struct ui *u, enum action a)
 		else if (a == ACT_QUIT) u->running = 0;
 		break;
 	}
+
+	case SCR_DIAG:
+		if (a == ACT_CONFIRM) run_portscope(u);
+		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
+		else if (a == ACT_QUIT) u->running = 0;
+		break;
 
 	case SCR_ABOUT:
 		if (a == ACT_CONFIRM && u->about_sel == 0) open_update(u);

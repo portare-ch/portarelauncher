@@ -64,6 +64,9 @@ void term_hline(struct term *t, unsigned y, unsigned char glyph, int attr);
 const char *term_set_palette(struct term *t, int idx);
 int term_palette_count(void);
 int term_palette(const struct term *t);
+/* The colour an attribute has in the palette in use, for what is drawn
+ * beside the grid rather than in it. */
+uint32_t term_color(const struct term *t, int attr);
 
 /* Writes the cells that changed since the last flush. */
 void term_flush(struct term *t);

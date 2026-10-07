@@ -74,6 +74,24 @@ to look at. `--raw` starts there. A short press of SELECT is a press like
 any other and lights its word; only the hold switches. Diagnostics has
 one entry, PortScope; the layer is a mode of it, not a second item.
 
+InputPlumber grabs the devices it reads (`EVIOCGRAB`, in
+`src/input/source/evdev/gamepad.rs`), so while it runs a second reader of
+the MCU gets no events at all, and it has no call that lets one go. The
+raw layer therefore stops `inputplumber.service`; InputPlumber puts the
+hidden nodes back in `/dev/input` when it stops, and PortScope reads them
+there. Leaving the raw layer starts it again, and so does every way out
+of PortScope it controls. The launcher starts it once more after
+PortScope returns, which covers the one way out that runs no code in
+PortScope, a SIGKILL. While the raw layer is shown nothing else gets the
+pad, which is the point of it.
+
+The raw layer is two devices: the MCU, and gpio-keys, which carries the
+paddles, BTN_Z for M1 and BTN_C for M2. The MCU reports the top face
+button as BTN_WEST and the left one as BTN_NORTH; `nova_mcu.yaml` swaps
+them for InputPlumber, and PortScope reads them the same way, so the
+diagram stays where the buttons are and Last input shows the code the
+MCU sent.
+
 ## What it does not do
 
 No calibration, no remapping, no settings. `gamepadcalibration` keeps the
@@ -91,5 +109,7 @@ everything on the device.
 
 `packages/apps/gamepadtester` goes, with its two SM8550 patches and the
 Tools script and gamelist entry that ran it; nothing replaces them in
-Tools. The launcher opens `portscope` from Settings > Diagnostics. `SDL2_gfx` was pulled
-in for it and may go too once nothing else lists it.
+Tools. The launcher opens `/usr/bin/portscope` from Settings >
+Diagnostics, so the package installs it beside `portarelauncher`.
+`SDL2_gfx` was pulled in for the old tester and may go too once nothing
+else lists it.
