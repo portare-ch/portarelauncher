@@ -36,7 +36,9 @@
 
 #define CARD        "/dev/dri/card0"
 #define ES_SYSTEMS  "/usr/config/emulationstation/es_systems.cfg"
-#define PORTSCOPE   "/usr/bin/portscope"
+#ifndef PORTSCOPE
+#define PORTSCOPE   "/usr/bin/portscope"   /* a test build points elsewhere */
+#endif
 #define SETTINGS    "/storage/.config/system/configs/system.cfg"
 
 /* The panel's color profile. "stock" leaves the display controller's color
