@@ -1,6 +1,7 @@
 #include "check.h"
 #include "term.h"
 #include "glyph.h"
+#include "ja26_fixture.h"
 
 /* Three cells by two at scale 3: 72 x 96 pixels. */
 #define W 72
@@ -182,9 +183,71 @@ static void test_text(void)
 	term_free(&t);
 }
 
+/* A two-cell glyph from the 26-pixel file: scaled to 48 x 48 with
+ * bilinear filtering and blended, so its edges take colours between the
+ * text and the black, and nothing lands outside its two cells. A glyph
+ * the file does not have is Unifont's, in the two colours only. */
+static void test_ja26(void)
+{
+	char *dir = fixture_dir(), path[64];
+	snprintf(path, sizeof(path), "%s/ja26.bin", dir);
+	static unsigned char glyph[1][JA26_BYTES];
+	for (int y = 8; y < 18; y++)                 /* a solid square, 10 x 10 */
+		for (int x = 8; x < 18; x += 2)
+			glyph[0][y * 13 + x / 2] = 0xFF;
+	const uint32_t cps[1] = { 0x91D1 };
+	ja26_fixture(path, "PLJA26\0\1", 1, JA26_SIZE, cps, glyph, 0);
+	CHECK_INT(ja26_load(path), 0);
+
+	struct term t;
+	memset(&t, 0, sizeof(t));
+	CHECK_INT(term_init(&t, tfb, TW, TW, TH, 3), 0);
+	const uint32_t text = term_color(&t, ATTR_TEXT), bg = term_color(&t, ATTR_BG);
+
+	memset(tfb, 0, sizeof(tfb));
+	term_invalidate(&t);
+	term_puts(&t, 0, 0, KIN, ATTR_TEXT);
+	term_flush(&t);
+	int full = 0, edge = 0, outside = 0;
+	for (int y = 0; y < TH; y++)
+		for (int x = 0; x < TW; x++) {
+			uint32_t v = tfb[y * TW + x];
+			if (x >= 48 && v != bg)
+				outside++;
+			else if (v == text)
+				full++;
+			else if (v != bg)
+				edge++;
+		}
+	CHECK(full > 0);
+	CHECK(edge > 0);
+	CHECK_INT(outside, 0);
+	/* The square's middle is the text colour, the cells' corners black. */
+	CHECK(tfb[24 * TW + 24] == text);
+	CHECK(tfb[0] == bg && tfb[47 * TW + 47] == bg);
+
+	/* あ is not in this file: Unifont's, the text colour and black only. */
+	memset(tfb, 0, sizeof(tfb));
+	term_clear(&t);
+	term_invalidate(&t);
+	term_puts(&t, 0, 0, "\xe3\x81\x82", ATTR_TEXT);
+	term_flush(&t);
+	int other = 0, ink = 0;
+	for (int i = 0; i < TW * TH; i++) {
+		other += tfb[i] != text && tfb[i] != bg;
+		ink += tfb[i] == text;
+	}
+	CHECK_INT(other, 0);
+	CHECK(ink > 0);
+
+	term_free(&t);
+	fixture_cleanup(dir);
+}
+
 int main(void)
 {
 	test_marks();
 	test_text();
+	test_ja26();
 	return check_report("term");
 }

@@ -1,12 +1,28 @@
 # Fonts
 
-Two bitmap fonts, both drawn from data generated into this repository.
+Three fonts, all drawn from data generated into this repository.
 
 ## VGA 8x16
 
 `src/font8x16.h`, the whole UI today, is the VGA 8x16 text-mode font from
 Linux, `lib/fonts/font_8x16.c`, under the GPL 2.0 like the launcher.
 `tools/mkfont.py` generates it and records where it comes from.
+
+## Kana and kanji, from Noto Sans CJK JP
+
+`data/ja26.bin` holds the kana and kanji as the launcher draws them: Noto
+Sans CJK JP Medium, version 2.004, rasterised at 26 x 26 pixels with 16
+grey levels by `tools/mkja26.py`. That is a modified version of the font
+under the SIL Open Font License 1.1, so `data/ja26.NOTICE`, with the
+font's copyright, and `data/OFL-1.1.txt`, the licence, go wherever the
+glyphs go: the launcher's package installs all three to
+`/usr/share/portarelauncher`.
+
+> © 2014-2021 Adobe (http://www.adobe.com/).
+
+The font is reached by the name Noto; Adobe's reserved name for it,
+Source, is not used here. `tools/ja26-mockup.hex` carries the glyphs the
+mockups use, under the same notice.
 
 ## Japanese, from Unifont
 

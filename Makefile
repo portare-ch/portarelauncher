@@ -109,7 +109,7 @@ endif
 TESTS := tests/test_text tests/test_settings tests/test_proc \
          tests/test_catalog tests/test_tools tests/test_net tests/test_bt \
          tests/test_osk tests/test_update tests/test_osinfo tests/test_tz tests/test_quit tests/test_sheets tests/test_color tests/test_lists \
-         tests/test_scope tests/test_pix tests/test_term tests/test_glyph tests/test_lang
+         tests/test_scope tests/test_pix tests/test_term tests/test_glyph tests/test_lang tests/test_ja26
 
 tests/test_text:     src/text.c
 tests/test_settings: src/settings.c
@@ -131,8 +131,9 @@ tests/test_pix:      src/pix.c
 tests/test_term:     src/term.c src/pix.c src/glyph.c src/unifont.c src/ja26.c
 tests/test_glyph:    src/glyph.c src/unifont.c
 tests/test_lang:     src/lang.c src/glyph.c src/unifont.c
+tests/test_ja26:     src/ja26.c
 
-$(TESTS): %: %.c tests/check.h
+$(TESTS): %: %.c tests/check.h tests/ja26_fixture.h
 	$(CC) $(TEST_CFLAGS) $(PL_WARN) -o $@ $(filter %.c,$^)
 
 # Always rebuilt: SAN=1 and a plain run must not reuse each other's binaries.

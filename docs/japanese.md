@@ -33,12 +33,29 @@ deliberate change to that script, not a side effect of this one.
 
 ## The font
 
-Kana and kanji are 16x16 glyphs from the Japanese build of GNU Unifont,
-`unifont_jp` 18.0.01. Each takes two cells of the 8x16 grid, and ASCII
-stays the VGA font. The result is a PC-98 text screen, which is where the
-launcher's DOS look leads in Japanese anyway.
+Kana and kanji are drawn the way the PS2 drew its system menus. The PS2's
+font, `rom0:FONTM`, held each glyph at 26 x 26 pixels with 16 grey
+levels, and the console scaled it with bilinear filtering and blended it
+over the background (gsKit's `gsFontM.c` reads it so: a `GS_PSM_T4`
+texture with a greyscale ramp, `GS_FILTER_LINEAR`). The launcher does the
+same with a free font: Noto Sans CJK JP Medium, rasterised at 26 x 26
+with 16 levels into `data/ja26.bin` by `tools/mkja26.py`, scaled to the
+48 x 48 of two cells and blended into the cell's colour. Medium is the
+weight that matches the VGA letters; Regular reads thin beside them.
 
-The set is every character of JIS X 0213 the VGA font does not have,
+Earlier tries are why. Unifont's 16 x 16 glyphs tripled showed
+three-pixel stairs, which on this panel read as aliasing. Scale3x
+smoothed them, and that was too smooth.
+
+The file holds 13,636 glyphs, every two-cell character below, in 4.5 MB,
+2 MB compressed; it is installed as
+`/usr/share/portarelauncher/ja26.bin` with `ja26.NOTICE` and
+`OFL-1.1.txt`. The program reads it at start. Without it, or for a
+character it lacks, Unifont's glyph is drawn instead, which also covers
+the one-cell symbols.
+
+Unifont stays the source of what is drawn in what width. The set is every
+character of JIS X 0213 the VGA font does not have,
 with its `unifont_jp` glyph. Kana and kanji are 16 pixels wide and take
 two cells. Some symbols and letters, such as Ⅳ, ※ and Ō, are 8 wide and
 take one.
@@ -55,9 +72,11 @@ glyphs are generated into `src/unifont.c` by `tools/mkunifont.py`, 446 KB
 of bitmaps. Combining marks are left out, since they are always composed
 or dropped. [FONTS.md](../FONTS.md) is the notice for both fonts.
 
-The mockups carry only the glyphs they use, in `tools/unifont-mockup.hex`,
-cut from the full font by `tools/mkjafont.py` with the same rule. Its
-header lists which of them are Unifont's own.
+The mockups carry only the glyphs they use: `tools/unifont-mockup.hex`,
+cut by `tools/mkjafont.py` with the same rule, its header listing which
+are Unifont's own, and `tools/ja26-mockup.hex` from `tools/mkja26.py`.
+`tools/mockup_png.py` draws the latter in the same integer steps as the
+launcher.
 
 ## Text
 
@@ -163,8 +182,5 @@ language at once.
 
 ## Open
 
-Izumi16 draws with one-pixel strokes and the VGA font mostly with two, so
-a row that mixes them looks uneven; `MOTHER2 ギーグの逆襲` in the games
-mockup shows it. Drawing kana and kanji one pixel bolder matches the
-weight but fills dense kanji such as 魔 and 襲. That is for the panel to
-decide, not a mockup.
+Nothing. The stroke weight that was open here is settled by the font:
+Noto Medium at 26 pixels matches the VGA letters, judged on the panel.

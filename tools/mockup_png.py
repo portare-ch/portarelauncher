@@ -31,6 +31,30 @@ def unifont():
     return out
 UNI = unifont()
 
+def ja26():
+    """The 26 x 26, 16-level glyphs the launcher draws kana and kanji with,
+    those the mockups use (tools/mkja26.py): character to 26 rows."""
+    out = {}
+    path = os.path.join(os.path.dirname(__file__), "ja26-mockup.hex")
+    for line in open(path):
+        if line.startswith("#"):
+            continue
+        cp, h = line.strip().split(":")
+        b = bytes.fromhex(h)
+        out[chr(int(cp, 16))] = [[(b[y * 13 + x // 2] >> (0 if x & 1 else 4)) & 15
+                                  for x in range(26)] for y in range(26)]
+    return out
+JA26 = ja26()
+
+# term.c's draw_ja26, in the same integer steps: bilinear from 26 to 48,
+# then the cell colour blended over black.
+_I0, _W1 = [], []
+for _o in range(48):
+    _f = (2 * _o + 1) * 26 * 128 // 48 - 128
+    _i = _f // 256 if _f >= 0 else -1
+    _I0.append(_i)
+    _W1.append(_f - _i * 256)
+
 def font():
     src = open(os.path.join(os.path.dirname(__file__), "..", "src", "font8x16.h")).read()
     body = re.sub(r"/\*.*?\*/", "", src.split("font8x16[4096] = {")[1], flags=re.S)
@@ -132,6 +156,21 @@ def render(lines, path, glyphs, spans=None, shapes=None):
         for r, c0, c1 in spans[0]:
             for c in range(c0, c1 + 1):
                 forced[(r, c)] = BRIGHT
+    def put_ja26(col, row, ch, color):
+        g = JA26[ch]
+        L = lambda y, x: g[y][x] if 0 <= y < 26 and 0 <= x < 26 else 0
+        x0, y0 = OX + col * 8 * SCALE, OY + row * 16 * SCALE
+        for oy in range(48):
+            y, wy = _I0[oy], _W1[oy]
+            for ox in range(48):
+                x, wx = _I0[ox], _W1[ox]
+                top = L(y, x) * (256 - wx) + L(y, x + 1) * wx
+                bot = L(y + 1, x) * (256 - wx) + L(y + 1, x + 1) * wx
+                a = (top * (256 - wy) + bot * wy) // 3855
+                if a:
+                    base = ((y0 + oy) * W + x0 + ox) * 3
+                    px[base:base + 3] = bytes(b + (c - b) * a // 255
+                                              for b, c in zip(BG, color))
     def put_unifont(col, row, ch, color):
         wpx, rows = UNI[ch]
         x0, y0 = OX + col * 8 * SCALE, OY + row * 16 * SCALE
@@ -166,6 +205,8 @@ def render(lines, path, glyphs, spans=None, shapes=None):
                 color = forced.get((r, c), color)
                 if kind == "mark":
                     mark(px, c, r, g, color)
+                elif kind == "unifont" and w == 2 and g in JA26:
+                    put_ja26(c, r, g, color)
                 elif kind == "unifont":
                     put_unifont(c, r, g, color)
                 else:
