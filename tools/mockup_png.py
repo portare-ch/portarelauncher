@@ -17,21 +17,19 @@ COLS, ROWS = mockup.COLS, mockup.ROWS
 OX, OY = (W - COLS * 8 * SCALE) // 2, (H - ROWS * 16 * SCALE) // 2
 # color.c, "amber": background, dim, mid, text, bright
 BG, DIM, MID, TEXT, BRIGHT = (0, 0, 0), (0x66, 0x3d, 0), (0xb3, 0x74, 0), (0xff, 0xb0, 0), (0xff, 0xd9, 0x8a)
-CP437 = {"═": 0xCD, "─": 0xC4, "▸": 0x10, "↑": 0x18, "↓": 0x19, "←": 0x1B, "→": 0x1A,
-         "♥": 0x03, "›": 0x3E, "…": 0x2E, "┌": 0xDA, "┐": 0xBF, "└": 0xC0, "┘": 0xD9,
-         "│": 0xB3, "·": 0xFA, "•": 0x07, "▲": 0x1E, "■": 0xFE, "○": 0x09, "×": 0x58}
 
-def ja_font():
-    """The 16x16 kana and kanji the mockups use, from tools/ja16-mockup.hex
-    (tools/mkjafont.py): code point to 16 rows of 16 bits."""
+def unifont():
+    """The Unifont glyphs the mockups use, from tools/unifont-mockup.hex
+    (tools/mkjafont.py): character to (width in pixels, 16 rows)."""
     out = {}
-    for line in open(os.path.join(os.path.dirname(__file__), "ja16-mockup.hex")):
+    for line in open(os.path.join(os.path.dirname(__file__), "unifont-mockup.hex")):
         if line.startswith("#"):
             continue
         cp, bits = line.strip().split(":")
-        out[chr(int(cp, 16))] = [int(bits[i:i + 4], 16) for i in range(0, 64, 4)]
+        step = len(bits) // 16
+        out[chr(int(cp, 16))] = (step * 4, [int(bits[i:i + step], 16) for i in range(0, len(bits), step)])
     return out
-JA = ja_font()
+UNI = unifont()
 
 def font():
     src = open(os.path.join(os.path.dirname(__file__), "..", "src", "font8x16.h")).read()
@@ -89,7 +87,6 @@ def pix_line(px, x0, y0, x1, y1, t, c):
 
 # term.c's draw_mark: the four characters that stand for the shape marks,
 # drawn as two-pixel outlines on the capitals' centre line.
-MARKS = {"\u25b2": "triangle", "\u25a0": "square", "\u25cb": "circle", "\u00d7": "cross"}
 
 def mark(px, col, row, shape, c):
     cx = OX + col * 8 * SCALE + 8 * SCALE // 2
@@ -135,19 +132,17 @@ def render(lines, path, glyphs, spans=None, shapes=None):
         for r, c0, c1 in spans[0]:
             for c in range(c0, c1 + 1):
                 forced[(r, c)] = BRIGHT
-    def put_wide(col, row, ch, color):
-        if ch not in JA:
-            sys.exit(f"no glyph for {ch!r} (U+{ord(ch):04X}): run tools/mkjafont.py")
+    def put_unifont(col, row, ch, color):
+        wpx, rows = UNI[ch]
         x0, y0 = OX + col * 8 * SCALE, OY + row * 16 * SCALE
-        for yy, bits in enumerate(JA[ch]):
-            for xx in range(16):
-                if bits & (0x8000 >> xx):
+        for yy, bits in enumerate(rows):
+            for xx in range(wpx):
+                if bits & (1 << (wpx - 1 - xx)):
                     for sy in range(SCALE):
                         base = ((y0 + yy * SCALE + sy) * W + x0 + xx * SCALE) * 3
                         for sx in range(SCALE):
                             px[base + sx * 3:base + sx * 3 + 3] = bytes(color)
-    def put(col, row, ch, color):
-        g = CP437.get(ch, ord(ch) if ord(ch) < 128 else 0x3F)
+    def put(col, row, g, color):
         x0, y0 = OX + col * 8 * SCALE, OY + row * 16 * SCALE
         for yy in range(16):
             bits = glyphs[g * 16 + yy]
@@ -162,18 +157,19 @@ def render(lines, path, glyphs, spans=None, shapes=None):
         selected = "▸" in line
         c = 0
         for ch in line:
+            kind, g = mockup.glyph(ch)
             w = mockup.cw(ch)
             if c + w > COLS:
                 break
-            if ch != " ":
+            if ch != " " and kind != "none":
                 color = MID if rule else BRIGHT if selected else TEXT
                 color = forced.get((r, c), color)
-                if ch in MARKS:
-                    mark(px, c, r, MARKS[ch], color)
-                elif w == 2:
-                    put_wide(c, r, ch, color)
+                if kind == "mark":
+                    mark(px, c, r, g, color)
+                elif kind == "unifont":
+                    put_unifont(c, r, g, color)
                 else:
-                    put(c, r, ch, color)
+                    put(c, r, g, color)
             c += w
     if shapes:
         shapes_draw(px, shapes)
@@ -199,5 +195,6 @@ if __name__ == "__main__":
                         ("ja-recently-played", mockup.ja_recent),
                         ("ja-settings", mockup.ja_settings),
                         ("ja-language-region", mockup.ja_language),
-                        ("language-region", mockup.en_language)):
+                        ("language-region", mockup.en_language),
+                        ("games-any-script", mockup.games_any_script)):
         render(lines, os.path.join(out, name + ".png"), glyphs)

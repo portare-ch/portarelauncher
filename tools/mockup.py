@@ -2,17 +2,72 @@
 """Renders the launcher screens at the real grid so layout can be judged
 before any of it is written. 53x20 is 8x16 glyphs at 3x on a 1280x960 panel."""
 
-import unicodedata
+import os, unicodedata
 
 COLS, ROWS = 53, 20
 
-# Kana and kanji take two cells: a 16x16 glyph across two 8x16 ones, as
-# on a PC-98. Everything else, the box drawing and the marks included,
-# takes one.
+# How a character is drawn decides how wide it is; there is no Unicode
+# width table. In order:
+#   - a combining mark left after composing: nothing, no cell
+#   - a shape mark (term.h): drawn, one cell
+#   - the VGA font: ASCII and the rest of CP437, é ü ñ, the box drawing
+#   - Unifont's glyph for a character of JIS X 0213: one cell if it is 8
+#     pixels wide, Ⅳ or ※, two if it is 16, kana and kanji
+#   - the base letter of a composed one, ș as s, if a font has that
+#   - ? in one cell
+MARKS = {"\u25b2": "triangle", "\u25a0": "square", "\u25cb": "circle", "\u00d7": "cross"}
+# CP437's low symbols, which the codec maps to control codes, and two the
+# launcher borrows: > for the crumb separator, . for an ellipsis.
+VGA_EXTRA = {"\u25b8": 0x10, "\u2191": 0x18, "\u2193": 0x19, "\u2190": 0x1B, "\u2192": 0x1A,
+             "\u2665": 0x03, "\u2022": 0x07, "\u203a": 0x3E, "\u2026": 0x2E}
+def vga(ch):
+    """The VGA font's glyph for ch, or None."""
+    if ch in VGA_EXTRA:
+        return VGA_EXTRA[ch]
+    if " " <= ch <= "~":
+        return ord(ch)
+    if ord(ch) < 0x80:
+        return None
+    try:
+        return ch.encode("cp437")[0]
+    except UnicodeEncodeError:
+        return None
+
+def _unifont():
+    """Character to width in cells, from tools/unifont-mockup.hex."""
+    path = os.path.join(os.path.dirname(__file__), "unifont-mockup.hex")
+    if not os.path.exists(path):
+        return {}
+    return {chr(int(cp, 16)): len(bits) // 32
+            for cp, bits in (l.strip().split(":") for l in open(path) if not l.startswith("#"))}
+UNIFONT = _unifont()
+
+def glyph(ch):
+    """("none", None), ("mark", shape), ("vga", code) or ("unifont", ch)."""
+    if unicodedata.combining(ch):
+        return ("none", None)
+    if ch in MARKS:
+        return ("mark", MARKS[ch])
+    v = vga(ch)
+    if v is not None:
+        return ("vga", v)
+    if ch in UNIFONT:
+        return ("unifont", ch)
+    base = unicodedata.normalize("NFD", ch)[0]
+    if base != ch and glyph(base)[0] in ("vga", "unifont"):
+        return glyph(base)
+    return ("vga", ord("?"))
+
 def cw(ch):
-    return 2 if unicodedata.east_asian_width(ch) in "WF" else 1
+    kind, g = glyph(ch)
+    return 0 if kind == "none" else UNIFONT[g] if kind == "unifont" else 1
 def width(s):
     return sum(cw(c) for c in s)
+
+# Titles come from file names and gamelists, and a file copied from a Mac
+# is named in decomposed form, e + U+0301. The catalog composes on load.
+def nfc(s):
+    return unicodedata.normalize("NFC", s)
 def fit(s, w):
     """The longest start of s that fits in w columns, never half a glyph."""
     out, n = "", 0
@@ -269,10 +324,27 @@ TITLE_W = COLS - 4 - 2    # marker and indent, then the right margin
 def cut(t):
     return t if width(t) <= TITLE_W else fit(t, TITLE_W - 3) + "..."
 def scrolled(t, shift):
-    """shift characters scrolled off the left; a step is a character, so
-    a kanji leaves whole, never half drawn at the edge."""
-    return fit(t[shift:], TITLE_W)
+    """shift is in columns, one per 150 ms tick. The view starts at the
+    character the shift falls in, drawn whole: a kanji holds for two ticks
+    and then leaves as a whole, so text moves a column a tick on average
+    whatever its script, and no glyph is ever drawn by half."""
+    col = 0
+    for i, c in enumerate(t):
+        if col + cw(c) > shift:
+            return fit(t[i:], TITLE_W)
+        col += cw(c)
+    return ""
+def marquee_end(t):
+    """Where scrolling stops: the first character boundary at or past the
+    overflow, so the last character is in view."""
+    over, col = width(t) - TITLE_W, 0
+    for c in t:
+        if col >= over:
+            break
+        col += cw(c)
+    return max(col, 0)
 def game(sel, title, shift=0):
+    title = nfc(title)
     return item(sel, scrolled(title, shift) if sel else cut(title))
 
 # The footer is the favourite cue: Y FAVOURITE under a game that is not
@@ -321,6 +393,7 @@ RECENT = [("TODAY", [("Super Mario World", "SNES"), ("Tekken 3", "PS1")]),
           ("SUNDAY", [("Super Metroid", "SNES"), ("Wipeout XL", "PS1")]),
           ("SATURDAY", [("Mega Man X", "SNES"), ("Xenogears", "PS1")])]
 def across(sel, title, right):
+    title = nfc(title)
     w = COLS - 4 - width(right) - 3
     return item(sel, title if width(title) <= w else fit(title, w - 3) + "...", right)
 recent = [crumb("Recently played"), RULE, ""]
@@ -423,10 +496,10 @@ def pad_shapes(shapes=False):
 # menus, the hints and the console names. It is system.language, which
 # the scraper already reads, en_US or ja_JP.
 #
-# Console names are the ones the machines were sold under in Japan. The
+# Console names are the ones Nintendo, Sony and Sega use in Japan. The
 # short names in the cross-system lists follow: SFC and FC, not SNES and
 # NES.
-JA_STATUS = "\u97f3\u91cf 50%  \u8f1d\u5ea6 70%  \u96fb\u6c60 87%  23:59 "
+JA_STATUS = "\u97f3\u91cf 50%  \u660e\u308b\u3055 70%  \u96fb\u6c60 87%  23:59 "
 def ja_header(crumb):
     return header(crumb, JA_STATUS)
 def ja_crumb(name):
@@ -434,8 +507,8 @@ def ja_crumb(name):
 
 JA_QUICK = [("\u6700\u8fd1\u904a\u3093\u3060\u30b2\u30fc\u30e0", 10),
             ("\u304a\u6c17\u306b\u5165\u308a", 7)]
-JA_SYS = [("\u30b2\u30fc\u30e0\u30ad\u30e5\u30fc\u30d6", 24),
-          ("\u30cb\u30f3\u30c6\u30f3\u30c9\u30a664", 9),
+JA_SYS = [("\u30cb\u30f3\u30c6\u30f3\u30c9\u30fc \u30b2\u30fc\u30e0\u30ad\u30e5\u30fc\u30d6", 24),
+          ("NINTENDO64", 9),
           ("\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f3", 112),
           ("\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f32", 2),
           ("\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f3\u30fb\u30dd\u30fc\u30bf\u30d6\u30eb", 31),
@@ -449,7 +522,7 @@ ja_systems = [ja_header("PortareOS"), RULE, "",
 ja_systems += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(JA_QUICK)]
 ja_systems += [THIN, row("  \u30b2\u30fc\u30e0\u6a5f", "")]
 ja_systems += [item(False, n, str(c)) for n, c in JA_SYS]
-ja_systems += [THIN, row(" A \u9078\u629e   X \u8a2d\u5b9a", "")]
+ja_systems += [THIN, row(" A \u6c7a\u5b9a   X \u8a2d\u5b9a", "")]
 
 # A Super Famicom list as a Japanese gamelist names it, in code point
 # order: Latin, then kana in their own order, then kanji in no order a
@@ -460,7 +533,7 @@ JA_SFC = sorted([
     "\u30af\u30ed\u30ce\u30fb\u30c8\u30ea\u30ac\u30fc",
     "\u30b9\u30fc\u30d1\u30fc\u30c9\u30f3\u30ad\u30fc\u30b3\u30f3\u30b02 \u30c7\u30a3\u30af\u30b7\u30fc&\u30c7\u30a3\u30c7\u30a3\u30fc",
     "MOTHER2 \u30ae\u30fc\u30b0\u306e\u9006\u8972",
-    "\u30d5\u30a1\u30a4\u30ca\u30eb\u30d5\u30a1\u30f3\u30bf\u30b8\u30fcVI",
+    "\u30d5\u30a1\u30a4\u30ca\u30eb\u30d5\u30a1\u30f3\u30bf\u30b8\u30fc\u2163",
     "\u661f\u306e\u30ab\u30fc\u30d3\u30a3 \u30b9\u30fc\u30d1\u30fc\u30c7\u30e9\u30c3\u30af\u30b9",
     "\u30bc\u30eb\u30c0\u306e\u4f1d\u8aac \u795e\u3005\u306e\u30c8\u30e9\u30a4\u30d5\u30a9\u30fc\u30b9",
     "\u30ed\u30c3\u30af\u30de\u30f3X",
@@ -477,9 +550,7 @@ def ja_footer(fav, pos, total):
                ("\u89e3\u9664" if fav else "\u304a\u6c17\u306b\u5165\u308a"),
                "%d / %d " % (pos, total))
 def ja_games_screen(selected):
-    shift = 0
-    while width(selected[shift:]) > TITLE_W:    # scrolled to its end
-        shift += 1
+    shift = marquee_end(selected)
     lines = [ja_crumb("\u30b9\u30fc\u30d1\u30fc\u30d5\u30a1\u30df\u30b3\u30f3"), RULE, ""]
     lines += [game(t == selected, t, shift=shift) for t in JA_SFC]
     lines += [""] * (ROWS - 2 - len(lines))
@@ -511,7 +582,7 @@ ja_recent += [THIN, row(" A \u8d77\u52d5   B \u623b\u308b   Y \u89e3\u9664", "")
 JA_SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "\u30aa\u30f3"), ("Bluetooth", "WH-1000XM4"),
           ("USB\u30e2\u30fc\u30c9", "\u30cd\u30c3\u30c8\u30ef\u30fc\u30af"),
           ("\u30dc\u30bf\u30f3\u8868\u8a18", "Retroid"),
-          ("\u30b2\u30fc\u30e0\u6a5f", "2\u4ef6\u5909\u66f4"),
+          ("\u30b2\u30fc\u30e0\u6a5f", "\u5909\u66f4 2\u4ef6"),
           ("\u914d\u8272", "\u30b0\u30ec\u30fc"),
           ("\u30ab\u30e9\u30fc\u30d7\u30ed\u30d5\u30a1\u30a4\u30eb", "\u6a19\u6e96"),
           ("\u5145\u96fbLED", "\u30aa\u30f3"),
@@ -519,8 +590,8 @@ JA_SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "\u30aa\u30f3"), ("Bluetooth", "WH-10
           ("\u8a3a\u65ad", ""), ("\u60c5\u5831", "v0.6.0 2026-10-07"), ("\u96fb\u6e90", "")]
 ja_settings = [ja_header("\u8a2d\u5b9a"), RULE]
 ja_settings += [item(i == 9, n, v) for i, (n, v) in enumerate(JA_SET)]
-ja_settings += [THIN, "    \u8a00\u8a9e\u3068\u30bf\u30a4\u30e0\u30be\u30fc\u30f3\u3092\u9078\u3073\u307e\u3059\u3002", ""]
-ja_settings += [THIN, row(" A \u5909\u66f4   B \u623b\u308b", "")]
+ja_settings += [THIN, "    \u8a00\u8a9e\u3068\u30bf\u30a4\u30e0\u30be\u30fc\u30f3\u3092\u8a2d\u5b9a\u3057\u307e\u3059\u3002", ""]
+ja_settings += [THIN, row(" A \u6c7a\u5b9a   B \u623b\u308b", "")]
 
 # The language row names itself in both languages, the one place that
 # does: whoever switched by mistake has to find the way back without
@@ -542,6 +613,26 @@ def lang_screen(ja):
     return lines + [THIN, row(hint, "")]
 ja_language = lang_screen(True)
 en_language = lang_screen(False)
+
+# Titles in any script, under English menus. Pokémon twice: once as the
+# gamelist wrote it, once decomposed, e and U+0301, the way a file copied
+# from a Mac is named; both read the same once composed. The Japanese
+# title renders in the 16x16 font whatever the menu language. The Korean
+# one has no glyphs in either font, so each syllable is a ?.
+GBC = sorted(["Dragon Warrior Monsters (USA)",
+              "Legend of Zelda, The - Link's Awakening DX (USA, Europe)",
+              "Poke\u0301mon - Gold Version (USA, Europe)",
+              "Pok\u00e9mon - Silver Version (USA, Europe)",
+              "Pok\u00e9mon Pinball (USA)",
+              "Pok\u00e9mon Trading Card Game (USA)",
+              "Shantae (USA)", "Wario Land 3 (World)",
+              "\u30dd\u30b1\u30c3\u30c8\u30e2\u30f3\u30b9\u30bf\u30fc \u91d1",
+              "\ud3ec\ucf13\ubaac\uc2a4\ud130 \uae08"], key=nfc)
+GBC_SEL = [t for t in GBC if "Gold" in t][0]
+games_any_script = [crumb("Game Boy Color"), RULE, ""]
+games_any_script += [game(t == GBC_SEL, t) for t in GBC]
+games_any_script += [""] * (ROWS - 2 - len(games_any_script))
+games_any_script += [THIN, games_footer(False, 1 + GBC.index(GBC_SEL), len(GBC))]
 
 if __name__ == "__main__":
     for t, s in (("SYSTEMS", systems), ("GAMES", games),
@@ -566,6 +657,7 @@ if __name__ == "__main__":
                  ("PROPOSED - JAPANESE, RECENTLY PLAYED", ja_recent),
                  ("PROPOSED - JAPANESE, SETTINGS", ja_settings),
                  ("PROPOSED - JAPANESE, LANGUAGE & REGION", ja_language),
-                 ("PROPOSED - LANGUAGE & REGION", en_language)):
+                 ("PROPOSED - LANGUAGE & REGION", en_language),
+                 ("PROPOSED - ENGLISH, TITLES IN ANY SCRIPT", games_any_script)):
         print(screen(t, s))
         print()
