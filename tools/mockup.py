@@ -62,11 +62,12 @@ SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
        ("USB mode", "network"), ("Button style", "Retroid"),
        ("Consoles", "2 changed"),
        ("Color", "grey"), ("Color profile", "stock"), ("Charging LED", "on"),
-       ("Time zone", "Europe/Zurich"), ("About", "v0.2.6 2026-09-26"),
-       ("Power", "")]
-# Twelve settings leave two rows between the rules; the button diagram needs
-# three and takes the upper rule's row, every other setting uses one or two.
-settings = [row(" Settings", ""), RULE, ""]
+       ("Time zone", "Europe/Zurich"), ("Diagnostics", ""),
+       ("About", "v0.2.6 2026-09-26"), ("Power", "")]
+# Thirteen settings fill 2..14 with no blank under the rule; the button
+# diagram needs three rows and takes the upper rule's, every other setting
+# uses one or two.
+settings = [row(" Settings", ""), RULE]
 settings += [item(i == 4, n, v) for i, (n, v) in enumerate(SET)]
 settings += ["         X          X confirm",
              "      Y     A       A back",
@@ -91,6 +92,17 @@ def consoles_screen(sel):
     return lines
 
 consoles = consoles_screen(0)
+
+# Settings > Diagnostics: the tools that show what the hardware does, each
+# a screen of its own. One entry so far; which layer PortScope reads is a
+# mode inside it, not a second entry.
+DIAG = [("PortScope", "")]
+diagnostics = [row(" Settings  \u203a  Diagnostics", ""), RULE, ""]
+diagnostics += [item(i == 0, n, v) for i, (n, v) in enumerate(DIAG)]
+# No description band: the names say it, and Home + START is the way out
+# of everything on the device.
+diagnostics += [""] * (ROWS - 2 - len(diagnostics))
+diagnostics += [THIN, row(" A OPEN   B BACK", "\u2191\u2193 MOVE ")]
 
 # Two toggles and the devices in one list: switching it on, letting known
 # headphones come back, and picking them when they have not.
@@ -162,8 +174,8 @@ def field(text, hidden=False, cursor=True):
             "  └" + "─" * (FIELD_W - 2) + "┘"]
 
 RETROID_HINTS = " A TYPE  B DELETE  X SPACE  L1 SHIFT  START JOIN"
-# The PS printing, approximated out of CP437 as the launcher draws it.
-PS_HINTS      = " X TYPE  ○ DELETE  ▲ SPACE  L1 SHIFT  START JOIN"
+# The shape marks, approximated out of CP437 as the launcher draws it.
+SHAPE_HINTS   = " X TYPE  ○ DELETE  ▲ SPACE  L1 SHIFT  START JOIN"
 
 def kb_screen(ssid, text, layer, sel=None, bottom_sel=None, hidden=False,
               note="SELECT: show or hide password", labels=None,
@@ -184,7 +196,7 @@ def kb_screen(ssid, text, layer, sel=None, bottom_sel=None, hidden=False,
 
 kb_lower = kb_screen("FRITZ!Box 7520 JI", "hunt", LOWER, sel=(1, 2))
 kb_upper = kb_screen("FRITZ!Box 7520 JI", "hunter2Hunt", UPPER, sel=(2, 6),
-                     hints=PS_HINTS)
+                     hints=SHAPE_HINTS)
 kb_syms  = kb_screen("FRITZ!Box 7520 JI", "hunter2Hunter!", SYMS, bottom_sel="DONE",
                      hidden=True, labels={"#+=": "abc"})
 
@@ -196,16 +208,14 @@ joining = kb_screen("FRITZ!Box 7520 JI", "hunter2Hunter!", LOWER, sel=(1, 2),
 # Tools: whatever scripts are in the modules folder, named and described
 # from its gamelist.xml. The description gets fixed room under the list,
 # because it is where a tool says how to get back out of it.
-TOOLS = ["File Manager", "PortMaster", "Remove ._ Files",
-         "Start RetroArch (64-bit)", "Test Gamepad"]
+TOOLS = ["Remove ._ Files", "Start RetroArch (64-bit)"]
 tools = [header("Tools"), RULE, "",
-         row("  TOOLS", "5 found  "), ""]
-tools += [item(n == "Test Gamepad", n) for n in TOOLS]
+         row("  TOOLS", "2 found  "), ""]
+tools += [item(n == "Remove ._ Files", n) for n in TOOLS]
 tools += [""] * (ROWS - 2 - 4 - 1 - len(tools))
 tools += [THIN,
-          "    A simple SDL GUI gamepad tester to help",
-          "    validate gamepad inputs. To exit, hold L1 and",
-          "    press START + SELECT.", ""]
+          "    Deletes the ._ files macOS leaves beside",
+          "    every ROM on an SD card. Returns on its own.", "", ""]
 tools += [THIN, " B RUN   A BACK"]
 
 launching = [header("PortareOS"), RULE] + [""] * 4
@@ -313,12 +323,89 @@ favourites += [across(i == 2, t, sy) for i, (t, sy) in enumerate(FAVS)]
 favourites += [""] * (ROWS - 2 - len(favourites))
 favourites += [THIN, games_footer(True, 3, 7)]
 
+# ---- proposed: PortScope, input diagnostics --------------------------------
+#
+# Settings > Diagnostics > PortScope, as one more launcher screen rather
+# than a program that looks like something else: the same grid, font and
+# palette, nothing decorative. The one thing a menu never needs and this
+# does is a diagram of the pad, drawn in line glyphs. A control is bright
+# while it is held and dim while it is not, so PortScope takes whatever
+# palette the launcher has. The face buttons follow the button style
+# setting: the Retroid letters or the shape marks, which the renderer
+# draws as outlines.
+#
+# Sample state: A down, D-pad right, R1 held, R2 two thirds in, the right
+# stick up and left. One layer at a time: the virtual pad games see by
+# default, the MCU's raw device after a long press of SELECT; the header
+# says which, in one word, so nobody wonders what they are looking at.
+# RATE is measured from the device shown, so it is the virtual pad's rate
+# by default and the MCU's in raw mode.
+def pad_screen(shapes=False, raw=False):
+    top, left, right, bottom = ("\u25b2", "\u25a0", "\u25cb", "\u00d7") if shapes else ("X", "Y", "A", "B")
+    L = [row(" PortScope" + (", raw" if raw else ""), "RATE 200 Hz "), RULE]
+    L.append(row("  L1", "R1  "))
+    L.append(row("  L2  0.00", "0.67  R2  "))
+    # The stick's click is a button too; it sits with the other shoulder
+    # buttons rather than crowding the ring.
+    L.append(row("  L3", "R3  "))
+    L.append(" " * 10 + "\u2191" + " " * 29 + top)
+    L.append(" " * 7 + "\u2190  \u00b7  \u2192" + " " * 23 + left + "     " + right)
+    L.append(" " * 10 + "\u2193" + " " * 29 + bottom)
+    L.append("")
+    # The sticks are round, so their travel is drawn round: a ring and a
+    # dot at the panel's own resolution, not out of the font. These five
+    # rows are theirs; tools/mockup_png.py draws into them from pad_shapes.
+    L += [""] * 5
+    L.append(" " * 5 + "X +0.02 Y -0.01" + " " * 18 + "X -0.41 Y -0.83")
+    L.append(" " * 12 + "SELECT     HOME     START")
+    L.append(" " * 19 + "M1       M2")
+    # No footer: nothing here is a menu, and the way out is the one every
+    # program on the device has. The rows go to the last events instead.
+    L.append(" Last input")
+    L.append(" ABS_RY    -27210")
+    L.append(" ABS_Z      21580")
+    return L
+
+gamepad = pad_screen()
+gamepad_shapes = pad_screen(shapes=True)
+
+# Which cells are bright (held) and which dim (idle); the rest is text.
+# Rows and columns of pad_screen above.
+def pad_spans(shapes=False):
+    bright, dim = [], []
+    dim += [(2, 2, 4)]                      # L1
+    bright += [(2, 49, 51)]                 # R1
+    dim += [(3, 2, 4), (3, 6, 10)]          # L2 and its 0.00
+    bright += [(3, 43, 47), (3, 49, 51)]    # 0.67 and R2
+    dim += [(4, 2, 4), (4, 49, 51)]         # L3, R3
+    dim += [(5, 10, 11), (6, 7, 8), (7, 10, 11)]   # up, left, down
+    bright += [(6, 13, 14)]                 # right
+    dim += [(5, 40, 41), (6, 37, 38), (7, 40, 41)]   # top, left, bottom face
+    bright += [(6, 43, 44)]                 # A, or the circle
+    dim += [(15, 12, 18), (15, 23, 27), (15, 32, 37), (16, 19, 21), (16, 28, 30)]
+    return bright, dim
+
+# What is drawn rather than typed: the two stick rings with their dots,
+# centred on rows 9-13, and with the shape marks the four face cells as
+# plain geometric outlines, a circle, a triangle, a square and a cross,
+# thin and never filled. Held is bright, idle is dim.
+def pad_shapes(shapes=False):
+    rings = [dict(row=11, col=9.5, rows=5, x=0.02, y=-0.01, clicked=False),
+             dict(row=11, col=41.5, rows=5, x=-0.41, y=-0.83, clicked=False)]
+    marks = []
+    if shapes:
+        marks = [dict(row=5, col=40, shape="triangle", held=False),
+                 dict(row=6, col=37, shape="square", held=False),
+                 dict(row=6, col=43, shape="circle", held=True),
+                 dict(row=7, col=40, shape="cross", held=False)]
+    return dict(rings=rings, marks=marks)
+
 if __name__ == "__main__":
     for t, s in (("SYSTEMS", systems), ("GAMES", games),
                  ("SETTINGS", settings), ("SETTINGS - CONSOLES", consoles),
                  ("BLUETOOTH", bluetooth),
                  ("KEYBOARD - letters", kb_lower),
-                 ("KEYBOARD - shift, PS button style", kb_upper),
+                 ("KEYBOARD - shift, shape marks", kb_upper),
                  ("KEYBOARD - symbols, password hidden, DONE selected", kb_syms),
                  ("KEYBOARD - join failed", joining),
                  ("TOOLS", tools),
@@ -327,6 +414,9 @@ if __name__ == "__main__":
                  ("PROPOSED - GAMES, LONG TITLES", games_long),
                  ("PROPOSED - GAMES, A FAVOURITE SELECTED", games_fav),
                  ("PROPOSED - RECENTLY PLAYED", recent),
-                 ("PROPOSED - FAVOURITES", favourites)):
+                 ("PROPOSED - FAVOURITES", favourites),
+                 ("SETTINGS - DIAGNOSTICS", diagnostics),
+                 ("PROPOSED - PORTSCOPE", gamepad),
+                 ("PROPOSED - PORTSCOPE, SHAPE MARKS", gamepad_shapes)):
         print(screen(t, s))
         print()

@@ -50,7 +50,6 @@
     .....................................................  <- 53 columns
      Settings                                            |
      ═══════════════════════════════════════════════════ |
-                                                         |
         Wi-Fi                                Hofmann-5G  |
         SSH                                          on  |
         Bluetooth                            WH-1000XM4  |
@@ -61,6 +60,7 @@
         Color profile                             stock  |
         Charging LED                                 on  |
         Time zone                         Europe/Zurich  |
+        Diagnostics                                      |
         About                         v0.2.6 2026-09-26  |
         Power                                            |
              X          X confirm                        |
@@ -142,7 +142,7 @@
      A TYPE  B DELETE  X SPACE  L1 SHIFT  START JOIN     |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
-    KEYBOARD - shift, PS button style
+    KEYBOARD - shift, shape marks
     .....................................................  <- 53 columns
      Settings  ›  Wi-Fi VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
@@ -219,20 +219,20 @@
      Tools              VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
-      TOOLS                                     5 found  |
+      TOOLS                                     2 found  |
                                                          |
-        File Manager                                     |
-        PortMaster                                       |
-        Remove ._ Files                                  |
+      ▸ Remove ._ Files                                  |
         Start RetroArch (64-bit)                         |
-      ▸ Test Gamepad                                     |
+                                                         |
+                                                         |
+                                                         |
                                                          |
                                                          |
                                                          |
      ─────────────────────────────────────────────────── |
-        A simple SDL GUI gamepad tester to help          |
-        validate gamepad inputs. To exit, hold L1 and    |
-        press START + SELECT.                            |
+        Deletes the ._ files macOS leaves beside         |
+        every ROM on an SD card. Returns on its own.     |
+                                                         |
                                                          |
      ─────────────────────────────────────────────────── |
      B RUN   A BACK                                      |
@@ -380,5 +380,77 @@
                                                          |
      ─────────────────────────────────────────────────── |
      A LAUNCH   B BACK   Y REMOVE                  3 / 7 |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    SETTINGS - DIAGNOSTICS
+    .....................................................  <- 53 columns
+     Settings  ›  Diagnostics                            |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+      ▸ PortScope                                        |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A OPEN   B BACK                             ↑↓ MOVE |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    PROPOSED - PORTSCOPE
+    .....................................................  <- 53 columns
+     PortScope                               RATE 200 Hz |
+     ═══════════════════════════════════════════════════ |
+      L1                                             R1  |
+      L2  0.00                                 0.67  R2  |
+      L3                                             R3  |
+              ↑                             X            |
+           ←  ·  →                       Y     A         |
+              ↓                             B            |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+         X +0.02 Y -0.01                  X -0.41 Y -0.83|
+                SELECT     HOME     START                |
+                       M1       M2                       |
+     Last input                                          |
+     ABS_RY    -27210                                    |
+     ABS_Z      21580                                    |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    PROPOSED - PORTSCOPE, SHAPE MARKS
+    .....................................................  <- 53 columns
+     PortScope                               RATE 200 Hz |
+     ═══════════════════════════════════════════════════ |
+      L1                                             R1  |
+      L2  0.00                                 0.67  R2  |
+      L3                                             R3  |
+              ↑                             ▲            |
+           ←  ·  →                       ■     ○         |
+              ↓                             ×            |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+         X +0.02 Y -0.01                  X -0.41 Y -0.83|
+                SELECT     HOME     START                |
+                       M1       M2                       |
+     Last input                                          |
+     ABS_RY    -27210                                    |
+     ABS_Z      21580                                    |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
