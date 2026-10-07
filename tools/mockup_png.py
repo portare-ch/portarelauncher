@@ -21,6 +21,18 @@ CP437 = {"═": 0xCD, "─": 0xC4, "▸": 0x10, "↑": 0x18, "↓": 0x19, "←":
          "♥": 0x03, "›": 0x3E, "…": 0x2E, "┌": 0xDA, "┐": 0xBF, "└": 0xC0, "┘": 0xD9,
          "│": 0xB3, "·": 0xFA, "•": 0x07, "▲": 0x1E, "■": 0xFE, "○": 0x09, "×": 0x58}
 
+def ja_font():
+    """The 16x16 kana and kanji the mockups use, from tools/ja16-mockup.hex
+    (tools/mkjafont.py): code point to 16 rows of 16 bits."""
+    out = {}
+    for line in open(os.path.join(os.path.dirname(__file__), "ja16-mockup.hex")):
+        if line.startswith("#"):
+            continue
+        cp, bits = line.strip().split(":")
+        out[chr(int(cp, 16))] = [int(bits[i:i + 4], 16) for i in range(0, 64, 4)]
+    return out
+JA = ja_font()
+
 def font():
     src = open(os.path.join(os.path.dirname(__file__), "..", "src", "font8x16.h")).read()
     body = re.sub(r"/\*.*?\*/", "", src.split("font8x16[4096] = {")[1], flags=re.S)
@@ -123,6 +135,17 @@ def render(lines, path, glyphs, spans=None, shapes=None):
         for r, c0, c1 in spans[0]:
             for c in range(c0, c1 + 1):
                 forced[(r, c)] = BRIGHT
+    def put_wide(col, row, ch, color):
+        if ch not in JA:
+            sys.exit(f"no glyph for {ch!r} (U+{ord(ch):04X}): run tools/mkjafont.py")
+        x0, y0 = OX + col * 8 * SCALE, OY + row * 16 * SCALE
+        for yy, bits in enumerate(JA[ch]):
+            for xx in range(16):
+                if bits & (0x8000 >> xx):
+                    for sy in range(SCALE):
+                        base = ((y0 + yy * SCALE + sy) * W + x0 + xx * SCALE) * 3
+                        for sx in range(SCALE):
+                            px[base + sx * 3:base + sx * 3 + 3] = bytes(color)
     def put(col, row, ch, color):
         g = CP437.get(ch, ord(ch) if ord(ch) < 128 else 0x3F)
         x0, y0 = OX + col * 8 * SCALE, OY + row * 16 * SCALE
@@ -137,15 +160,21 @@ def render(lines, path, glyphs, spans=None, shapes=None):
     for r, line in enumerate(lines[:ROWS]):
         rule = line.strip() and set(line.strip()) <= {"═", "─"}
         selected = "▸" in line
-        for c, ch in enumerate(line[:COLS]):
-            if ch == " ":
-                continue
-            color = MID if rule else BRIGHT if selected else TEXT
-            color = forced.get((r, c), color)
-            if ch in MARKS:
-                mark(px, c, r, MARKS[ch], color)
-            else:
-                put(c, r, ch, color)
+        c = 0
+        for ch in line:
+            w = mockup.cw(ch)
+            if c + w > COLS:
+                break
+            if ch != " ":
+                color = MID if rule else BRIGHT if selected else TEXT
+                color = forced.get((r, c), color)
+                if ch in MARKS:
+                    mark(px, c, r, MARKS[ch], color)
+                elif w == 2:
+                    put_wide(c, r, ch, color)
+                else:
+                    put(c, r, ch, color)
+            c += w
     if shapes:
         shapes_draw(px, shapes)
     png(path, px)
@@ -166,3 +195,9 @@ if __name__ == "__main__":
     render(mockup.gamepad_shapes, os.path.join(out, "portscope-shapes.png"), glyphs,
            mockup.pad_spans(True), mockup.pad_shapes(True))
     render(mockup.diagnostics, os.path.join(out, "settings-diagnostics.png"), glyphs)
+    for name, lines in (("ja-systems", mockup.ja_systems), ("ja-games", mockup.ja_games),
+                        ("ja-recently-played", mockup.ja_recent),
+                        ("ja-settings", mockup.ja_settings),
+                        ("ja-language-region", mockup.ja_language),
+                        ("language-region", mockup.en_language)):
+        render(lines, os.path.join(out, name + ".png"), glyphs)

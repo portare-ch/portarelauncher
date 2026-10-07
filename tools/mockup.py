@@ -2,21 +2,39 @@
 """Renders the launcher screens at the real grid so layout can be judged
 before any of it is written. 53x20 is 8x16 glyphs at 3x on a 1280x960 panel."""
 
+import unicodedata
+
 COLS, ROWS = 53, 20
+
+# Kana and kanji take two cells: a 16x16 glyph across two 8x16 ones, as
+# on a PC-98. Everything else, the box drawing and the marks included,
+# takes one.
+def cw(ch):
+    return 2 if unicodedata.east_asian_width(ch) in "WF" else 1
+def width(s):
+    return sum(cw(c) for c in s)
+def fit(s, w):
+    """The longest start of s that fits in w columns, never half a glyph."""
+    out, n = "", 0
+    for c in s:
+        if n + cw(c) > w:
+            break
+        out, n = out + c, n + cw(c)
+    return out
 
 def screen(title, lines):
     out = [f"    {title}", "    " + "." * COLS + "  <- %d columns" % COLS]
     for i, l in enumerate(lines):
-        if len(l) > COLS:
-            raise SystemExit(f"{title}: row {i} is {len(l)} cols, max {COLS}:\n{l}")
-        out.append("    " + l.ljust(COLS) + "|")
+        if width(l) > COLS:
+            raise SystemExit(f"{title}: row {i} is {width(l)} cols, max {COLS}:\n{l}")
+        out.append("    " + l + " " * (COLS - width(l)) + "|")
     for _ in range(ROWS - len(lines)):
         out.append("    " + " " * COLS + "|")
     out.append("    " + "'" * COLS + "  <- %d rows" % ROWS)
     return "\n".join(out)
 
 def row(left, right):
-    pad = COLS - len(left) - len(right)
+    pad = COLS - width(left) - width(right)
     return left + " " * max(pad, 1) + right
 
 def item(sel, label, right=""):
@@ -30,8 +48,8 @@ RULE = " " + "\u2550" * (COLS - 2)
 STATUS = "VOL 50%  BRI 70%  BAT 87%  23:59 "
 CLOCK = "23:59 "
 def header(crumb, status=STATUS):
-    room = COLS - 1 - len(status) - 2 - 1
-    return row(" " + crumb[:room], status)
+    room = COLS - 1 - width(status) - 2 - 1
+    return row(" " + fit(crumb, room), status)
 
 # A list of games is a step down from the Systems screen, and its header
 # says so: the crumb, and the clock alone at the right. Volume, brightness
@@ -249,9 +267,11 @@ systems_quick += [THIN, row(" A SELECT   X SETTINGS", "")]
 # favourite in the list: Favourites is where favourites are.
 TITLE_W = COLS - 4 - 2    # marker and indent, then the right margin
 def cut(t):
-    return t if len(t) <= TITLE_W else t[:TITLE_W - 3] + "..."
+    return t if width(t) <= TITLE_W else fit(t, TITLE_W - 3) + "..."
 def scrolled(t, shift):
-    return t[shift:shift + TITLE_W]
+    """shift characters scrolled off the left; a step is a character, so
+    a kanji leaves whole, never half drawn at the edge."""
+    return fit(t[shift:], TITLE_W)
 def game(sel, title, shift=0):
     return item(sel, scrolled(title, shift) if sel else cut(title))
 
@@ -301,8 +321,8 @@ RECENT = [("TODAY", [("Super Mario World", "SNES"), ("Tekken 3", "PS1")]),
           ("SUNDAY", [("Super Metroid", "SNES"), ("Wipeout XL", "PS1")]),
           ("SATURDAY", [("Mega Man X", "SNES"), ("Xenogears", "PS1")])]
 def across(sel, title, right):
-    w = COLS - 4 - len(right) - 3
-    return item(sel, title if len(title) <= w else title[:w - 3] + "...", right)
+    w = COLS - 4 - width(right) - 3
+    return item(sel, title if width(title) <= w else fit(title, w - 3) + "...", right)
 recent = [crumb("Recently played"), RULE, ""]
 for day, games_of_day in RECENT:
     recent.append(" " + day)
@@ -393,6 +413,136 @@ def pad_shapes(shapes=False):
     return dict(rings=[dict(row=11, col=9.5, rows=5, x=0.02, y=-0.01, clicked=False),
                        dict(row=11, col=41.5, rows=5, x=-0.41, y=-0.83, clicked=False)])
 
+# ---- proposed: Japanese -----------------------------------------------------
+#
+# English and Japanese, nothing else. Kana and kanji are 16x16 glyphs from
+# the Japanese build of GNU Unifont, two cells wide: the launcher's 8x16
+# grid becomes a PC-98 text screen, ASCII from the VGA font as now, the
+# rest full width. Titles render in either language, since a gamelist can
+# hold Japanese names whatever the menus say; the setting changes the
+# menus, the hints and the console names. It is system.language, which
+# the scraper already reads, en_US or ja_JP.
+#
+# Console names are the ones the machines were sold under in Japan. The
+# short names in the cross-system lists follow: SFC and FC, not SNES and
+# NES.
+JA_STATUS = "\u97f3\u91cf 50%  \u8f1d\u5ea6 70%  \u96fb\u6c60 87%  23:59 "
+def ja_header(crumb):
+    return header(crumb, JA_STATUS)
+def ja_crumb(name):
+    return header("PortareOS  \u203a  " + name, CLOCK)
+
+JA_QUICK = [("\u6700\u8fd1\u904a\u3093\u3060\u30b2\u30fc\u30e0", 10),
+            ("\u304a\u6c17\u306b\u5165\u308a", 7)]
+JA_SYS = [("\u30b2\u30fc\u30e0\u30ad\u30e5\u30fc\u30d6", 24),
+          ("\u30cb\u30f3\u30c6\u30f3\u30c9\u30a664", 9),
+          ("\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f3", 112),
+          ("\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f32", 2),
+          ("\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f3\u30fb\u30dd\u30fc\u30bf\u30d6\u30eb", 31),
+          ("\u30b9\u30fc\u30d1\u30fc\u30d5\u30a1\u30df\u30b3\u30f3", 204),
+          ("\u30e1\u30ac\u30c9\u30e9\u30a4\u30d6", 88),
+          ("\u30b2\u30fc\u30e0\u30dc\u30fc\u30a4\u30a2\u30c9\u30d0\u30f3\u30b9", 140),
+          ("\u30c9\u30ea\u30fc\u30e0\u30ad\u30e3\u30b9\u30c8", 6),
+          ("\u30a2\u30fc\u30b1\u30fc\u30c9", 47)]
+ja_systems = [ja_header("PortareOS"), RULE, "",
+              row("  \u30af\u30a4\u30c3\u30af\u30a2\u30af\u30bb\u30b9", "")]
+ja_systems += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(JA_QUICK)]
+ja_systems += [THIN, row("  \u30b2\u30fc\u30e0\u6a5f", "")]
+ja_systems += [item(False, n, str(c)) for n, c in JA_SYS]
+ja_systems += [THIN, row(" A \u9078\u629e   X \u8a2d\u5b9a", "")]
+
+# A Super Famicom list as a Japanese gamelist names it, in code point
+# order: Latin, then kana in their own order, then kanji in no order a
+# reader would expect. A gamelist <sortname> decides when it has one.
+# The selected title is past the column, so it scrolls; a step is one
+# character, so a kanji leaves the edge whole.
+JA_SFC = sorted([
+    "\u30af\u30ed\u30ce\u30fb\u30c8\u30ea\u30ac\u30fc",
+    "\u30b9\u30fc\u30d1\u30fc\u30c9\u30f3\u30ad\u30fc\u30b3\u30f3\u30b02 \u30c7\u30a3\u30af\u30b7\u30fc&\u30c7\u30a3\u30c7\u30a3\u30fc",
+    "MOTHER2 \u30ae\u30fc\u30b0\u306e\u9006\u8972",
+    "\u30d5\u30a1\u30a4\u30ca\u30eb\u30d5\u30a1\u30f3\u30bf\u30b8\u30fcVI",
+    "\u661f\u306e\u30ab\u30fc\u30d3\u30a3 \u30b9\u30fc\u30d1\u30fc\u30c7\u30e9\u30c3\u30af\u30b9",
+    "\u30bc\u30eb\u30c0\u306e\u4f1d\u8aac \u795e\u3005\u306e\u30c8\u30e9\u30a4\u30d5\u30a9\u30fc\u30b9",
+    "\u30ed\u30c3\u30af\u30de\u30f3X",
+    "\u8056\u5263\u4f1d\u8aac2",
+    "\u30b9\u30bf\u30fc\u30d5\u30a9\u30c3\u30af\u30b9",
+    "\u60aa\u9b54\u57ce\u30c9\u30e9\u30ad\u30e5\u30e9",
+    "\u30b9\u30fc\u30d1\u30fc\u30de\u30ea\u30aa\u30ef\u30fc\u30eb\u30c9",
+    "\u30b9\u30fc\u30d1\u30fc\u30e1\u30c8\u30ed\u30a4\u30c9",
+    "\u30b9\u30fc\u30d1\u30fc\u30ed\u30dc\u30c3\u30c8\u5927\u6226\u5916\u4f1d \u9b54\u88c5\u6a5f\u795e THE LORD OF ELEMENTAL",
+    "\u30b9\u30fc\u30d1\u30fc\u30de\u30ea\u30aa \u30e8\u30c3\u30b7\u30fc\u30a2\u30a4\u30e9\u30f3\u30c9"])
+JA_LONG = [t for t in JA_SFC if t.endswith("ELEMENTAL")][0]
+def ja_footer(fav, pos, total):
+    return row(" A \u8d77\u52d5   B \u623b\u308b   Y " +
+               ("\u89e3\u9664" if fav else "\u304a\u6c17\u306b\u5165\u308a"),
+               "%d / %d " % (pos, total))
+def ja_games_screen(selected):
+    shift = 0
+    while width(selected[shift:]) > TITLE_W:    # scrolled to its end
+        shift += 1
+    lines = [ja_crumb("\u30b9\u30fc\u30d1\u30fc\u30d5\u30a1\u30df\u30b3\u30f3"), RULE, ""]
+    lines += [game(t == selected, t, shift=shift) for t in JA_SFC]
+    lines += [""] * (ROWS - 2 - len(lines))
+    return lines + [THIN, ja_footer(False, 1 + JA_SFC.index(selected), 204)]
+ja_games = ja_games_screen(JA_LONG)
+
+# The days as Japanese says them: today, yesterday, then the weekday.
+JA_RECENT = [("\u4eca\u65e5", [("\u30b9\u30fc\u30d1\u30fc\u30de\u30ea\u30aa\u30ef\u30fc\u30eb\u30c9", "SFC"),
+                         ("\u9244\u62f33", "PS")]),
+             ("\u6628\u65e5", [("\u30b9\u30fc\u30d1\u30fc\u30de\u30ea\u30aa \u30e8\u30c3\u30b7\u30fc\u30a2\u30a4\u30e9\u30f3\u30c9", "SFC"),
+                         ("\u30e1\u30c8\u30ed\u30a4\u30c9", "FC")]),
+             ("\u6708\u66dc\u65e5", [("\u30bd\u30a6\u30eb\u30ad\u30e3\u30ea\u30d0\u30fcII", "GC"),
+                           ("\u30dd\u30c3\u30d7\u30f3\u30df\u30e5\u30fc\u30b8\u30c3\u30af \u30dd\u30fc\u30bf\u30d6\u30eb", "PSP")]),
+             ("\u65e5\u66dc\u65e5", [("\u30b9\u30fc\u30d1\u30fc\u30e1\u30c8\u30ed\u30a4\u30c9", "SFC"),
+                           ("\u30ef\u30a4\u30d7\u30a2\u30a6\u30c8XL", "PS")]),
+             ("\u571f\u66dc\u65e5", [("\u30ed\u30c3\u30af\u30de\u30f3X", "SFC"),
+                           ("\u30bc\u30ce\u30ae\u30a2\u30b9", "PS")])]
+ja_recent = [ja_crumb("\u6700\u8fd1\u904a\u3093\u3060\u30b2\u30fc\u30e0"), RULE, ""]
+for day, games_of_day in JA_RECENT:
+    ja_recent.append(" " + day)
+    ja_recent += [across(i == 0 and day == "\u4eca\u65e5", t, sy)
+                  for i, (t, sy) in enumerate(games_of_day)]
+ja_recent += [""] * (ROWS - 2 - len(ja_recent))
+ja_recent += [THIN, row(" A \u8d77\u52d5   B \u623b\u308b   Y \u89e3\u9664", "")]
+
+# Settings stays at thirteen rows: Time zone becomes Language & region, a
+# submenu with the language and the time zone. Its value is the language,
+# named in itself, so it reads the same to whoever is looking for it.
+JA_SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "\u30aa\u30f3"), ("Bluetooth", "WH-1000XM4"),
+          ("USB\u30e2\u30fc\u30c9", "\u30cd\u30c3\u30c8\u30ef\u30fc\u30af"),
+          ("\u30dc\u30bf\u30f3\u8868\u8a18", "Retroid"),
+          ("\u30b2\u30fc\u30e0\u6a5f", "2\u4ef6\u5909\u66f4"),
+          ("\u914d\u8272", "\u30b0\u30ec\u30fc"),
+          ("\u30ab\u30e9\u30fc\u30d7\u30ed\u30d5\u30a1\u30a4\u30eb", "\u6a19\u6e96"),
+          ("\u5145\u96fbLED", "\u30aa\u30f3"),
+          ("\u8a00\u8a9e\u3068\u5730\u57df", "\u65e5\u672c\u8a9e"),
+          ("\u8a3a\u65ad", ""), ("\u60c5\u5831", "v0.6.0 2026-10-07"), ("\u96fb\u6e90", "")]
+ja_settings = [ja_header("\u8a2d\u5b9a"), RULE]
+ja_settings += [item(i == 9, n, v) for i, (n, v) in enumerate(JA_SET)]
+ja_settings += [THIN, "    \u8a00\u8a9e\u3068\u30bf\u30a4\u30e0\u30be\u30fc\u30f3\u3092\u9078\u3073\u307e\u3059\u3002", ""]
+ja_settings += [THIN, row(" A \u5909\u66f4   B \u623b\u308b", "")]
+
+# The language row names itself in both languages, the one place that
+# does: whoever switched by mistake has to find the way back without
+# reading the language they switched to. The values are each language in
+# its own script, and A or left and right switches, as Button style does;
+# the screen redraws in the new language at once.
+def lang_screen(ja):
+    if ja:
+        lines = [header("\u8a2d\u5b9a  \u203a  \u8a00\u8a9e\u3068\u5730\u57df", CLOCK), RULE, ""]
+        lines += [item(True, "\u8a00\u8a9e / Language", "\u65e5\u672c\u8a9e"),
+                  item(False, "\u30bf\u30a4\u30e0\u30be\u30fc\u30f3", "Asia/Tokyo")]
+        hint = " A \u5909\u66f4   B \u623b\u308b"
+    else:
+        lines = [header("Settings  \u203a  Language & region", CLOCK), RULE, ""]
+        lines += [item(True, "Language / \u8a00\u8a9e", "English"),
+                  item(False, "Time zone", "Europe/Zurich")]
+        hint = " A CHANGE   B BACK"
+    lines += [""] * (ROWS - 2 - len(lines))
+    return lines + [THIN, row(hint, "")]
+ja_language = lang_screen(True)
+en_language = lang_screen(False)
+
 if __name__ == "__main__":
     for t, s in (("SYSTEMS", systems), ("GAMES", games),
                  ("SETTINGS", settings), ("SETTINGS - CONSOLES", consoles),
@@ -410,6 +560,12 @@ if __name__ == "__main__":
                  ("PROPOSED - FAVOURITES", favourites),
                  ("SETTINGS - DIAGNOSTICS", diagnostics),
                  ("PROPOSED - PORTSCOPE", gamepad),
-                 ("PROPOSED - PORTSCOPE, SHAPE MARKS", gamepad_shapes)):
+                 ("PROPOSED - PORTSCOPE, SHAPE MARKS", gamepad_shapes),
+                 ("PROPOSED - JAPANESE, SYSTEMS", ja_systems),
+                 ("PROPOSED - JAPANESE, GAMES, A LONG TITLE SCROLLED", ja_games),
+                 ("PROPOSED - JAPANESE, RECENTLY PLAYED", ja_recent),
+                 ("PROPOSED - JAPANESE, SETTINGS", ja_settings),
+                 ("PROPOSED - JAPANESE, LANGUAGE & REGION", ja_language),
+                 ("PROPOSED - LANGUAGE & REGION", en_language)):
         print(screen(t, s))
         print()
