@@ -58,4 +58,5 @@ Layout notes and mockups are in [docs/](docs/). Regenerate mockups with
 
 [GPL-2.0](LICENSE). The embedded font comes from Linux's
 `lib/fonts/font_8x16.c`; its provenance is recorded in
-[tools/mkfont.py](tools/mkfont.py).
+[tools/mkfont.py](tools/mkfont.py). The Japanese glyphs come from GNU
+Unifont; [FONTS.md](FONTS.md) has the notice for both fonts.
