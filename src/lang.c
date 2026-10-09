@@ -131,7 +131,7 @@ static const struct {
 	[S_HINT_KEYBOARD] = { { "%c TYPE  %c DELETE  %c SPACE  L1 SHIFT  START JOIN", "%c 入力  %c 削除  %c 空白  L1 シフト  START 接続" }, 51 },
 
 	[S_SCREEN_OFF]      = { { "Screen off", "画面オフ" }, 24 },
-	[S_SLEEP_AFTER]     = { { "Sleep after", "スリープまで" }, 24 },
+	[S_SLEEP_AFTER]     = { { "Sleep after screen off", "画面オフからスリープまで" }, 24 },
 	[S_RESTART]         = { { "Restart", "再起動" }, 24 },
 	[S_POWER_OFF]       = { { "Power off", "電源オフ" }, 24 },
 	[S_MIN]             = { { "%d min", "%d分" }, 12 },
