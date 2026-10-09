@@ -24,6 +24,7 @@
 #include "tools.h"
 #include "tz.h"
 #include "update.h"
+#include "idle.h"
 #include "timeutil.h"
 
 #include <errno.h>
@@ -62,6 +63,13 @@
 #define KEY_BLANK "display.blankminutes"
 static const int blank_minutes[] = { 5, 10, 15 };
 #define N_BLANK ((int)(sizeof(blank_minutes) / sizeof(blank_minutes[0])))
+/* And how long after that the device sleeps, if nothing was pressed. The
+ * request goes to power-handler, which applies the power key's rules and
+ * declines while SSH is in use. */
+#define KEY_SLEEP "system.sleepminutes"
+static const int sleep_minutes[] = { 5, 10, 15, 30 };
+#define N_SLEEP ((int)(sizeof(sleep_minutes) / sizeof(sleep_minutes[0])))
+#define POWER_HANDLER "/usr/lib/autostart/quirks/platforms/SM8550/bin/power-handler"
 #define PROFILE_DIR "/usr/config/color"
 static const struct { const char *key, *label; } profile_names[] = {
 	{ "stock",   "stock" },
@@ -153,6 +161,8 @@ struct ui {
 	int profile;         /* the one applied, an index into profiles[]     */
 	int charging_led;    /* led.charging, 1 unless the file says 0        */
 	int blank_idx;       /* into blank_minutes[]                          */
+	int sleep_idx;       /* into sleep_minutes[]                          */
+	long long sleep_retry; /* a declined sleep is asked again then, ms    */
 	long long last_act;  /* when the last press came in, ms               */
 	int blanked;         /* the CRTC is off, by idle or by SIGUSR1        */
 	struct status st;
@@ -1271,13 +1281,14 @@ static void power(struct ui *u, const char *verb)
 	         tr(strcmp(verb, "reboot") == 0 ? S_FAIL_RESTART : S_FAIL_OFF), rc);
 }
 
-/* Row 0 is a setting and cycles; rows 1 and 2 are the armed actions, and
- * power_verbs is indexed from row 1. */
+/* Rows 0 and 1 are settings and cycle; rows 2 and 3 are the armed actions,
+ * and power_verbs is indexed from row 2. */
 #define POW_BLANK   0
-#define POW_RESTART 1
-#define POW_OFF     2
-#define N_POWER_ROWS 3
-static const enum str power_rows[] = { S_SCREEN_OFF, S_RESTART, S_POWER_OFF };
+#define POW_SLEEP   1
+#define POW_RESTART 2
+#define POW_OFF     3
+#define N_POWER_ROWS 4
+static const enum str power_rows[] = { S_SCREEN_OFF, S_SLEEP_AFTER, S_RESTART, S_POWER_OFF };
 static const char *const power_verbs[] = { "reboot", "poweroff" };
 
 static void draw_power(struct ui *u)
@@ -1290,17 +1301,18 @@ static void draw_power(struct ui *u)
 	for (int i = 0; i < N_POWER_ROWS; i++) {
 		char v[16];
 		const char *value = NULL;
-		if (i == POW_BLANK) {
-			snprintf(v, sizeof(v), tr(S_MIN), blank_minutes[u->blank_idx]);
+		if (i == POW_BLANK || i == POW_SLEEP) {
+			snprintf(v, sizeof(v), tr(S_MIN), i == POW_BLANK
+			         ? blank_minutes[u->blank_idx] : sleep_minutes[u->sleep_idx]);
 			value = v;
 		}
 		draw_row(u, (unsigned)(3 + i), i == u->power_sel, tr(power_rows[i]), value);
 	}
 	term_hline(t, 3 + N_POWER_ROWS, G_HLINE, ATTR_DIM);
 
-	if (u->power_sel == POW_BLANK)
+	if (u->power_sel == POW_BLANK || u->power_sel == POW_SLEEP)
 		wrap_puts(t, 4, 3 + N_POWER_ROWS + 1, t->cols - 8, 3,
-		          tr(S_DESC_BLANK), ATTR_DIM);
+		          tr(u->power_sel == POW_BLANK ? S_DESC_BLANK : S_DESC_SLEEP), ATTR_DIM);
 
 	/* One press arms it and says so; the second does it. Anything else
 	 * disarms, so a stray press on the way through never switches off. */
@@ -2318,7 +2330,7 @@ static void on_action(struct ui *u, enum action a)
 		break;
 
 	case SCR_POWER:
-		if (a == ACT_CONFIRM && u->power_sel != POW_BLANK &&
+		if (a == ACT_CONFIRM && u->power_sel >= POW_RESTART &&
 		    u->power_armed == u->power_sel) {
 			u->power_armed = -1;
 			power(u, power_verbs[u->power_sel - POW_RESTART]);
@@ -2335,6 +2347,15 @@ static void on_action(struct ui *u, enum action a)
 			             : (u->blank_idx + 1) % N_BLANK;
 			snprintf(buf, sizeof(buf), "%d", blank_minutes[u->blank_idx]);
 			settings_set(SETTINGS, KEY_BLANK, buf);
+		}
+		else if (u->power_sel == POW_SLEEP &&
+		         (a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT)) {
+			char buf[8];
+			u->sleep_idx = (a == ACT_LEFT)
+			             ? (u->sleep_idx + N_SLEEP - 1) % N_SLEEP
+			             : (u->sleep_idx + 1) % N_SLEEP;
+			snprintf(buf, sizeof(buf), "%d", sleep_minutes[u->sleep_idx]);
+			settings_set(SETTINGS, KEY_SLEEP, buf);
 		}
 		else if (a == ACT_CONFIRM) u->power_armed = u->power_sel;
 		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
@@ -2493,6 +2514,34 @@ static void on_action(struct ui *u, enum action a)
 	}
 }
 
+/* The panel back on after a blank, with the idle clock started again. */
+static void wake_panel(struct ui *u)
+{
+	kms_present(&u->kms);
+	reapply_profile(u);
+	term_invalidate(&u->term);
+	status_read(&u->st);
+	redraw(u);
+	u->blanked = 0;
+	u->last_act = now_ms();
+	u->sleep_retry = 0;
+}
+
+/* Dark and untouched for the sleep time: ask power-handler to sleep the
+ * device. It sets the backlight to 0 and returns once the suspend is
+ * queued, so the panel comes back on here under a dark backlight and resume
+ * shows the menu rather than a black screen. When it declines - SSH in use,
+ * an external display, suspend switched off - ask again a minute later. */
+static void idle_sleep(struct ui *u)
+{
+	char *const argv[] = { (char *)POWER_HANDLER, (char *)"idle", NULL };
+	if (proc_run_for(argv, NULL, NULL, 10000) != 0) {
+		u->sleep_retry = now_ms() + IDLE_RETRY_MS;
+		return;
+	}
+	wake_panel(u);
+}
+
 int main(void)
 {
 	struct ui u;
@@ -2599,6 +2648,14 @@ int main(void)
 			if (strcmp(blk, want) == 0)
 				u.blank_idx = i;
 		}
+		char slp[8] = "";
+		settings_get(SETTINGS, KEY_SLEEP, slp, sizeof(slp));
+		for (int i = 0; i < N_SLEEP; i++) {
+			char want[8];
+			snprintf(want, sizeof(want), "%d", sleep_minutes[i]);
+			if (strcmp(slp, want) == 0)
+				u.sleep_idx = i;
+		}
 		for (int i = 1; i < N_PROFILES; i++)
 			if (u.profile_ok[i] && strcmp(prof, profile_names[i].key) == 0 &&
 			    kms_color_apply(&u.kms, &u.profiles[i]) == 0)
@@ -2661,16 +2718,19 @@ int main(void)
 		if (net_left < idle)
 			idle = net_left > 0 ? (int)net_left : 0;
 		/* Dark already: nothing drawn needs refreshing, so sleep until
-		 * a button, or a signal, says otherwise. Not while the panel
-		 * is someone else's - that retry has to keep ticking. */
+		 * a button, a signal or the time to ask for the device to
+		 * sleep. Not while the panel is someone else's - that retry
+		 * has to keep ticking. */
 		if (u.blanked && !u.panel_lost)
-			idle = -1;
+			idle = u.going_down ? -1
+			     : idle_wait_ms(now_ms(), u.last_act, 1,
+			                    blank_minutes[u.blank_idx],
+			                    sleep_minutes[u.sleep_idx], u.sleep_retry);
 		else if (!u.blanked) {
-			long long blank_left = u.last_act
-			                     + blank_minutes[u.blank_idx] * 60000LL
-			                     - now_ms();
+			int blank_left = idle_wait_ms(now_ms(), u.last_act, 0,
+			                              blank_minutes[u.blank_idx], 0, 0);
 			if (blank_left < idle)
-				idle = blank_left > 0 ? (int)blank_left : 0;
+				idle = blank_left;
 		}
 
 		enum action a = input_wait(&u.in, idle);
@@ -2680,13 +2740,7 @@ int main(void)
 			int on = blank_requested > 0;
 			blank_requested = 0;
 			if (on) {
-				kms_present(&u.kms);
-				reapply_profile(&u);
-				term_invalidate(&u.term);
-				status_read(&u.st);
-				redraw(&u);
-				u.blanked = 0;
-				u.last_act = now_ms();
+				wake_panel(&u);
 			} else {
 				kms_blank(&u.kms);
 				u.blanked = 1;
@@ -2710,15 +2764,15 @@ int main(void)
 		}
 
 		if (u.blanked) {
+			if (a == ACT_TICK && !u.going_down &&
+			    now_ms() >= idle_sleep_at(u.last_act,
+			                              blank_minutes[u.blank_idx],
+			                              sleep_minutes[u.sleep_idx],
+			                              u.sleep_retry))
+				idle_sleep(&u);
 			if (a == ACT_NONE || a == ACT_TICK)
 				continue;
-			kms_present(&u.kms);
-			reapply_profile(&u);
-			term_invalidate(&u.term);
-			status_read(&u.st);
-			redraw(&u);
-			u.blanked = 0;
-			u.last_act = now_ms();
+			wake_panel(&u);
 			continue;
 		}
 
