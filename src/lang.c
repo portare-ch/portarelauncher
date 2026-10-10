@@ -141,7 +141,7 @@ static const struct {
 	[S_ARMED_RESTART]   = { { "Press %c again to restart.", "もう一度 %c を押すと再起動します。" }, 47 },
 	[S_ARMED_OFF]       = { { "Press %c again to switch off.", "もう一度 %c を押すと電源を切ります。" }, 47 },
 	[S_ARMED_RESET]     = { { "Press %c again to reset to stock.", "もう一度 %c を押すと初期状態に戻します。" }, 47 },
-	[S_DESC_RESET]      = { { "Every setting back to how it shipped, Wi-Fi and SSH keys too. Games, saves, BIOS, favourites and Steam stay.", "すべての設定を出荷時に戻します。Wi-FiとSSHの鍵も消えます。ゲーム、セーブ、BIOS、お気に入り、Steamは残ります。" }, 135 },
+	[S_DESC_RESET]      = { { "Back to a fresh install, to find a fault. Only the roms folder and Wi-Fi stay: games, BIOS and saves.", "新規インストールの状態に戻して不具合を切り分けます。romsフォルダ(ゲーム、BIOS、セーブ)とWi-Fiだけが残ります。" }, 135 },
 	[S_FAIL_RESTART]    = { { "Could not restart (%d).", "再起動できませんでした (%d)。" }, 47 },
 	[S_FAIL_OFF]        = { { "Could not switch off (%d).", "電源を切れませんでした (%d)。" }, 47 },
 	[S_FAIL_RESET]      = { { "Could not reset (%d).", "初期状態に戻せませんでした (%d)。" }, 47 },

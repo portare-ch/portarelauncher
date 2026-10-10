@@ -640,9 +640,9 @@ POWER = [("Screen off", "5 min"), ("Sleep after", "5 min"), ("Restart", ""),
 power_reset = [row(" Settings  \u203a  Power", ""), RULE, ""]
 power_reset += [item(i == 4, n, v) for i, (n, v) in enumerate(POWER)]
 power_reset += [THIN,
-                "    Every setting back to how it shipped, Wi-Fi",
-                "    and SSH keys too. Games, saves, BIOS,",
-                "    favourites and Steam stay.",
+                "    Back to a fresh install, to find a fault.",
+                "    Only the roms folder and Wi-Fi stay: games,",
+                "    BIOS and saves.",
                 "",
                 "    Press A again to reset to stock."]
 power_reset += [""] * (ROWS - 2 - len(power_reset))

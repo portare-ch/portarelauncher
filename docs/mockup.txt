@@ -633,9 +633,9 @@
         Power off                                        |
       ▸ Reset to stock                                   |
      ─────────────────────────────────────────────────── |
-        Every setting back to how it shipped, Wi-Fi      |
-        and SSH keys too. Games, saves, BIOS,            |
-        favourites and Steam stay.                       |
+        Back to a fresh install, to find a fault.        |
+        Only the roms folder and Wi-Fi stay: games,      |
+        BIOS and saves.                                  |
                                                          |
         Press A again to reset to stock.                 |
                                                          |
