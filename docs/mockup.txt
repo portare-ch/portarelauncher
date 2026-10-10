@@ -94,6 +94,30 @@
      A CHANGE   B BACK                           ↑↓ MOVE |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
+    SETTINGS - POWER, RESET TO STOCK PRESSED ONCE
+    .....................................................  <- 53 columns
+     Settings  ›  Power                                  |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+        Screen off                                5 min  |
+        Sleep after                               5 min  |
+        Restart                                          |
+        Power off                                        |
+      ▸ Reset to stock                                   |
+     ─────────────────────────────────────────────────── |
+        Every setting back to how it shipped, Wi-Fi      |
+        and SSH keys too. Games, saves, BIOS,            |
+        favourites and Steam stay.                       |
+                                                         |
+        Press A again to reset to stock.                 |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A SELECT   B BACK                           ↑↓ MOVE |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
     BLUETOOTH
     .....................................................  <- 53 columns
      Settings  ›  Bluetooth                              |

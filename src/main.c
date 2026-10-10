@@ -1266,10 +1266,29 @@ static void draw_keyboard(struct ui *u)
  * refuses, the panel comes back with the reason; if it accepts and the
  * system still has not gone down by the next press, that press brings the
  * panel back rather than leaving a dark screen with no way out. */
-static void power(struct ui *u, const char *verb)
+/* Rows 0 and 1 are settings and cycle; rows 2 to 4 are the armed actions,
+ * and the tables below are indexed from row 2. Reset to stock flags the
+ * reset and restarts into it; factoryreset says what goes and what stays. */
+#define POW_BLANK   0
+#define POW_SLEEP   1
+#define POW_RESTART 2
+#define POW_OFF     3
+#define POW_RESET   4
+#define N_POWER_ROWS 5
+static const enum str power_rows[] = { S_SCREEN_OFF, S_SLEEP_AFTER, S_RESTART,
+                                       S_POWER_OFF, S_RESET_STOCK };
+static const char *const power_argv[][3] = {
+	{ "/usr/bin/systemctl", "reboot", NULL },
+	{ "/usr/bin/systemctl", "poweroff", NULL },
+	{ "/usr/bin/factoryreset", NULL, NULL },
+};
+static const enum str power_armed_text[] = { S_ARMED_RESTART, S_ARMED_OFF, S_ARMED_RESET };
+static const enum str power_fail[] = { S_FAIL_RESTART, S_FAIL_OFF, S_FAIL_RESET };
+
+static void power(struct ui *u, int row)
 {
 	kms_blank(&u->kms);
-	char *const argv[] = { (char *)"/usr/bin/systemctl", (char *)verb, NULL };
+	char *const *argv = (char *const *)power_argv[row - POW_RESTART];
 	int rc = proc_run_for(argv, NULL, NULL, 10000);
 	if (rc == 0) {
 		u->going_down = 1;
@@ -1277,19 +1296,8 @@ static void power(struct ui *u, const char *verb)
 	}
 	kms_present(&u->kms);
 	term_invalidate(&u->term);
-	snprintf(u->note, sizeof(u->note),
-	         tr(strcmp(verb, "reboot") == 0 ? S_FAIL_RESTART : S_FAIL_OFF), rc);
+	snprintf(u->note, sizeof(u->note), tr(power_fail[row - POW_RESTART]), rc);
 }
-
-/* Rows 0 and 1 are settings and cycle; rows 2 and 3 are the armed actions,
- * and power_verbs is indexed from row 2. */
-#define POW_BLANK   0
-#define POW_SLEEP   1
-#define POW_RESTART 2
-#define POW_OFF     3
-#define N_POWER_ROWS 4
-static const enum str power_rows[] = { S_SCREEN_OFF, S_SLEEP_AFTER, S_RESTART, S_POWER_OFF };
-static const char *const power_verbs[] = { "reboot", "poweroff" };
 
 static void draw_power(struct ui *u)
 {
@@ -1308,19 +1316,22 @@ static void draw_power(struct ui *u)
 		}
 		draw_row(u, (unsigned)(3 + i), i == u->power_sel, tr(power_rows[i]), value);
 	}
-	term_hline(t, 3 + N_POWER_ROWS, G_HLINE, ATTR_DIM);
+	unsigned y = 3 + N_POWER_ROWS, r = 0;
+	term_hline(t, y, G_HLINE, ATTR_DIM);
 
 	if (u->power_sel == POW_BLANK || u->power_sel == POW_SLEEP)
-		wrap_puts(t, 4, 3 + N_POWER_ROWS + 1, t->cols - 8, 3,
+		wrap_puts(t, 4, y + 1, t->cols - 8, 3,
 		          tr(u->power_sel == POW_BLANK ? S_DESC_BLANK : S_DESC_SLEEP), ATTR_DIM);
+	else if (u->power_sel == POW_RESET)
+		r = wrap_puts(t, 4, y + 1, t->cols - 8, 3, tr(S_DESC_RESET), ATTR_DIM);
 
 	/* One press arms it and says so; the second does it. Anything else
-	 * disarms, so a stray press on the way through never switches off. */
+	 * disarms, so a stray press on the way through never switches off.
+	 * Under what a reset keeps, so that is read before the second press. */
 	if (u->power_armed >= 0) {
 		snprintf(buf, sizeof(buf),
-		         tr(u->power_armed == POW_RESTART ? S_ARMED_RESTART : S_ARMED_OFF),
-		         f.confirm);
-		term_puts(t, 4, 3 + N_POWER_ROWS + 2, buf, ATTR_BRIGHT);
+		         tr(power_armed_text[u->power_armed - POW_RESTART]), f.confirm);
+		term_puts(t, 4, y + 2 + r, buf, ATTR_BRIGHT);
 	}
 	if (u->note[0])
 		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
@@ -1592,7 +1603,7 @@ static void open_update(struct ui *u)
 /* The update is applied by the boot that follows. */
 static void restart(struct ui *u)
 {
-	power(u, "reboot");
+	power(u, POW_RESTART);
 }
 
 static void redraw(struct ui *u)
@@ -2333,7 +2344,7 @@ static void on_action(struct ui *u, enum action a)
 		if (a == ACT_CONFIRM && u->power_sel >= POW_RESTART &&
 		    u->power_armed == u->power_sel) {
 			u->power_armed = -1;
-			power(u, power_verbs[u->power_sel - POW_RESTART]);
+			power(u, u->power_sel);
 			break;
 		}
 		u->power_armed = -1;

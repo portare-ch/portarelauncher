@@ -166,6 +166,21 @@ def consoles_screen(sel):
 
 consoles = consoles_screen(0)
 
+# Settings > Power with Reset to stock pressed once: what it keeps is said
+# under the rule, and the second press is asked for under that.
+POWER = [("Screen off", "5 min"), ("Sleep after", "5 min"), ("Restart", ""),
+         ("Power off", ""), ("Reset to stock", "")]
+power_reset = [row(" Settings  \u203a  Power", ""), RULE, ""]
+power_reset += [item(i == 4, n, v) for i, (n, v) in enumerate(POWER)]
+power_reset += [THIN,
+                "    Every setting back to how it shipped, Wi-Fi",
+                "    and SSH keys too. Games, saves, BIOS,",
+                "    favourites and Steam stay.",
+                "",
+                "    Press A again to reset to stock."]
+power_reset += [""] * (ROWS - 2 - len(power_reset))
+power_reset += [THIN, row(" A SELECT   B BACK", "\u2191\u2193 MOVE ")]
+
 # Settings > Diagnostics: the tools that show what the hardware does, each
 # a screen of its own. One entry so far; which layer PortScope reads is a
 # mode inside it, not a second entry.
@@ -636,6 +651,7 @@ games_any_script += [THIN, games_footer(False, 1 + GBC.index(GBC_SEL), len(GBC))
 if __name__ == "__main__":
     for t, s in (("SYSTEMS", systems), ("GAMES", games),
                  ("SETTINGS", settings), ("SETTINGS - CONSOLES", consoles),
+                 ("SETTINGS - POWER, RESET TO STOCK PRESSED ONCE", power_reset),
                  ("BLUETOOTH", bluetooth),
                  ("KEYBOARD - letters", kb_lower),
                  ("KEYBOARD - shift, shape marks", kb_upper),
