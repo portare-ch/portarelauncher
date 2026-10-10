@@ -7,6 +7,7 @@
 #include "catalog.h"
 #include "lists.h"
 #include "color.h"
+#include "consoles.h"
 #include "input.h"
 #include "glyph.h"
 #include "ja26.h"
@@ -78,50 +79,6 @@ static const struct { const char *key, *label; } profile_names[] = {
 };
 #define N_PROFILES ((int)(sizeof(profile_names) / sizeof(profile_names[0])))
 
-/* Settings > Consoles: one switch per console, read by setsettings.sh
- * when the game starts. The key is the system's name in es_systems.cfg,
- * which is also how every other per-system setting is keyed. The switch
- * is the pre-emptive frame: stored as <system>.preempt, 1 or 0, shown as
- * PRMPT on or off, BIOS-style.
- *
- * The PlayStation keeps its Vulkan renderer at 4x with the frame on. Its
- * old latency mode also dropped to software at 1x; that renderer was
- * never what cost the frame rate, so the switch is the same as here. */
-static const struct { const char *key, *label; } consoles[] = {
-	{ "snes",    "SNES"             },
-	{ "nes",     "NES"              },
-	{ "psx",     "PlayStation"      },
-	{ "gb",      "Game Boy"         },
-	{ "gbc",     "Game Boy Color"   },
-	{ "gba",     "Game Boy Advance" },
-	{ "genesis", "Genesis"          },
-};
-#define N_CONSOLES ((int)(sizeof(consoles) / sizeof(consoles[0])))
-
-/* Absent, empty or anything else reads as off: it is the default and
- * what an install from before the setting has. */
-static int console_latency(int i)
-{
-	char key[64], val[16];
-	snprintf(key, sizeof(key), "%s.preempt", consoles[i].key);
-	return settings_get(SETTINGS, key, val, sizeof(val)) &&
-	       strcmp(val, "1") == 0;
-}
-
-/* What the stored value is called on screen for this console. */
-static const char *console_mode_name(int i, int latency)
-{
-	(void)i;
-	return tr(latency ? S_PRMPT_ON : S_PRMPT_OFF);
-}
-
-static void console_set_latency(int i, int latency)
-{
-	char key[64];
-	snprintf(key, sizeof(key), "%s.preempt", consoles[i].key);
-	settings_set(SETTINGS, key, latency ? "1" : "0");
-}
-
 #ifndef PL_VERSION
 #define PL_VERSION "dev"   /* set by the Makefile, from VERSION or git */
 #endif
@@ -146,8 +103,8 @@ enum { QUICK_RECENT = 0, QUICK_FAVS = 1 };
 
 enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI, SCR_BT,
               SCR_KEYBOARD, SCR_TOOLS, SCR_ABOUT, SCR_UPDATE,
-              SCR_TZ, SCR_POWER, SCR_CONSOLES, SCR_RECENT, SCR_FAVS,
-              SCR_DIAG, SCR_REGION };
+              SCR_TZ, SCR_POWER, SCR_CONSOLES, SCR_CONSOLE, SCR_RECENT,
+              SCR_FAVS, SCR_DIAG, SCR_REGION };
 
 struct ui {
 	struct term term;
@@ -194,6 +151,7 @@ struct ui {
 	int power_sel;
 	int power_armed;     /* the row pressed once, waiting for a second; -1 */
 	int console_sel;     /* Settings > Consoles                            */
+	int console_opt;     /* Settings > Consoles > one console              */
 	int region_sel;      /* Settings > Language & region                   */
 	int going_down;      /* reboot or poweroff accepted, panel off         */
 	int panel_lost;      /* master not yet back after a child; retrying    */
@@ -857,8 +815,8 @@ static void draw_settings(struct ui *u)
 			break;
 		case SET_CONSOLES: {
 			int n = 0;
-			for (int k = 0; k < N_CONSOLES; k++)
-				n += console_latency(k);
+			for (int k = 0; k < n_consoles; k++)
+				n += console_changed(SETTINGS, CONSOLES_SHIPPED, k);
 			if (n == 0)
 				value = tr(S_DEFAULTS);
 			else {
@@ -983,26 +941,61 @@ static void draw_settings(struct ui *u)
 	}
 }
 
-/* One row per console, the pre-emptive frame on or off. What it means is
- * written under the list, wrapped by wrap_puts so it can never run past
- * the frame; the text is experimental and says so. */
+/* One row per console, each saying whether anything in it differs from
+ * the image; A opens the console's own settings. */
 static void draw_consoles(struct ui *u)
 {
 	struct term *t = &u->term;
-	char buf[192];
+	char buf[192], val[32];
 
 	draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SETTINGS), tr(S_SET_CONSOLES), NULL));
-	for (int i = 0; i < N_CONSOLES; i++)
+	for (int i = 0; i < n_consoles; i++) {
+		int n = console_changed(SETTINGS, CONSOLES_SHIPPED, i);
+		if (n)
+			snprintf(val, sizeof(val), tr(S_N_CHANGED), n);
 		draw_row(u, (unsigned)(3 + i), i == u->console_sel,
 		         lang_system(consoles[i].key, consoles[i].label),
-		         console_mode_name(i, console_latency(i)));
+		         n ? val : tr(S_DEFAULTS));
+	}
 
-	unsigned y = 3 + N_CONSOLES;
+	struct face f = face_of(u->retroid);
+	snprintf(buf, sizeof(buf), tr(S_HINT_OPEN), f.confirm, f.back);
+	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
+}
+
+/* Settings > Consoles > one console: its switches, and under the rule
+ * what the selected one does, wrapped by wrap_puts so it can never run
+ * past the frame. PRMPT is experimental and says so. The header shows
+ * the clock alone, as a list of games does: the crumb is the only place
+ * the console is named, and beside the full status it was cut to
+ * "Settings  >  Consol". */
+static const enum str console_opt_labels[N_CONSOLE_OPTS] = {
+	[CON_PRMPT] = S_PRMPT, [CON_INTEGER] = S_INTEGER_SCALING,
+};
+
+static void draw_console(struct ui *u)
+{
+	struct term *t = &u->term;
+	const struct console *c = &consoles[u->console_sel];
+	char buf[192];
+
+	draw_frame_right(u, crumb_of(buf, sizeof(buf), tr(S_SETTINGS), tr(S_SET_CONSOLES),
+	                             lang_system(c->key, c->label)), 0);
+	for (int o = 0; o < N_CONSOLE_OPTS; o++)
+		draw_row(u, (unsigned)(3 + o), o == u->console_opt,
+		         tr(console_opt_labels[o]),
+		         tr(console_get(SETTINGS, u->console_sel, (enum console_opt)o)
+		            ? S_ON : S_OFF));
+
+	unsigned y = 3 + N_CONSOLE_OPTS;
 	term_hline(t, y, G_HLINE, ATTR_DIM);
 	/* The rows between the rule and the bottom rule, and no more. */
 	unsigned width = t->cols - 8, room = t->rows - 2 - (y + 1);
-	unsigned r = wrap_puts(t, 4, y + 1, width, room, tr(S_EXPERIMENTAL), ATTR_DIM);
-	wrap_puts(t, 4, y + 1 + r, width, room - r, tr(S_PRMPT_DESC), ATTR_DIM);
+	if (u->console_opt == CON_PRMPT) {
+		unsigned r = wrap_puts(t, 4, y + 1, width, room, tr(S_EXPERIMENTAL), ATTR_DIM);
+		wrap_puts(t, 4, y + 1 + r, width, room - r, tr(S_PRMPT_DESC), ATTR_DIM);
+	} else
+		wrap_puts(t, 4, y + 1, width, room, tr(S_INTEGER_DESC), ATTR_DIM);
 
 	if (u->note[0])
 		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
@@ -1609,6 +1602,7 @@ static void redraw(struct ui *u)
 	case SCR_TZ:       draw_tz(u);       break;
 	case SCR_POWER:    draw_power(u);    break;
 	case SCR_CONSOLES: draw_consoles(u); break;
+	case SCR_CONSOLE:  draw_console(u); break;
 	case SCR_DIAG:     draw_diag(u);     break;
 	case SCR_REGION:   draw_region(u);   break;
 	case SCR_UPDATE:   draw_update(u);   break;
@@ -2364,12 +2358,24 @@ static void on_action(struct ui *u, enum action a)
 
 	case SCR_CONSOLES:
 		if (a == ACT_UP && u->console_sel > 0) u->console_sel--;
-		else if (a == ACT_DOWN && u->console_sel < N_CONSOLES - 1) u->console_sel++;
-		else if (a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) {
-			int i = u->console_sel;
-			console_set_latency(i, !console_latency(i));
+		else if (a == ACT_DOWN && u->console_sel < n_consoles - 1) u->console_sel++;
+		else if (a == ACT_CONFIRM) {
+			u->console_opt = 0;
+			u->screen = SCR_CONSOLE;
 		}
 		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
+		else if (a == ACT_QUIT) u->running = 0;
+		break;
+
+	case SCR_CONSOLE:
+		if (a == ACT_UP && u->console_opt > 0) u->console_opt--;
+		else if (a == ACT_DOWN && u->console_opt < N_CONSOLE_OPTS - 1) u->console_opt++;
+		else if (a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) {
+			int i = u->console_sel;
+			enum console_opt o = (enum console_opt)u->console_opt;
+			console_set(SETTINGS, i, o, !console_get(SETTINGS, i, o));
+		}
+		else if (a == ACT_BACK) u->screen = SCR_CONSOLES;
 		else if (a == ACT_QUIT) u->running = 0;
 		break;
 
