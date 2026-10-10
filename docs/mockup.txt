@@ -622,3 +622,27 @@
      A LAUNCH   B BACK   Y FAVOURITE              3 / 10 |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
+    SETTINGS - POWER, RESET TO STOCK PRESSED ONCE
+    .....................................................  <- 53 columns
+     Settings  ›  Power                                  |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+        Screen off                                5 min  |
+        Sleep after                               5 min  |
+        Restart                                          |
+        Power off                                        |
+      ▸ Reset to stock                                   |
+     ─────────────────────────────────────────────────── |
+        Back to a fresh install, to find a fault.        |
+        Only the roms folder and Wi-Fi stay: games,      |
+        BIOS and saves.                                  |
+                                                         |
+        Press A again to reset to stock.                 |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A SELECT   B BACK                           ↑↓ MOVE |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+

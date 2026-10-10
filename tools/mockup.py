@@ -633,6 +633,21 @@ games_any_script += [game(t == GBC_SEL, t) for t in GBC]
 games_any_script += [""] * (ROWS - 2 - len(games_any_script))
 games_any_script += [THIN, games_footer(False, 1 + GBC.index(GBC_SEL), len(GBC))]
 
+# Settings > Power with Reset to stock pressed once: what it keeps is said
+# under the rule, and the second press is asked for under that.
+POWER = [("Screen off", "5 min"), ("Sleep after", "5 min"), ("Restart", ""),
+         ("Power off", ""), ("Reset to stock", "")]
+power_reset = [row(" Settings  \u203a  Power", ""), RULE, ""]
+power_reset += [item(i == 4, n, v) for i, (n, v) in enumerate(POWER)]
+power_reset += [THIN,
+                "    Back to a fresh install, to find a fault.",
+                "    Only the roms folder and Wi-Fi stay: games,",
+                "    BIOS and saves.",
+                "",
+                "    Press A again to reset to stock."]
+power_reset += [""] * (ROWS - 2 - len(power_reset))
+power_reset += [THIN, row(" A SELECT   B BACK", "\u2191\u2193 MOVE ")]
+
 if __name__ == "__main__":
     for t, s in (("SYSTEMS", systems), ("GAMES", games),
                  ("SETTINGS", settings), ("SETTINGS - CONSOLES", consoles),
@@ -657,6 +672,7 @@ if __name__ == "__main__":
                  ("PROPOSED - JAPANESE, SETTINGS", ja_settings),
                  ("PROPOSED - JAPANESE, LANGUAGE & REGION", ja_language),
                  ("PROPOSED - LANGUAGE & REGION", en_language),
-                 ("PROPOSED - ENGLISH, TITLES IN ANY SCRIPT", games_any_script)):
+                 ("PROPOSED - ENGLISH, TITLES IN ANY SCRIPT", games_any_script),
+                 ("SETTINGS - POWER, RESET TO STOCK PRESSED ONCE", power_reset)):
         print(screen(t, s))
         print()

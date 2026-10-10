@@ -239,3 +239,4 @@ if __name__ == "__main__":
                         ("language-region", mockup.en_language),
                         ("games-any-script", mockup.games_any_script)):
         render(lines, os.path.join(out, name + ".png"), glyphs)
+    render(mockup.power_reset, os.path.join(out, "settings-power-reset.png"), glyphs)
