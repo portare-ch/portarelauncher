@@ -74,7 +74,7 @@ static const struct {
 	[S_RESTART_TO_INSTALL] = { { "restart to install", "再起動でインストール" }, 20 },
 	[S_UNKNOWN]            = { { "unknown", "不明" }, 20 },
 
-	[S_DESC_CONSOLES] = { { "Experimental: reduce input lag per console.", "試験的: ゲーム機ごとに入力遅延を減らします。" }, 90 },
+	[S_DESC_CONSOLES] = { { "Input lag and picture scaling, per console.", "ゲーム機ごとの入力遅延と画面の拡大。" }, 90 },
 	[S_ADDRESS_FMT]   = { { "address  %s", "アドレス  %s" }, 12 },
 	[S_DESC_PROFILE]  = { { "Experimental: may lose detail in dark areas.", "試験的: 暗い部分の階調が失われることがあります。" }, 90 },
 	[S_NO_PROFILES]   = { { "No colour profiles installed.", "カラープロファイルがありません。" }, 45 },
@@ -92,10 +92,11 @@ static const struct {
 	[S_FACE_BACK]     = { { "back", "戻る" }, 29 },
 	[S_FACE_SETTINGS] = { { "settings", "設定" }, 29 },
 
-	[S_PRMPT_ON]     = { { "PRMPT on", "PRMPT オン" }, 20 },
-	[S_PRMPT_OFF]    = { { "PRMPT off", "PRMPT オフ" }, 20 },
+	[S_PRMPT]           = { { "PRMPT", "PRMPT" }, 24 },
+	[S_INTEGER_SCALING] = { { "Integer scaling", "整数倍拡大" }, 24 },
 	[S_EXPERIMENTAL] = { { "Experimental.", "試験的な機能です。" }, 45 },
 	[S_PRMPT_DESC]   = { { "PRMPT adds a pre-emptive frame to reduce input lag.", "PRMPTは先読みフレームを1つ加えて入力遅延を減らします。" }, 90 },
+	[S_INTEGER_DESC] = { { "On: every pixel the same whole multiple. Off: as large as the screen allows.", "オン: すべての画素を同じ整数倍で表示します。オフ: 画面に収まる最大の大きさで表示します。" }, 90 },
 
 	[S_LANGUAGE_ROW] = { { "Language / 言語", "言語 / Language" }, 24 },
 	[S_TIMEZONE]     = { { "Time zone", "タイムゾーン" }, 24 },

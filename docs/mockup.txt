@@ -75,17 +75,65 @@
      Settings  ›  Consoles                               |
      ═══════════════════════════════════════════════════ |
                                                          |
-      ▸ SNES                                   PRMPT on  |
-        NES                                   PRMPT off  |
-        PlayStation                           PRMPT off  |
-        Game Boy                              PRMPT off  |
-        Game Boy Color                        PRMPT off  |
-        Game Boy Advance                      PRMPT off  |
-        Genesis                               PRMPT off  |
+      ▸ SNES                                  1 changed  |
+        NES                                    defaults  |
+        PlayStation                            defaults  |
+        Game Boy                               defaults  |
+        Game Boy Color                         defaults  |
+        Game Boy Advance                       defaults  |
+        Genesis                               2 changed  |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A OPEN   B BACK                             ↑↓ MOVE |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    SETTINGS - CONSOLES - SNES, INTEGER SCALING
+    .....................................................  <- 53 columns
+     Settings  ›  Consoles  ›  SNES                23:59 |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+        PRMPT                                       off  |
+      ▸ Integer scaling                             off  |
+     ─────────────────────────────────────────────────── |
+        On: every pixel the same whole multiple.         |
+        Off: as large as the screen allows.              |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A CHANGE   B BACK                           ↑↓ MOVE |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    SETTINGS - CONSOLES - GENESIS, PRMPT
+    .....................................................  <- 53 columns
+     Settings  ›  Consoles  ›  Genesis             23:59 |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+      ▸ PRMPT                                        on  |
+        Integer scaling                             off  |
      ─────────────────────────────────────────────────── |
         Experimental.                                    |
         PRMPT adds a pre-emptive frame to reduce         |
         input lag.                                       |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
                                                          |
                                                          |
                                                          |

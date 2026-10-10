@@ -147,24 +147,38 @@ settings += ["         X          X confirm",
              "         B          X settings"]
 settings += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
 
-# Settings > Consoles: the pre-emptive frame per console, and what it
-# means, wrapped at 45 columns as wrap_puts does it on the device.
-CONSOLES = [("SNES", "PRMPT on"), ("NES", "PRMPT off"),
-            ("PlayStation", "PRMPT off"),
-            ("Game Boy", "PRMPT off"),
-            ("Game Boy Color", "PRMPT off"), ("Game Boy Advance", "PRMPT off"),
-            ("Genesis", "PRMPT off")]
-def consoles_screen(sel):
-    lines = [row(" Settings  \u203a  Consoles", ""), RULE, ""]
-    lines += [item(i == sel, n, v) for i, (n, v) in enumerate(CONSOLES)]
-    lines += [THIN, "    Experimental."]
-    lines += ["    PRMPT adds a pre-emptive frame to reduce",
-              "    input lag."]
+# Settings > Consoles: one row per console, whether anything in it differs
+# from the image; A opens the console's own settings.
+CONSOLES = [("SNES", "1 changed"), ("NES", "defaults"),
+            ("PlayStation", "defaults"), ("Game Boy", "defaults"),
+            ("Game Boy Color", "defaults"), ("Game Boy Advance", "defaults"),
+            ("Genesis", "2 changed")]
+consoles = [row(" Settings  \u203a  Consoles", ""), RULE, ""]
+consoles += [item(i == 0, n, v) for i, (n, v) in enumerate(CONSOLES)]
+consoles += [""] * (ROWS - 2 - len(consoles))
+consoles += [THIN, row(" A OPEN   B BACK", "\u2191\u2193 MOVE ")]
+
+# Settings > Consoles > one console: its switches, and what the selected
+# one does under the rule, wrapped at 45 columns as wrap_puts does it on
+# the device. The header has the clock alone, so the crumb naming the
+# console is never cut.
+def console_screen(name, prmpt, integer, sel):
+    lines = [header("Settings  \u203a  Consoles  \u203a  " + name, CLOCK), RULE, ""]
+    lines += [item(sel == 0, "PRMPT", prmpt),
+              item(sel == 1, "Integer scaling", integer), THIN]
+    if sel == 0:
+        lines += ["    Experimental.",
+                  "    PRMPT adds a pre-emptive frame to reduce",
+                  "    input lag."]
+    else:
+        lines += ["    On: every pixel the same whole multiple.",
+                  "    Off: as large as the screen allows."]
     lines += [""] * (ROWS - 2 - len(lines))
     lines += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
     return lines
 
-consoles = consoles_screen(0)
+console_snes = console_screen("SNES", "off", "off", 1)
+console_genesis = console_screen("Genesis", "on", "off", 0)
 
 # Settings > Diagnostics: the tools that show what the hardware does, each
 # a screen of its own. One entry so far; which layer PortScope reads is a
@@ -636,6 +650,8 @@ games_any_script += [THIN, games_footer(False, 1 + GBC.index(GBC_SEL), len(GBC))
 if __name__ == "__main__":
     for t, s in (("SYSTEMS", systems), ("GAMES", games),
                  ("SETTINGS", settings), ("SETTINGS - CONSOLES", consoles),
+                 ("SETTINGS - CONSOLES - SNES, INTEGER SCALING", console_snes),
+                 ("SETTINGS - CONSOLES - GENESIS, PRMPT", console_genesis),
                  ("BLUETOOTH", bluetooth),
                  ("KEYBOARD - letters", kb_lower),
                  ("KEYBOARD - shift, shape marks", kb_upper),
