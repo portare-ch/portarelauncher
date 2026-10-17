@@ -9,7 +9,7 @@ DRM_LIBS   := $(shell $(PKG_CONFIG) --libs libdrm 2>/dev/null)
 
 # Require libdrm for device builds; host tests and mockups do not need it.
 GOALS := $(or $(MAKECMDGOALS),all)
-ifneq ($(filter-out clean font mockup test tests/%,$(GOALS)),)
+ifneq ($(filter-out clean font mockup test test-chd test-chd-san install-disc-titles ps-chd-id disc-title-tables tests/%,$(GOALS)),)
 ifeq ($(strip $(DRM_LIBS)),)
 $(error libdrm not found by '$(PKG_CONFIG)'. Point PKG_CONFIG at the one for \
 the target, or install the libdrm development headers. The device ships \
@@ -34,7 +34,7 @@ ifeq ($(PL_VERSION),)
 PL_VERSION := dev
 endif
 
-SRC  := src/text.c src/proc.c src/update.c src/osinfo.c src/tz.c src/quit.c src/idle.c src/sheets.c src/color.c src/net.c src/bt.c src/osk.c src/tools.c src/settings.c src/status.c src/notify.c src/term.c src/pix.c src/glyph.c src/unifont.c src/ja26.c src/lang.c src/kms.c \
+SRC  := src/disc_titles.c src/ps_serial.c src/text.c src/proc.c src/update.c src/osinfo.c src/tz.c src/quit.c src/idle.c src/sheets.c src/color.c src/net.c src/bt.c src/osk.c src/tools.c src/settings.c src/status.c src/notify.c src/term.c src/pix.c src/glyph.c src/unifont.c src/ja26.c src/lang.c src/kms.c \
         src/input.c src/catalog.c src/lists.c src/main.c
 OBJ  := $(SRC:.c=.o)
 BIN  := portarelauncher
@@ -45,7 +45,7 @@ SCOPE_SRC := src/portscope.c src/scope.c src/pix.c src/term.c src/kms.c \
 SCOPE_OBJ := $(SCOPE_SRC:.c=.o)
 SCOPE_BIN := portscope
 
-all: $(BIN) $(SCOPE_BIN)
+all: $(BIN) $(SCOPE_BIN) ps-chd-id disc-title-tables
 
 $(BIN): $(OBJ)
 	$(CC) $(CFLAGS) $(PL_CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(DRM_LIBS)
@@ -62,7 +62,7 @@ src/term.o: src/font8x16.h
 src/main.o: PL_CFLAGS += -DPL_VERSION='"$(PL_VERSION)"'
 
 clean:
-	rm -f $(OBJ) $(SCOPE_OBJ) $(BIN) $(SCOPE_BIN) $(TESTS)
+	rm -f $(OBJ) $(SCOPE_OBJ) $(BIN) $(SCOPE_BIN) $(TESTS) ps-chd-id
 
 # Regenerate the VGA font; FONT_SRC points to Linux's font_8x16.c.
 font: tools/mkfont.py
@@ -88,7 +88,7 @@ TEST_CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer \
 endif
 
 TESTS := tests/test_text tests/test_settings tests/test_proc \
-         tests/test_catalog tests/test_tools tests/test_net tests/test_bt \
+         tests/test_catalog tests/test_metadata_input tests/test_disc_titles tests/test_tools tests/test_net tests/test_bt \
          tests/test_osk tests/test_update tests/test_osinfo tests/test_tz tests/test_quit tests/test_sheets tests/test_color tests/test_lists \
          tests/test_scope tests/test_pix tests/test_term tests/test_glyph tests/test_lang tests/test_ja26 \
          tests/test_idle
@@ -96,7 +96,11 @@ TESTS := tests/test_text tests/test_settings tests/test_proc \
 tests/test_text:     src/text.c
 tests/test_settings: src/settings.c
 tests/test_proc:     src/proc.c src/text.c
-tests/test_catalog:  src/catalog.c src/settings.c src/sheets.c src/text.c src/glyph.c src/unifont.c
+tests/test_catalog:  src/disc_titles.c src/ps_serial.c src/proc.c src/catalog.c src/settings.c src/sheets.c src/text.c src/glyph.c src/unifont.c
+ifeq ($(shell uname -s),Linux)
+tests/test_metadata_input: src/input.c src/proc.c src/quit.c
+endif
+tests/test_disc_titles: src/ps_sfo.c src/disc_titles.c src/ps_serial.c src/ps_iso.c src/proc.c src/catalog.c src/settings.c src/sheets.c src/text.c src/glyph.c src/unifont.c
 tests/test_tools:    src/tools.c src/text.c
 tests/test_net:      src/net.c src/text.c tests/fake_proc.c
 tests/test_bt:       src/bt.c src/text.c src/settings.c tests/fake_proc.c
@@ -124,3 +128,49 @@ test:
 	@rm -f $(TESTS)
 	@$(MAKE) --no-print-directory $(TESTS)
 	@fail=0; for t in $(TESTS); do ./$$t || fail=1; done; exit $$fail
+
+# Decoder and codecs stay in this helper; the launcher links only libc/libdrm.
+CMAKE ?= cmake
+PS_BUILD ?= build/ps-helper
+PS_CMAKE_ARGS ?=
+ps-chd-id: src/ps_sfo.c src/ps_sfo.h tools/ps-chd-id.c src/ps_iso.c src/ps_iso.h src/ps_serial.c src/ps_serial.h tools/ps-helper/CMakeLists.txt
+	$(CMAKE) -S tools/ps-helper -B $(PS_BUILD) -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER="$(CC)" $(PS_CMAKE_ARGS)
+	+$(CMAKE) --build $(PS_BUILD) --target ps-chd-id
+	cp $(PS_BUILD)/ps-chd-id $@
+
+disc-title-tables: data/ps2-titles.tsv data/psx-titles.tsv data/psp-titles.tsv
+data/ps2-titles.tsv: third_party/pcsx2/GameIndex.yaml tools/gen_ps2_titles.py
+	python3 tools/gen_ps2_titles.py $< $@
+
+data/psx-titles.tsv: third_party/libretro/PlayStation.dat tools/gen_psx_titles.py
+	python3 tools/gen_psx_titles.py $< $@ --collisions data/psx-title-collisions.json
+
+data/psp-titles.tsv: third_party/libretro/PlayStationPortable.dat tools/gen_psp_titles.py tools/gen_psx_titles.py
+	python3 tools/gen_psp_titles.py $< $@ --collisions data/psp-title-collisions.json
+
+test-chd: ps-chd-id disc-title-tables
+	python3 tests/test_ps_chd.py ./ps-chd-id
+	python3 tests/test_title_generators.py
+
+.PHONY: disc-title-tables test-chd
+
+# ASan needs its large virtual address mapping; production memory bounds stay on.
+test-chd-san: disc-title-tables
+	$(CMAKE) -S tools/ps-helper -B build/ps-helper-san -DCMAKE_BUILD_TYPE=Debug -DPS_ID_SANITIZED=ON -DCMAKE_C_COMPILER="$(CC)" -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
+	$(CMAKE) --build build/ps-helper-san --target ps-chd-id
+	python3 tests/test_ps_chd.py build/ps-helper-san/ps-chd-id
+
+# Device packaging can call this alongside its existing launcher/font install.
+PREFIX ?= /usr
+install-disc-titles: ps-chd-id disc-title-tables
+	install -Dm755 ps-chd-id $(DESTDIR)$(PREFIX)/bin/ps-chd-id
+	install -Dm644 data/ps2-titles.tsv $(DESTDIR)$(PREFIX)/share/portarelauncher/ps2-titles.tsv
+	install -Dm644 data/psx-titles.tsv $(DESTDIR)$(PREFIX)/share/portarelauncher/psx-titles.tsv
+	install -Dm644 data/psp-titles.tsv $(DESTDIR)$(PREFIX)/share/portarelauncher/psp-titles.tsv
+	install -Dm644 third_party/libretro/NOTICE $(DESTDIR)$(PREFIX)/share/portarelauncher/notices/LIBRETRO-NOTICE.txt
+	install -Dm644 third_party/libretro/LICENSE $(DESTDIR)$(PREFIX)/share/portarelauncher/notices/LIBRETRO-LICENSE.txt
+	install -Dm644 third_party/CHD-NOTICES.txt $(DESTDIR)$(PREFIX)/share/portarelauncher/notices/CHD-NOTICES.txt
+	install -Dm644 third_party/pcsx2/NOTICE $(DESTDIR)$(PREFIX)/share/portarelauncher/notices/PCSX2-NOTICE.txt
+	install -Dm644 third_party/pcsx2/COPYING.GPLv3 $(DESTDIR)$(PREFIX)/share/portarelauncher/notices/PCSX2-COPYING.GPLv3
+
+.PHONY: ps-chd-id test-chd-san install-disc-titles

@@ -1,0 +1,27 @@
+PortareLauncher offline PlayStation (PS1) and PSP titles
+
+Source: Libretro database, Redump Sony - PlayStation DAT
+https://github.com/libretro/libretro-database/blob/12c21cf79f1e20eff6ac68b80875816c717d0a7a/metadat/redump/Sony%20-%20PlayStation.dat
+Revision: 12c21cf79f1e20eff6ac68b80875816c717d0a7a
+Retrieved: 2026-10-17
+Upstream header credits: http://github.com/robloach/libretro-dats
+Redump source: http://redump.org/
+Repository license: CC-BY-SA-4.0, retained in LICENSE.
+
+PSP source: Libretro database, Redump Sony - PlayStation Portable DAT
+https://github.com/libretro/libretro-database/blob/12c21cf79f1e20eff6ac68b80875816c717d0a7a/metadat/redump/Sony%20-%20PlayStation%20Portable.dat
+PSP uses the same revision, retrieval date, credits and license.
+
+The original DATs are retained unmodified as PlayStation.dat and
+PlayStationPortable.dat.
+PortareLauncher generated the derivative serial/title table on 2026-10-17,
+using game name and rom.serial only. Parenthesized Rev/version labels are
+removed. Multiple records with the same resulting title are collapsed. Serials
+with different remaining names are omitted and listed in the build-time
+psx-title-collisions.json and psp-title-collisions.json reports. Regions, language and disc labels are retained.
+Generated PS1 table: 10,293 entries, 505,263 UTF-8 bytes; 76 ambiguous serials omitted.
+Generated PSP table: 3,726 entries, 192,947 UTF-8 bytes; 16 ambiguous serials omitted.
+The menu resolver removes parenthesized language-code groups for display only;
+regions, disc labels, source DATs and exported table contents are preserved.
+The derivative data retains CC-BY-SA-4.0 terms and attribution. No RetroArch
+runtime, .rdb parser, online lookup or provider fallback chain is used.
