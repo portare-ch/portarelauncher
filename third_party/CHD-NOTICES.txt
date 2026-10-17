@@ -2,8 +2,10 @@ PortareLauncher PS1/PS2/PSP CHD helper dependencies
 
 libchdr https://github.com/rtissera/libchdr
 Pinned revision 47d794151b2b64f6aba60304e6480f4f5a2bc24b (2026-10-11).
-The vendored upstream files are unmodified except for the added Zstandard
-LICENSE file referenced by its sources. Portare's wrapper is tools/ps-chd-id.c.
+The retained upstream files are unmodified except for the added Zstandard
+LICENSE file referenced by its sources. This is a source subset: upstream CI,
+examples, benchmarks, tests and auxiliary docs are omitted. Decoder sources,
+build files and licenses are retained. Portare's wrapper is tools/ps-chd-id.c.
 Bundled codec versions: miniz 3.1.2, LZMA SDK 26.02, Zstandard 1.5.7;
 dr_flac is included at this libchdr revision. No codec was implemented here.
 

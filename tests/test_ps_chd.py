@@ -257,6 +257,31 @@ class HelperTests(unittest.TestCase):
         r=subprocess.run([HELPER,str(self.path)],capture_output=True,timeout=5)
         self.assertEqual((r.returncode,r.stdout),(0,b'UCUS-98646\n'),r.stderr)
     @unittest.skipUnless(shutil.which('chdman'), 'optional chdman compression integration')
+    def test_compressed_map_checkpoints(self):
+        # Put the root across a sparse-map checkpoint and the config beyond
+        # another one. Small fixtures otherwise exercise only the first bucket.
+        config = b'BOOT2 = cdrom0:\\SLUS_209.46;1\r\n'
+        data = iso(config)
+        data[16*2048+80:16*2048+88] = both32(17000)
+        data[16*2048+158:16*2048+166] = both32(8191)
+        root = bytearray(4096)
+        r = entry('SYSTEM.CNF;1', 16387, len(config))
+        root[2048:2048+len(r)] = r
+        raw = Path(self.tmp.name)/'distant.iso'
+        with raw.open('wb') as f:
+            f.truncate(17000*2048)
+            f.write(data)
+            f.seek(8191*2048); f.write(root)
+            f.seek(16387*2048); f.write(config)
+        subprocess.run(['chdman','createraw','-i',str(raw),'-o',str(self.path),
+                        '-hs','8192','-us','2048','-c','lzma'],check=True,capture_output=True)
+        image = bytearray(self.path.read_bytes())
+        self.run_image(image)
+        # Sparse-map decoding must still reject a bad map checksum.
+        map_at = struct.unpack_from('>Q', image, 40)[0]
+        image[map_at+10] ^= 1
+        self.run_image(image, 1)
+    @unittest.skipUnless(shutil.which('chdman'), 'optional chdman compression integration')
     def test_compressed_cd_chdman(self):
         for stored in (False, True):
             with self.subTest(stored=stored):

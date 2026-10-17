@@ -135,14 +135,19 @@ static void load_table(struct disc_title_table *m, const char *path)
 	long size = ftell(f);
 	if (size <= 0 || size > TABLE_MAX || fseek(f,0,SEEK_SET)) { fclose(f); return; }
 	char *data = malloc((size_t)size+1);
-	struct disc_title *rows = calloc(ENTRY_MAX,sizeof(*rows));
-	if (!data || !rows) { free(data); free(rows); fclose(f); return; }
+	if (!data) { fclose(f); return; }
 	int valid = fread(data,1,(size_t)size,f) == (size_t)size && !memchr(data,0,(size_t)size);
 	fclose(f); data[size] = 0;
+	/* Allocate for this table, rather than reserving ENTRY_MAX for each system. */
+	size_t nrows = 0;
+	for (long i = 0; valid && i < size; i++) if (data[i] == '\n') nrows++;
+	if (!nrows || nrows > ENTRY_MAX) { free(data); return; }
+	struct disc_title *rows = malloc(nrows*sizeof(*rows));
+	if (!rows) { free(data); return; }
 	size_t count = 0;
 	for (char *p = data; valid && *p;) {
 		char *end = strchr(p,'\n'), *tab = strchr(p,'\t');
-		if (!end || !tab || tab >= end || count == ENTRY_MAX) { valid = 0; break; }
+		if (!end || !tab || tab >= end || count == nrows) { valid = 0; break; }
 		*end = 0; *tab = 0;
 		if (!ps_serial_valid(p) || !tab[1] || (count && strcmp(rows[count-1].serial,p) >= 0)) {
 			valid = 0; break;

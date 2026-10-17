@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Export only standard serial keys and their name fields. Build-time YAML only."""
+"""Export only standard serial keys and their name fields from pinned YAML."""
 import argparse
 import hashlib
+import lzma
 import re
 from pathlib import Path
 import yaml
@@ -40,6 +41,8 @@ def main():
     p.add_argument("output", type=Path)
     args = p.parse_args()
     source = args.source.read_bytes()
+    if args.source.suffix == '.xz':
+        source = lzma.decompress(source)
     if hashlib.sha256(source).hexdigest() != SOURCE_SHA256:
         raise SystemExit("GameIndex checksum differs from pinned source; update provenance explicitly")
     output = export(source)

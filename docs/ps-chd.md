@@ -10,13 +10,21 @@ revision, translation or modification.
 
 ## Build and package
 
-Install CMake and Python 3 with PyYAML alongside the existing build dependencies.
-`make` builds `ps-chd-id` and generates `data/ps2-titles.tsv` from the vendored,
-checksum-pinned PCSX2 GameIndex and `data/psx-titles.tsv` from the pinned
-Libretro/Redump PS1 DAT. `data/psp-titles.tsv` is generated from the PSP DAT
-at that same Libretro revision, using the same collision policy. Runtime needs
-neither Python nor YAML. No build or
-runtime download is performed. Device packaging must install the new artifacts:
+Install CMake alongside the existing build dependencies. `make` builds
+`ps-chd-id` and uses the checked-in `data/ps2-titles.tsv`,
+`data/psx-titles.tsv` and `data/psp-titles.tsv`. Normal builds and runtime need
+neither Python nor YAML. No build or runtime download is performed.
+
+The checksum-pinned PCSX2 GameIndex and Libretro/Redump PS1/PSP DATs are retained
+losslessly as `.xz` files for offline regeneration. They occupy 1,258,588 bytes
+combined, versus 7,743,561 bytes uncompressed. With Python 3 and PyYAML installed,
+run `make regen-disc-title-tables` to recreate the tables and collision reports.
+Checksums are verified against the original, decompressed source bytes.
+The PS1 and PSP DATs share the same pinned Libretro revision and collision policy.
+Unused upstream libchdr CI, examples, benchmarks, tests and auxiliary docs are
+omitted; its decoder sources, build files and licenses are retained.
+
+Device packaging must install the new artifacts:
 
 ```sh
 make install-disc-titles DESTDIR=/path/to/package/root PREFIX=/usr
@@ -27,7 +35,9 @@ This adds `/usr/bin/ps-chd-id`,
 `/usr/share/portarelauncher/psx-titles.tsv`,
 `/usr/share/portarelauncher/psp-titles.tsv`, and dependency notices under
 `/usr/share/portarelauncher/notices/`. Use it alongside the existing launcher
-and font packaging. Source archives retain all dependency sources and licenses.
+and font packaging. Source archives retain the decoder sources, compressed
+catalogue inputs and licenses. The YAML, DATs and upstream build files are not
+installed on the device.
 The PS2 table has 12,830 entries and is 599,092 bytes in UTF-8. The PS1 table
 has 10,293 entries and is 505,263 bytes. The PSP table has 3,726 entries and is
 192,947 bytes. See
@@ -58,13 +68,23 @@ therefore no packaged title catalogue to reuse at runtime. These small build-tim
 exports follow the identifier/table design without adding an RDB parser.
 See the [PortareOS recipe](https://github.com/portare-ch/portareos/blob/main/packages/emulators/libretro/libretro-database/package.mk).
 
-Measured on Linux arm64, GCC 12.2, CMake Release: the helper is 358,584 bytes,
-or 330,168 bytes after `strip`. It statically includes libchdr, miniz 3.1.2
+`make` uses CMake's `MinSizeRel` configuration and enables interprocedural
+optimization when the toolchain supports it. Measured on Linux arm64, GCC 12.2:
+the helper is 217,152 bytes, or 199,064 bytes after `strip`, versus 358,584 and
+330,168 bytes for the previous Release build (40% smaller when stripped).
+It statically includes libchdr, miniz 3.1.2
 (Deflate), LZMA SDK 26.02, Zstandard 1.5.7, dr_flac (FLAC), and libchdr's
 Huffman/CD codecs. `ldd` reports only libc and the ELF loader for the helper;
 the launcher still depends on libc and libdrm. No emulator libraries are linked.
 These measurements are build-specific; use `wc -c`, `size`, and `ldd` on the
 packaged target binaries when changing toolchains or decoder options.
+
+The helper enables libchdr's low-memory mode: sparse hunk-map checkpoints,
+lazy codec allocation, smaller Huffman tables and in-place CD decoding. Raw
+sector reconstruction, subcode decoding and block CRC verification stay enabled.
+On a synthetic uncompressed CHDv5 with a 4 GiB logical size and 524,288 map
+entries, median peak RSS across seven runs fell from 3,360 KiB to 1,320 KiB.
+This measures map overhead; memory use varies with the image and codecs.
 
 ## Identification
 
@@ -81,7 +101,9 @@ The helper uses pinned libchdr `47d794151b2b64f6aba60304e6480f4f5a2bc24b`.
 It decodes only hunks needed for ISO9660 descriptors, the root directory and
 `SYSTEM.CNF` or `PSP_GAME/PARAM.SFO`. There is no full-disc hash, extraction,
 temporary ISO or byte scan
-for serial-like strings. A CHD's hunk map must still be read by the decoder.
+for serial-like strings. Compressed hunk maps are still read and validated at
+open, but only sparse checkpoints are retained; uncompressed map entries are
+read on demand.
 
 2048-byte DVD-style units and 2448-byte CD-style units are supported. CD track
 metadata (`CHT2` or legacy `CHTR`) determines the track framing. Cooked Mode 1,
@@ -137,6 +159,9 @@ titles across systems. A table-only update changes titles after launcher
 restart without reopening unchanged CHDs. Missing/corrupt caches or missing tables/helpers preserve the
 filename fallback. Limits are 32,768 cache records, 32,768 records and 2 MiB
 per title table, a 48 MiB cache file and 32,768 queued files per list opening.
+Title indexes allocate only the actual row count. On a 64-bit target the three
+current indexes reserve 429,584 bytes combined, down from 1,572,864 bytes;
+the title text and on-disk tables are unchanged.
 
 Opening PS1, PS2 or PSP queues that system's CHDs; Quick Access queues all three systems. One asynchronous
 helper runs at a time; an immutable path queue survives catalog resorting. The existing input
@@ -153,12 +178,13 @@ suspend or exit. Pending work resumes on the next list opening. Completed work
 is persisted every eight results and at queue completion/cancellation with a
 flushed, fsynced sibling file and atomic rename.
 
-## Validation (2026-10-17)
+## Validation (2026-10-18)
 
 `make test` and `make test SAN=1` cover cache hits, stable negatives, transient
 errors, replacement, changes during identification, database-only updates,
 corrupt cache recovery, cancellation/reaping, UTF-8 boundaries, title ties,
-selection by path, literal path arguments, helper timeout and input/completion
+selection by path, literal path arguments, malformed/maximum-size title tables,
+helper timeout and input/completion
 wakeups. The existing favourites/recents suite remains in those runs.
 
 `make test-chd` checks PS1 BOOT/PS2 BOOT2, bounded PSP PARAM.SFO parsing,
@@ -168,7 +194,9 @@ containers, including
 DVD-style units, multiple CD framing modes, preceding audio tracks, four-frame
 padding, stored/generated pregaps, legacy metadata, config variations and
 malformed/bounded inputs. With `chdman` installed (Debian `mame-tools`), it also
-creates compressed DVD-style and mixed-track CD fixtures with the real encoder.
+creates compressed DVD-style and mixed-track CD fixtures with the real encoder,
+including metadata across sparse-map checkpoints and rejection of a corrupt
+map checksum.
 `make test-chd-san` runs the decoder and the same fixtures under ASan/UBSan.
 CI includes chdman and runs all these targets.
 
