@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
-"""Render the proposed screens of docs/mockup.txt as images, from the same
-lists tools/mockup.py prints and the font the launcher draws with
-(src/font8x16.h), at SCALE 3 on the 1280x960 panel in the amber palette.
-One PNG per screen in docs/images/, so a layout can be judged as it
-would look rather than imagined from text. Pure Python: no ImageMagick,
-no PIL.
+"""Render mockup.py layouts to docs/images/ with launcher fonts and the amber
+palette at 1280x960, scale 3. Uses only the Python standard library.
 
     python3 tools/mockup_png.py
 """
@@ -15,12 +11,11 @@ import mockup
 W, H, SCALE = 1280, 960, 3
 COLS, ROWS = mockup.COLS, mockup.ROWS
 OX, OY = (W - COLS * 8 * SCALE) // 2, (H - ROWS * 16 * SCALE) // 2
-# color.c, "amber": background, dim, mid, text, bright
+# term.c amber palette: background, dim, mid, text, bright
 BG, DIM, MID, TEXT, BRIGHT = (0, 0, 0), (0x66, 0x3d, 0), (0xb3, 0x74, 0), (0xff, 0xb0, 0), (0xff, 0xd9, 0x8a)
 
 def unifont():
-    """The Unifont glyphs the mockups use, from tools/unifont-mockup.hex
-    (tools/mkjafont.py): character to (width in pixels, 16 rows)."""
+    """Load character -> (pixel width, 16 bitmap rows) from unifont-mockup.hex."""
     out = {}
     for line in open(os.path.join(os.path.dirname(__file__), "unifont-mockup.hex")):
         if line.startswith("#"):
@@ -32,8 +27,7 @@ def unifont():
 UNI = unifont()
 
 def ja26():
-    """The 26 x 26, 16-level glyphs the launcher draws kana and kanji with,
-    those the mockups use (tools/mkja26.py): character to 26 rows."""
+    """Load character -> 26 rows of 4-bit levels from ja26-mockup.hex."""
     out = {}
     path = os.path.join(os.path.dirname(__file__), "ja26-mockup.hex")
     for line in open(path):
@@ -46,8 +40,7 @@ def ja26():
     return out
 JA26 = ja26()
 
-# term.c's draw_ja26, in the same integer steps: bilinear from 26 to 48,
-# then the cell colour blended over black.
+# Match draw_ja26: bilinear scaling from 26 to 48, blended over black.
 _I0, _W1 = [], []
 for _o in range(48):
     _f = (2 * _o + 1) * 26 * 128 // 48 - 128
@@ -70,7 +63,7 @@ def png(path, px):
         f.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", W, H, 8, 2, 0, 0, 0))
                 + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
 
-# src/pix.c, line for line, so a mockup has the device's pixels.
+# Match src/pix.c rasterization.
 def _put(px, x, y, c):
     if 0 <= x < W and 0 <= y < H:
         px[(y * W + x) * 3:(y * W + x) * 3 + 3] = bytes(c)
@@ -109,8 +102,7 @@ def pix_line(px, x0, y0, x1, y1, t, c):
             if dx * dx + dy * dy <= lim2:
                 _put(px, x, y, c)
 
-# term.c's draw_mark: the four characters that stand for the shape marks,
-# drawn as two-pixel outlines on the capitals' centre line.
+# Match draw_mark: two-pixel outlines centered on capitals.
 
 def mark(px, col, row, shape, c):
     cx = OX + col * 8 * SCALE + 8 * SCALE // 2
@@ -143,10 +135,8 @@ def shapes_draw(px, shapes):
         pix_disc(px, cx + rnd(g["x"]), cy + rnd(g["y"]), 8, BRIGHT)
 
 def render(lines, path, glyphs, spans=None, shapes=None):
-    """spans: ([(row, c0, c1)] bright, [(row, c0, c1)] dim): cells coloured
-    by state rather than by their row, for the pad diagram. shapes: the
-    stick rings, drawn over the text afterwards, see shapes_draw. A shape
-    mark character is drawn as its outline, in the colour its cell has."""
+    """Render text with optional (bright, dim) lists of (row, c0, c1) spans.
+    Draw stick shapes over the text; button marks use cell-colored outlines."""
     px = bytearray(W * H * 3)
     forced = {}
     if spans:

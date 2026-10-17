@@ -8,8 +8,7 @@ struct map {
 	enum scope_ctl ctl;
 };
 
-/* The same everywhere: shoulders, sticks, the middle row, the D-pad when
- * it comes as buttons. */
+/* Controls shared by both layers. */
 static const struct map common[] = {
 	{ SC_BTN_TL, CTL_L1 },        { SC_BTN_TR, CTL_R1 },
 	{ SC_BTN_TL2, CTL_L2 },       { SC_BTN_TR2, CTL_R2 },
@@ -21,16 +20,15 @@ static const struct map common[] = {
 	{ SC_BTN_DPAD_LEFT, CTL_LEFT }, { SC_BTN_DPAD_RIGHT, CTL_RIGHT },
 };
 
-/* InputPlumber's virtual pad names the face buttons by position, and the
- * paddles are the fifth and sixth extra triggers (quirk 070-modifiers). */
+/* InputPlumber uses positional face buttons and extra triggers 5/6 for
+ * paddles (quirk 070-modifiers). */
 static const struct map virt[] = {
 	{ SC_BTN_NORTH, CTL_TOP },    { SC_BTN_WEST, CTL_WEST },
 	{ SC_BTN_TRIGGER_HAPPY3, CTL_M1 }, { SC_BTN_TRIGGER_HAPPY4, CTL_M2 },
 };
 
-/* The MCU has the top and left face buttons the other way round, and the
- * paddles are gpio-keys, BTN_Z on the left and BTN_C on the right: what
- * nova_mcu.yaml tells InputPlumber, read the other way. */
+/* The MCU swaps top and left; gpio-keys uses BTN_Z/BTN_C for left/right
+ * paddles, matching nova_mcu.yaml. */
 static const struct map raw[] = {
 	{ SC_BTN_WEST, CTL_TOP },     { SC_BTN_NORTH, CTL_WEST },
 	{ SC_BTN_Z, CTL_M1 },         { SC_BTN_C, CTL_M2 },
@@ -72,8 +70,6 @@ void scope_reset(struct scope *s, enum scope_layer layer)
 		s->min[a] = 0;
 		s->max[a] = 255;
 	}
-	/* At rest until the device says otherwise: centred sticks, released
-	 * triggers. */
 	s->value[AX_LX] = s->value[AX_LY] = s->value[AX_RX] = s->value[AX_RY] = 128;
 }
 
@@ -89,9 +85,7 @@ void scope_range(struct scope *s, unsigned abs_code, int min, int max, int value
 
 static void remember(struct scope *s, unsigned type, unsigned code, int value)
 {
-	/* The same code again updates its row in place. A moving stick sends
-	 * X and Y in turn, and two rows that swap two hundred times a second
-	 * cannot be read. */
+	/* Update repeated codes in place so alternating X/Y events keep stable rows. */
 	for (int i = 0; i < s->nlast; i++)
 		if (s->last[i].type == type && s->last[i].code == code) {
 			struct scope_event e = s->last[i];
@@ -157,8 +151,7 @@ double scope_axis(const struct scope *s, enum scope_axis a)
 		double f = (v - lo) / (hi - lo);
 		return f < 0 ? 0 : f > 1 ? 1 : f;
 	}
-	/* Centred on the middle of the range: 0..255 has its centre at 127.5,
-	 * so a pad resting at 128 reads +0.00 rather than a bias. */
+	/* Center the full range: 0..255 has midpoint 127.5, near rest at 128. */
 	double mid = (lo + hi) / 2, half = (hi - lo) / 2;
 	double f = (v - mid) / half;
 	return f < -1 ? -1 : f > 1 ? 1 : f;
@@ -204,8 +197,7 @@ static const struct name key_names[] = {
 	{ SC_BTN_THUMBL, "BTN_THUMBL" }, { SC_BTN_THUMBR, "BTN_THUMBR" },
 	{ SC_BTN_DPAD_UP, "BTN_DPAD_UP" },     { SC_BTN_DPAD_DOWN, "BTN_DPAD_DOWN" },
 	{ SC_BTN_DPAD_LEFT, "BTN_DPAD_LEFT" }, { SC_BTN_DPAD_RIGHT, "BTN_DPAD_RIGHT" },
-	/* The kernel's own name is BTN_TRIGGER_HAPPY3, eighteen characters
-	 * of a fifty-three column screen. */
+	/* Shorten trigger names to fit the 53-column display. */
 	{ SC_BTN_TRIGGER_HAPPY3, "BTN_HAPPY3" },
 	{ SC_BTN_TRIGGER_HAPPY4, "BTN_HAPPY4" },
 };

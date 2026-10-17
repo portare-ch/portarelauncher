@@ -1,23 +1,13 @@
 #!/usr/bin/env python3
-"""Renders the launcher screens at the real grid so layout can be judged
-before any of it is written. 53x20 is 8x16 glyphs at 3x on a 1280x960 panel."""
+"""Render layouts on the launcher's 53x20 grid: 8x16 glyphs at scale 3."""
 
 import os, unicodedata
 
 COLS, ROWS = 53, 20
 
-# How a character is drawn decides how wide it is; there is no Unicode
-# width table. In order:
-#   - a combining mark left after composing: nothing, no cell
-#   - a shape mark (term.h): drawn, one cell
-#   - the VGA font: ASCII and the rest of CP437, é ü ñ, the box drawing
-#   - Unifont's glyph for a character of JIS X 0213: one cell if it is 8
-#     pixels wide, Ⅳ or ※, two if it is 16, kana and kanji
-#   - the base letter of a composed one, ș as s, if a font has that
-#   - ? in one cell
+# Glyph lookup and widths follow glyph.h; leftover combining marks take no cells.
 MARKS = {"\u25b2": "triangle", "\u25a0": "square", "\u25cb": "circle", "\u00d7": "cross"}
-# CP437's low symbols, which the codec maps to control codes, and two the
-# launcher borrows: > for the crumb separator, . for an ellipsis.
+# Low CP437 symbols plus > for breadcrumbs and . for ellipses.
 VGA_EXTRA = {"\u25b8": 0x10, "\u2191": 0x18, "\u2193": 0x19, "\u2190": 0x1B, "\u2192": 0x1A,
              "\u2665": 0x03, "\u2022": 0x07, "\u203a": 0x3E, "\u2026": 0x2E}
 def vga(ch):
@@ -64,8 +54,7 @@ def cw(ch):
 def width(s):
     return sum(cw(c) for c in s)
 
-# Titles are file names, and a file copied from a Mac is named in
-# decomposed form, e + U+0301. The catalog composes on load.
+# Match catalog composition of decomposed filenames.
 def nfc(s):
     return unicodedata.normalize("NFC", s)
 def fit(s, w):
@@ -97,19 +86,14 @@ def item(sel, label, right=""):
 
 RULE = " " + "\u2550" * (COLS - 2)
 
-# The header as draw_frame draws it: the status at the right edge, the
-# crumb cut to end two columns short of it. On the device the games
-# screen's crumb is the system's name alone.
+# Match draw_frame: right-aligned status, then a two-column gap to the breadcrumb.
 STATUS = "VOL 50%  BRI 70%  BAT 87%  23:59 "
 CLOCK = "23:59 "
 def header(crumb, status=STATUS):
     room = COLS - 1 - width(status) - 2 - 1
     return row(" " + fit(crumb, room), status)
 
-# A list of games is a step down from the Systems screen, and its header
-# says so: the crumb, and the clock alone at the right. Volume, brightness
-# and battery stay on the Systems screen; a game list is not the place to
-# read them, and a count of the rows is in the footer already.
+# Game-list headers show only the clock beside the breadcrumb.
 def crumb(name):
     return header("PortareOS  \u203a  " + name, CLOCK)
 THIN = " " + "\u2500" * (COLS - 2)
@@ -137,9 +121,7 @@ SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
        ("Color", "grey"), ("Color profile", "stock"), ("Charging LED", "on"),
        ("Time zone", "Europe/Zurich"), ("Diagnostics", ""),
        ("About", "v0.2.6 2026-09-26"), ("Power", "")]
-# Thirteen settings fill 2..14 with no blank under the rule; the button
-# diagram needs three rows and takes the upper rule's, every other setting
-# uses one or two.
+# Settings fill rows 2..14; the three-row button diagram also uses the upper rule.
 settings = [row(" Settings", ""), RULE]
 settings += [item(i == 4, n, v) for i, (n, v) in enumerate(SET)]
 settings += ["         X          X confirm",
@@ -147,8 +129,7 @@ settings += ["         X          X confirm",
              "         B          X settings"]
 settings += [THIN, row(" A CHANGE   B BACK", "\u2191\u2193 MOVE ")]
 
-# Settings > Consoles: the pre-emptive frame per console, and what it
-# means, wrapped at 45 columns as wrap_puts does it on the device.
+# Wrap console descriptions at 45 columns, matching wrap_puts.
 CONSOLES = [("SNES", "PRMPT on"), ("NES", "PRMPT off"),
             ("PlayStation", "PRMPT off"),
             ("Game Boy", "PRMPT off"),
@@ -166,19 +147,12 @@ def consoles_screen(sel):
 
 consoles = consoles_screen(0)
 
-# Settings > Diagnostics: the tools that show what the hardware does, each
-# a screen of its own. One entry so far; which layer PortScope reads is a
-# mode inside it, not a second entry.
 DIAG = [("PortScope", "")]
 diagnostics = [row(" Settings  \u203a  Diagnostics", ""), RULE, ""]
 diagnostics += [item(i == 0, n, v) for i, (n, v) in enumerate(DIAG)]
-# No description band: the names say it, and Home + START is the way out
-# of everything on the device.
 diagnostics += [""] * (ROWS - 2 - len(diagnostics))
 diagnostics += [THIN, row(" A OPEN   B BACK", "\u2191\u2193 MOVE ")]
 
-# Two toggles and the devices in one list: switching it on, letting known
-# headphones come back, and picking them when they have not.
 BT = [("WH-1000XM4", "connected"), ("DualSense Edge", "paired"),
       ("Bose QC35", "paired"), ("JBL Flip 5", "new")]
 bluetooth = [row(" Settings  \u203a  Bluetooth", ""), RULE, "",
@@ -192,23 +166,12 @@ bluetooth += [THIN, row(" A DISCONNECT   B BACK   Y SCAN", "")]
 
 # ---- on-screen keyboard -------------------------------------------------
 #
-# A Wi-Fi password is 8 to 63 printable ASCII characters and anything goes,
-# so the keyboard has to reach every one of them from a d-pad. Ten keys a
-# row in five-column cells: 50 columns, which is the widest grid that still
-# leaves a margin, and a cell 120 px wide on the panel - a target, not a
-# character. The selected key is bracketed, the way a DOS form marked focus;
-# there is no inverse video on a monochrome ramp and there does not need to
-# be.
-#
-# The bottom row is the same ten cells, spent unevenly: the keys you reach
-# for without looking (space, delete, done) are the wide ones.
+# Ten five-column keys fill 50 columns. Action keys share that width;
+# brackets mark the selection.
 
 LOWER = ["1234567890", "qwertyuiop", "asdfghjkl-", "zxcvbnm_.@"]
 UPPER = ["1234567890", "QWERTYUIOP", "ASDFGHJKL-", "ZXCVBNM_.@"]
-# The digits stay on top in every layer, so they are always one press up
-# from wherever you are. That leaves 30 cells for the 28 printable symbols
-# that are not already on the letter layer (- _ . @ are, because they turn
-# up in passwords more than the rest). Printable ASCII, every one of it.
+# Both layers share digits; the symbol layer leaves two empty cells.
 SYMS  = ["1234567890", "!\"#$%&'()*", "+,/:;<=>?[", "\\]^`{|}~\u00a0\u00a0"]
 BOTTOM = [("SHIFT", 2), ("#+=", 2), ("SPACE", 3), ("DEL", 1), ("DONE", 2)]
 CELL = 5
@@ -240,15 +203,14 @@ def field(text, hidden=False, cursor=True):
     shown = "•" * len(text) if hidden else text
     shown += "_" if cursor else ""
     inner = FIELD_W - 4
-    if len(shown) > inner:                 # 63 characters do not fit: show
-        shown = "‹" + shown[-(inner - 1):]   # the end being typed
+    if len(shown) > inner:
+        shown = "‹" + shown[-(inner - 1):]   # show the text tail
     return ["  ┌" + "─" * (FIELD_W - 2) + "┐",
             "  │ " + shown.ljust(FIELD_W - 4) + " │",
             "  └" + "─" * (FIELD_W - 2) + "┘"]
 
 RETROID_HINTS = " A TYPE  B DELETE  X SPACE  L1 SHIFT  START JOIN"
-# The shape marks: the launcher draws them as outlines (term.h), and so
-# does tools/mockup_png.py for these four characters wherever they stand.
+# mockup_png.py draws these characters as outlines, matching term.h.
 SHAPE_HINTS   = " × TYPE  ○ DELETE  ▲ SPACE  L1 SHIFT  START JOIN"
 
 def kb_screen(ssid, text, layer, sel=None, bottom_sel=None, hidden=False,
@@ -256,8 +218,7 @@ def kb_screen(ssid, text, layer, sel=None, bottom_sel=None, hidden=False,
               hints=RETROID_HINTS):
     n = len(text)
     count = f"{n} / 63" if n >= 8 else f"{n} / 63  at least 8"
-    # The network gets its own line: the real header carries VOL, BRI and
-    # BAT beside the clock, and has no room left for a 32-byte SSID.
+    # A 32-byte SSID needs its own line below the status header.
     out = [row(" Settings  ›  Wi-Fi", "VOL 50%  BRI 70%  BAT 87%  23:59 "),
            RULE, "  NETWORK  " + ssid, row("  PASSWORD", count + "  ")]
     out += field(text, hidden)
@@ -274,14 +235,11 @@ kb_upper = kb_screen("FRITZ!Box 7520 JI", "hunter2Hunt", UPPER, sel=(2, 6),
 kb_syms  = kb_screen("FRITZ!Box 7520 JI", "hunter2Hunter!", SYMS, bottom_sel="DONE",
                      hidden=True, labels={"#+=": "abc"})
 
-# A failed join keeps the keyboard up with the text intact - the likeliest
-# fix is one wrong character - and says why on the line under the keys.
+# Failed joins preserve input and show the error below the keys.
 joining = kb_screen("FRITZ!Box 7520 JI", "hunter2Hunter!", LOWER, sel=(1, 2),
                     note="Password rejected. Check and retry.")
 
-# Tools: whatever scripts are in the modules folder, named and described
-# from its gamelist.xml. The description gets fixed room under the list,
-# because it is where a tool says how to get back out of it.
+# Reserve space below tools for gamelist.xml descriptions and exit instructions.
 TOOLS = ["Remove ._ Files", "Start RetroArch (64-bit)"]
 tools = [header("Tools"), RULE, "",
          row("  TOOLS", "2 found  "), ""]
@@ -297,15 +255,7 @@ launching += ["           Tekken 3 (USA)", "",
               "           Starting..."]
 launching += [""] * 9
 
-# ---- proposed: quick access, recent, favourites, long titles -----------
-#
-# From a tester who filled several systems: a way back to a game without
-# scrolling the list, and titles that do not stop at the panel's edge.
-# Quick Access is a category of its own above the systems, cross-system
-# shortcuts first, platforms below, a thin rule between and no blank row:
-# on 20 rows whitespace is the expensive thing. Recent comes first because
-# it needs no curation. The cross-system views use short system names so
-# the title keeps the width the long-title work just won.
+# ---- quick access, recent, favourites, long titles ----------------------
 QUICK = [("Recently played", 10), ("Favourites", 7)]
 systems_quick = [header("PortareOS"), RULE, "",
                  row("  QUICK ACCESS", "")]
@@ -314,20 +264,13 @@ systems_quick += [THIN, row("  SYSTEMS", "")]
 systems_quick += [item(False, n, str(c)) for n, c in SYS]
 systems_quick += [THIN, row(" A SELECT   X SETTINGS", "")]
 
-# A title wider than the column is cut with ... while it is not selected.
-# The selected row scrolls instead: still for 1 s, then one column left
-# every 150 ms until the end is in view, 1.5 s there, back to the start.
-# No wrap, so the ending the reader was after is not followed by what
-# they already read. Only the selected row ever moves. Nothing marks a
-# favourite in the list: Favourites is where favourites are.
+# Unselected titles use ellipses. Selected titles pause 1 s, scroll a column
+# every 150 ms, pause 1.5 s at the end, then reset.
 TITLE_W = COLS - 4 - 2    # marker and indent, then the right margin
 def cut(t):
     return t if width(t) <= TITLE_W else fit(t, TITLE_W - 3) + "..."
 def scrolled(t, shift):
-    """shift is in columns, one per 150 ms tick. The view starts at the
-    character the shift falls in, drawn whole: a kanji holds for two ticks
-    and then leaves as a whole, so text moves a column a tick on average
-    whatever its script, and no glyph is ever drawn by half."""
+    """Start at the character containing column shift, keeping wide glyphs whole."""
     col = 0
     for i, c in enumerate(t):
         if col + cw(c) > shift:
@@ -335,8 +278,7 @@ def scrolled(t, shift):
         col += cw(c)
     return ""
 def marquee_end(t):
-    """Where scrolling stops: the first character boundary at or past the
-    overflow, so the last character is in view."""
+    """First character boundary at or past overflow, leaving the title end visible."""
     over, col = width(t) - TITLE_W, 0
     for c in t:
         if col >= over:
@@ -347,11 +289,7 @@ def game(sel, title, shift=0):
     title = nfc(title)
     return item(sel, scrolled(title, shift) if sel else cut(title))
 
-# The footer is the favourite cue: Y FAVOURITE under a game that is not
-# one, Y REMOVE under one that is. Nothing in the list itself says so.
-# Its right end carries the position, "9 / 204", where the MOVE hint
-# used to be: the d-pad needs no hint, and the row the count had, with
-# the blanks around it, goes to the list - 14 games on screen, not 10.
+# The footer shares the favourite action and position count, leaving 14 list rows.
 def games_footer(fav, pos, total):
     return row(" A LAUNCH   B BACK   Y " + ("REMOVE" if fav else "FAVOURITE"),
                "%d / %d " % (pos, total))
@@ -379,13 +317,7 @@ def games_screen(selected, shift=0):
 games_long = games_screen("Teenage Mutant Ninja Turtles IV - Turtles in Time (USA)", shift=9)
 games_fav = games_screen("Super Mario World (USA)")
 
-# Ten launches, newest first, written when runemu exits with status 0,
-# so a game that never started is not in it. Grouped under the day in
-# small caps: TODAY, YESTERDAY, then the weekday for the last week and
-# the date beyond it. A row is the title and a short system name; the
-# day is the heading, not a third column. This sample's ten games fall on
-# five days and fill the panel exactly; on more days the list scrolls, the
-# headings with it.
+# Ten successful launches, newest first, grouped by local day with short system names.
 RECENT = [("TODAY", [("Super Mario World", "SNES"), ("Tekken 3", "PS1")]),
           ("YESTERDAY", [("Yoshi's Island - Super Mario World 2", "SNES"),
                          ("Metroid (USA)", "NES")]),
@@ -403,10 +335,7 @@ for day, games_of_day in RECENT:
 recent += [""] * (ROWS - 2 - len(recent))
 recent += [THIN, row(" A LAUNCH   B BACK   Y REMOVE", "")]
 
-# One file, a game path per line, pruned of paths that no longer exist
-# when it is read. Y toggles the selected game wherever a game is listed;
-# in here the same key removes. Hints name keys, A B X Y, nothing else,
-# and no glyph stands for a favourite anywhere.
+# Y removes the selected favourite; missing paths are pruned when the list opens.
 FAVS = [("Final Fantasy III (USA) (Rev 1)", "SNES"),
         ("Legend of Zelda, The - A Link to the Past (USA)", "SNES"),
         ("Super Mario World (USA)", "SNES"), ("Tekken 3", "PS1"),
@@ -417,44 +346,27 @@ favourites += [across(i == 2, t, sy) for i, (t, sy) in enumerate(FAVS)]
 favourites += [""] * (ROWS - 2 - len(favourites))
 favourites += [THIN, games_footer(True, 3, 7)]
 
-# ---- proposed: PortScope, input diagnostics --------------------------------
+# ---- PortScope input diagnostics ---------------------------------------
 #
-# Settings > Diagnostics > PortScope, as one more launcher screen rather
-# than a program that looks like something else: the same grid, font and
-# palette, nothing decorative. The one thing a menu never needs and this
-# does is a diagram of the pad, drawn in line glyphs. A control is bright
-# while it is held and dim while it is not, so PortScope takes whatever
-# palette the launcher has. The face buttons follow the button style
-# setting: the Retroid letters or the shape marks, which the renderer
-# draws as outlines.
-#
-# Sample state: A down, D-pad right, R1 held, R2 two thirds in, the right
-# stick up and left. One layer at a time: the virtual pad games see by
-# default, the MCU's raw device after a long press of SELECT; the header
-# says which, in one word, so nobody wonders what they are looking at.
-# RATE is measured from the device shown, so it is the virtual pad's rate
-# by default and the MCU's in raw mode.
+# Held controls are bright; button labels follow the selected style.
+# SELECT switches virtual/raw input; RATE measures the displayed device.
 def pad_screen(shapes=False, raw=False):
     top, left, right, bottom = ("\u25b2", "\u25a0", "\u25cb", "\u00d7") if shapes else ("X", "Y", "A", "B")
     L = [row(" PortScope" + (", raw" if raw else ""), "RATE 200 Hz "), RULE]
     L.append(row("  L1", "R1  "))
     L.append(row("  L2  0.00", "0.67  R2  "))
-    # The stick's click is a button too; it sits with the other shoulder
-    # buttons rather than crowding the ring.
+    # Stick clicks share the shoulder-button row.
     L.append(row("  L3", "R3  "))
     L.append(" " * 10 + "\u2191" + " " * 29 + top)
     L.append(" " * 7 + "\u2190  \u00b7  \u2192" + " " * 23 + left + "     " + right)
     L.append(" " * 10 + "\u2193" + " " * 29 + bottom)
     L.append("")
-    # The sticks are round, so their travel is drawn round: a ring and a
-    # dot at the panel's own resolution, not out of the font. These five
-    # rows are theirs; tools/mockup_png.py draws into them from pad_shapes.
+    # Reserve five rows for pixel rings and dots from pad_shapes.
     L += [""] * 5
     L.append(" " * 5 + "X +0.02 Y -0.01" + " " * 18 + "X -0.41 Y -0.83")
     L.append(" " * 12 + "SELECT     HOME     START")
     L.append(" " * 19 + "M1       M2")
-    # No footer: nothing here is a menu, and the way out is the one every
-    # program on the device has. The rows go to the last events instead.
+    # Use footer space for recent events; Home + START exits.
     L.append(" Last input")
     L.append(" ABS_RY    -27210")
     L.append(" ABS_Z      21580")
@@ -463,8 +375,7 @@ def pad_screen(shapes=False, raw=False):
 gamepad = pad_screen()
 gamepad_shapes = pad_screen(shapes=True)
 
-# Which cells are bright (held) and which dim (idle); the rest is text.
-# Rows and columns of pad_screen above.
+# Held and idle cell spans in pad_screen.
 def pad_spans(shapes=False):
     bright, dim = [], []
     dim += [(2, 2, 4)]                      # L1
@@ -479,25 +390,15 @@ def pad_spans(shapes=False):
     dim += [(15, 12, 18), (15, 23, 27), (15, 32, 37), (16, 19, 21), (16, 28, 30)]
     return bright, dim
 
-# What is drawn rather than typed: the two stick rings with their dots,
-# centred on rows 9-13. The shape marks are characters in the text, drawn
-# as outlines like everywhere else.
+# Pixel stick rings and dots, centered in rows 9..13.
 def pad_shapes(shapes=False):
     return dict(rings=[dict(row=11, col=9.5, rows=5, x=0.02, y=-0.01, clicked=False),
                        dict(row=11, col=41.5, rows=5, x=-0.41, y=-0.83, clicked=False)])
 
-# ---- proposed: Japanese -----------------------------------------------------
+# ---- Japanese ----------------------------------------------------------
 #
-# English and Japanese, nothing else. Kana and kanji are 16x16 glyphs from
-# the Japanese build of GNU Unifont, two cells wide: the launcher's 8x16
-# grid becomes a PC-98 text screen, ASCII from the VGA font as now, the
-# rest full width. Titles render in either language, since a file can be
-# named in Japanese whatever the menus say; the setting changes the menus,
-# the hints and the console names. It is system.language, en_US or ja_JP.
-#
-# Console names are the ones Nintendo, Sony and Sega use in Japan. The
-# short names in the cross-system lists follow: SFC and FC, not SNES and
-# NES.
+# system.language selects menus and console names; titles render in either
+# language. Wide glyphs use ja26 with a Unifont fallback; see FONTS.md.
 JA_STATUS = "\u97f3\u91cf 50%  \u660e\u308b\u3055 70%  \u96fb\u6c60 87%  23:59 "
 def ja_header(crumb):
     return header(crumb, JA_STATUS)
@@ -523,11 +424,8 @@ ja_systems += [THIN, row("  \u30b2\u30fc\u30e0\u6a5f", "")]
 ja_systems += [item(False, n, str(c)) for n, c in JA_SYS]
 ja_systems += [THIN, row(" A \u6c7a\u5b9a   X \u8a2d\u5b9a", "")]
 
-# A Super Famicom list with its files named in Japanese, in code point
-# order: Latin, then kana in their own order, then kanji in no order a
-# reader would expect. Readings are not in the data.
-# The selected title is past the column, so it scrolls; a step is one
-# character, so a kanji leaves the edge whole.
+# Japanese filenames sort by code point, without readings. The selected long
+# title scrolls by columns while keeping glyphs whole.
 JA_SFC = sorted([
     "\u30af\u30ed\u30ce\u30fb\u30c8\u30ea\u30ac\u30fc",
     "\u30b9\u30fc\u30d1\u30fc\u30c9\u30f3\u30ad\u30fc\u30b3\u30f3\u30b02 \u30c7\u30a3\u30af\u30b7\u30fc&\u30c7\u30a3\u30c7\u30a3\u30fc",
@@ -575,9 +473,7 @@ for day, games_of_day in JA_RECENT:
 ja_recent += [""] * (ROWS - 2 - len(ja_recent))
 ja_recent += [THIN, row(" A \u8d77\u52d5   B \u623b\u308b   Y \u89e3\u9664", "")]
 
-# Settings stays at thirteen rows: Time zone becomes Language & region, a
-# submenu with the language and the time zone. Its value is the language,
-# named in itself, so it reads the same to whoever is looking for it.
+# Language & region shares one Settings row and shows the language in its own script.
 JA_SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "\u30aa\u30f3"), ("Bluetooth", "WH-1000XM4"),
           ("USB\u30e2\u30fc\u30c9", "\u30cd\u30c3\u30c8\u30ef\u30fc\u30af"),
           ("\u30dc\u30bf\u30f3\u8868\u8a18", "Retroid"),
@@ -592,11 +488,7 @@ ja_settings += [item(i == 9, n, v) for i, (n, v) in enumerate(JA_SET)]
 ja_settings += [THIN, "    \u8a00\u8a9e\u3068\u30bf\u30a4\u30e0\u30be\u30fc\u30f3\u3092\u8a2d\u5b9a\u3057\u307e\u3059\u3002", ""]
 ja_settings += [THIN, row(" A \u6c7a\u5b9a   B \u623b\u308b", "")]
 
-# The language row names itself in both languages, the one place that
-# does: whoever switched by mistake has to find the way back without
-# reading the language they switched to. The values are each language in
-# its own script, and A or left and right switches, as Button style does;
-# the screen redraws in the new language at once.
+# Name the language row in both languages so an accidental switch can be undone.
 def lang_screen(ja):
     if ja:
         lines = [header("\u8a2d\u5b9a  \u203a  \u8a00\u8a9e\u3068\u5730\u57df", CLOCK), RULE, ""]
@@ -613,11 +505,8 @@ def lang_screen(ja):
 ja_language = lang_screen(True)
 en_language = lang_screen(False)
 
-# Titles in any script, under English menus. Pokémon twice: once
-# precomposed, once decomposed, e and U+0301, the way a file copied
-# from a Mac is named; both read the same once composed. The Japanese
-# title renders in the 16x16 font whatever the menu language. The Korean
-# one has no glyphs in either font, so each syllable is a ?.
+# Mixed scripts under English menus: composed/decomposed Pokémon agree;
+# Japanese renders normally; unsupported Hangul becomes ? per syllable.
 GBC = sorted(["Dragon Warrior Monsters (USA)",
               "Legend of Zelda, The - Link's Awakening DX (USA, Europe)",
               "Poke\u0301mon - Gold Version (USA, Europe)",

@@ -1,18 +1,5 @@
-/* Networking, through the tools the system already has.
- *
- * Wi-Fi is iwd, reached through portnet - a small command that talks to it
- * on sd-bus. NetworkManager used to sit in between, owning Ethernet and
- * doing DHCP while iwd did the 802.11; this device has one interface and
- * no Ethernet, so that layer went. portnet keeps the exit codes this file
- * documents, and iwd keeps a passphrase per network, so multiple saved
- * SSIDs still work the way they did.
- *
- * USB gadget goes through /usr/bin/usbgadget, which already has the
- * interface a menu wants: --options lists the modes, no argument reports
- * the current one, and a mode name sets it.
- *
- * Both are run through proc_run, which never involves a shell. See proc.h.
- */
+/* Networking via portnet (iwd) and USB modes via usbgadget.
+ * Commands use proc_run without a shell. */
 #ifndef PL_NET_H
 #define PL_NET_H
 
@@ -22,11 +9,11 @@
 
 struct net_entry {
 	char name[80];    /* SSID, or the connection profile's name */
-	int  saved;       /* iwd has a passphrase for it            */
-	int  active;      /* currently connected                    */
-	int  signal;      /* 0-100, or -1 when not seen in a scan   */
+	int  saved;       /* iwd has a passphrase for it */
+	int  active;      /* currently connected */
+	int  signal;      /* 0-100, or -1 when not seen in a scan */
 	char security[32];/* iwd's key type: "psk", "8021x", "wep",
-	                     "" when open or not seen in a scan     */
+	                     "" when open or not seen in a scan */
 };
 
 struct net_list {
@@ -39,44 +26,32 @@ struct net_list {
 void net_scan(struct net_list *l, int rescan);
 
 int  net_wifi_enabled(void);
-/* Switches the radio: the rfkill block the boot applies through wifictl,
- * and NetworkManager's switch. Persisting the choice (wifi.enabled) is the
- * caller's, since that is a setting and this file runs commands. */
+/* Sets rfkill and iwd adapter power. Caller persists wifi.enabled. */
 void net_wifi_set(int on);
 
-/* The SSH server. sshd.service only starts while its marker file exists
- * (ConditionPathExists), which the boot creates from ssh.enabled - so "on"
- * creates it and "off" removes it, or a later start would undo the switch.
- * Persisting the choice (ssh.enabled) is the caller's, as for Wi-Fi. */
+/* sshd.service requires a marker file (ConditionPathExists); toggling SSH
+ * updates that marker too. Caller persists ssh.enabled. */
 int  net_ssh_enabled(void);
 void net_ssh_set(int on);
 
 /* Brings up a saved profile. Returns 0 on success. */
 int  net_connect(const char *name);
 
-/* Joins a network that has no saved profile, saving one if it works.
- * password may be empty for an open network. Returns 0 on success, or
- * portnet's exit status: 4 when the passphrase was refused, 10 when the
- * network is no longer there, or PROC_TIMEOUT.
- *
- * A failed join leaves nothing behind, and now for free: iwd is told the
- * passphrase through an agent and writes it only once the association
- * succeeds. NetworkManager saved its profile before it knew whether the
- * password was right, which is why this used to delete one. */
+/* Joins and saves a network; password may be empty for an open network.
+ * Returns 0, portnet status 4 (rejected passphrase) or 10 (network gone),
+ * or PROC_TIMEOUT. iwd saves credentials only after a successful association. */
 int  net_join(const char *ssid, const char *password);
 
-/* The shortest password the network's security allows, or -1 when it needs
- * more than a password - a username too, for 802.1X - which this cannot
- * ask for. 0 means open: no password at all. */
+/* Minimum password length; 0 for open, -1 for unsupported 802.1X
+ * authentication requiring a username. */
 int  net_min_password(const char *security);
 int  net_disconnect(void);
 
 /* "192.168.1.42", or empty when not connected. */
 void net_address(char *out, size_t osz);
 
-/* The choice among a getifaddrs() list, separated so it can be tested with
- * a made-up one: the Wi-Fi address if there is one, else any real one,
- * never loopback, link-local or the USB gadget's. Returns 1 when found. */
+/* Selects an IPv4 address, preferring Wi-Fi. Excludes loopback, link-local
+ * and the USB gadget. Returns 1 when found. */
 struct ifaddrs;
 int  net_address_pick(const struct ifaddrs *list, char *out, size_t osz);
 

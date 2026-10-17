@@ -10,9 +10,8 @@
 #define LIST "/usr/bin/portnet list"
 #define SCAN "/usr/bin/portnet list --rescan"
 
-/* The shape of portnet's own output, names replaced: one tab-separated
- * line per network, SSID first, then known, connected, signal and the key
- * type. A network iwd knows but cannot see reports -1 for signal. */
+/* portnet TSV fixture: SSID, known, connected, signal, key type.
+ * Saved networks outside scan range have signal -1. */
 static void test_scan(void)
 {
 	fake_reset();
@@ -35,8 +34,7 @@ static void test_scan(void)
 		CHECK_INT(l.e[0].signal, 59);
 		CHECK_STR(l.e[0].security, "psk");
 
-		/* An SSID with a colon needs no unescaping now: the fields are
-		 * split on tabs, which an SSID cannot contain. */
+		/* Tab-separated fields preserve colons in SSIDs. */
 		CHECK_STR(l.e[1].name, "Cafe:Guest");
 		CHECK(l.e[1].saved && !l.e[1].active);
 		CHECK_INT(l.e[1].signal, 40);
@@ -72,8 +70,7 @@ static void test_min_password(void)
 {
 	CHECK_INT(net_min_password(NULL), 0);
 	CHECK_INT(net_min_password(""), 0);
-	/* iwd names the key type, not the protocol. psk covers WPA, WPA2 and
-	 * WPA3; wep has its own shorter keys; 8021x needs a username too. */
+	/* Accept iwd key types; 802.1X also needs an unsupported username. */
 	CHECK_INT(net_min_password("psk"), 8);
 	CHECK_INT(net_min_password("wep"), 1);
 	CHECK_INT(net_min_password("8021x"), -1);
@@ -81,22 +78,18 @@ static void test_min_password(void)
 
 static void test_join(void)
 {
-	/* A refused passphrase is portnet's 4, and nothing has to be undone:
-	 * iwd writes credentials only once the association succeeds, so there
-	 * is no half-saved network to delete. */
+	/* Rejected credentials return 4; iwd leaves no saved profile to delete. */
 	fake_reset();
 	fake_reply("/usr/bin/portnet join Neighbour hunter22", "", 4);
 	CHECK_INT(net_join("Neighbour", "hunter22"), 4);
 	CHECK_INT(fake_n_calls, 1);
 
-	/* Success. */
 	fake_reset();
 	fake_reply("/usr/bin/portnet join Neighbour hunter22", "", 0);
 	CHECK_INT(net_join("Neighbour", "hunter22"), 0);
 	CHECK_INT(fake_n_calls, 1);
 
-	/* A network that has gone is 10, which the caller shows differently
-	 * from a wrong password. */
+	/* A missing network returns 10, distinct from a rejected password. */
 	fake_reset();
 	fake_reply("/usr/bin/portnet join Neighbour hunter22", "", 10);
 	CHECK_INT(net_join("Neighbour", "hunter22"), 10);
@@ -136,8 +129,7 @@ static void test_address(void)
 {
 	char ip[40];
 
-	/* Loopback and the gadget are never the answer; Wi-Fi beats Ethernet
-	 * whatever the order. */
+	/* Prefer Wi-Fi over Ethernet; exclude loopback and the gadget. */
 	struct ifaddrs *l = add_if(NULL, "lo", "127.0.0.1", IFF_UP);
 	l = add_if(l, "usb0", "169.254.7.7", IFF_UP);
 	l = add_if(l, "eth0", "10.0.0.5", IFF_UP);
@@ -183,9 +175,7 @@ static void test_usb(void)
 
 static void test_wifi_switch(void)
 {
-	/* Both switches, the rfkill block first: the boot's wifictl disable is
-	 * what an official image starts with, and powering the adapter does
-	 * not lift it. That was true of NetworkManager and is true of iwd. */
+	/* Unblock boot-time rfkill before powering the iwd adapter. */
 	fake_reset();
 	fake_reply("/usr/bin/wifictl enable", "", 0);
 	fake_reply("/usr/bin/portnet radio on", "", 0);

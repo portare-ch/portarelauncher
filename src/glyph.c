@@ -3,8 +3,7 @@
 
 #include <string.h>
 
-/* One code point from UTF-8, or the byte as Latin-1 when it does not start
- * a well-formed sequence: overlong, surrogate, past U+10FFFF or cut short. */
+/* Decode one UTF-8 code point; invalid or truncated sequences use a Latin-1 byte. */
 static uint32_t decode(const unsigned char **p)
 {
 	const unsigned char *s = *p;
@@ -74,7 +73,7 @@ uint32_t text_next(const char **s)
 	const unsigned char *p = (const unsigned char *)*s;
 	uint32_t c;
 
-	/* Marks with nothing before them belong to nothing: dropped. */
+	/* Drop leading combining marks. */
 	for (;;) {
 		if (!*p) {
 			*s = (const char *)p;
@@ -92,7 +91,7 @@ uint32_t text_next(const char **s)
 		uint32_t made = compose(c, m);
 		if (made)
 			c = made;
-		p = q;            /* composed or dropped, it is used up */
+		p = q;
 	}
 	*s = (const char *)p;
 	return c;
@@ -148,8 +147,7 @@ static uint32_t base_of(uint32_t cp)
 
 static int drawn(uint32_t cp, struct glyph *g)
 {
-	/* Below 0x20 is ours: CP437's symbols and the shape marks, which the
-	 * program writes on purpose and text never holds. */
+	/* Reserve control codes for explicit CP437 symbols and button marks. */
 	if (cp < 0x7F) {
 		*g = (struct glyph){ (uint16_t)cp, 1 };
 		return 1;
@@ -284,9 +282,7 @@ void text_compose(char *s)
 	while ((c = text_next(&r))) {
 		char buf[4];
 		size_t n = put_utf8(buf, c);
-		/* A Latin-1 byte becomes two bytes of UTF-8, which would overrun
-		 * what has not been read yet; it stays a byte, and still reads
-		 * as Latin-1 next time. */
+		/* Keep Latin-1 bytes if UTF-8 expansion would overwrite unread input. */
 		if (w + n > r) {
 			*w++ = (char)(c & 0xFF);
 			continue;

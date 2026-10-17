@@ -6,8 +6,7 @@ static void test_fixed(void)
 	CHECK(color_ctm_fixed(1.0) == (1ull << 32));
 	CHECK(color_ctm_fixed(0.0) == 0);
 	CHECK(color_ctm_fixed(0.5) == (1ull << 31));
-	/* Sign-magnitude: the sign bit and the magnitude, not two's
-	 * complement. The kernel reads it as CONVERT_S3_15(). */
+	/* Negative coefficients use sign-magnitude encoding. */
 	CHECK(color_ctm_fixed(-0.5) == ((1ull << 63) | (1ull << 31)));
 	CHECK(color_ctm_fixed(0.7919) == 3401184602ull);
 }
@@ -46,8 +45,7 @@ static void test_load(void)
 	CHECK_INT(color_load(path, &p), 0);
 	CHECK(p.has_ctm && !p.has_lut);
 
-	/* A de-gamma table, all 256 lines of it, is carried; a short one is
-	 * refused like a short lut. */
+	/* Degamma requires all 256 entries, just as the LUT requires a full table. */
 	{
 		FILE *f = fopen(path, "w");
 		for (int i = 0; i < 256; i++)

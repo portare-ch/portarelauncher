@@ -22,8 +22,7 @@ static void test_replace_in_place(void)
 	CHECK_INT(settings_set(path, "wifi.ssid", "Cafe"), 0);
 	CHECK_STR(fixture_read(path), "# comment\nfirst=1\nwifi.ssid=Cafe\nlast=3\n");
 
-	/* The first line has no newline in front of it, so it is found by a
-	 * different path than every other line. */
+	/* The first line uses a separate lookup path. */
 	fixture_write(path, "first=1\nsecond=2\n");
 	char v[32];
 	CHECK_INT(settings_get(path, "first", v, sizeof(v)), 1);
@@ -35,8 +34,7 @@ static void test_replace_in_place(void)
 
 static void test_append(void)
 {
-	/* No newline at the end of the last line: appending must not glue
-	 * the new key onto it. */
+	/* Insert a newline before appending to an unterminated last line. */
 	fixture_write(path, "a=1");
 	CHECK_INT(settings_set(path, "b", "2"), 0);
 	CHECK_STR(fixture_read(path), "a=1\nb=2\n");

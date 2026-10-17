@@ -1,9 +1,5 @@
-/* proc.c without the processes: replays recorded output instead of running
- * nmcli or bluetoothctl, and remembers what it was asked to run.
- *
- * A test says what a command line prints and how it exits, runs the code
- * under test, then looks at the result and at the calls that were made.
- */
+/* Replays command output and exit statuses, recording calls without
+ * starting processes. Unconfigured commands fail. */
 #include "fake_proc.h"
 #include "proc.h"
 

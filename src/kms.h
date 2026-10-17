@@ -1,20 +1,7 @@
-/* Mode setting, one connector, one dumb buffer, no GPU.
- *
- * A text screen on a black field does not need GBM, EGL, Vulkan or Mesa. It
- * needs a buffer the display controller can scan out and somewhere to write
- * pixels, which is what a dumb buffer is.
- *
- * There is deliberately one buffer and no page flipping. The screen is static
- * almost all the time, so there is nothing to flip; changed cells are written
- * straight into the buffer being scanned out. The cost of that is a torn cell
- * if the scanout passes over it mid-write, which for a menu is invisible and
- * much cheaper than holding a second buffer and waiting on vblank.
- *
- * The panel runs variable refresh for everything (kms_vrr). With no frames
- * coming from the menu it settles at the floor the kernel keeps it at, and
- * the next refresh shows whatever was written since; the menu owns no
- * refresh rate of its own.
- */
+/* KMS with one connector and one dumb buffer, written directly without
+ * page flips. Static menus avoid a second buffer and vblank waits at the
+ * cost of possible tearing during cell updates. VRR lets the panel settle
+ * at its minimum refresh rate while idle. */
 #ifndef PL_KMS_H
 #define PL_KMS_H
 
@@ -42,33 +29,25 @@ struct kms {
 int  kms_open(struct kms *k, const char *card);
 void kms_close(struct kms *k);
 
-/* Points the CRTC back at our buffer. Needed after anything else has held
- * DRM master, because it will have set its own. */
+/* Restores our buffer after another DRM master changed the scanout. */
 int  kms_present(struct kms *k);
 
-/* Variable refresh, on the mode kms_open set, the fastest. The request is
- * remembered: kms_present sets it again, as a program in between may have
- * turned it off, and kms_close takes it back. Failing is reported once and
- * leaves the fixed rate, which works too. */
+/* Requests VRR at the selected mode. Reapplied by kms_present and reset by
+ * kms_close. Failure is reported once and leaves fixed refresh. */
 int  kms_vrr(struct kms *k, int on);
 
-/* Blanks by disabling the CRTC, which powers the panel down rather than
- * drawing black on it - on an OLED the difference is the backlight-equivalent
- * rather than a dark picture. */
+/* Disables the CRTC to power down the panel. */
 int  kms_blank(struct kms *k);
 
 int  kms_drop_master(struct kms *k);
 int  kms_set_master(struct kms *k);
 
-/* Writes a color profile into the CRTC's CTM and GAMMA_LUT properties, or
- * clears both with NULL. The display controller keeps them across every
- * later modeset, so what is set here stays in force for whatever runs after
- * the launcher has dropped master. Needs master. */
+/* Applies a color profile, or clears it with NULL. Requires DRM master.
+ * CRTC properties persist across modesets and master handoffs. */
 struct color_profile;
 int  kms_color_apply(struct kms *k, const struct color_profile *p);
 
-/* Whether the CRTC has a de-gamma stage (the DEGAMMA_LUT property with
- * entries): a kernel that drives the display controller's IGC. */
+/* Returns whether the CRTC exposes a 256-entry DEGAMMA_LUT stage. */
 int  kms_has_degamma(struct kms *k);
 
 #endif

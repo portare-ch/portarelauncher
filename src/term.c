@@ -13,22 +13,10 @@ struct palette {
 };
 
 static const struct palette palettes[] = {
-	/* Grey on black. The plain MS-DOS prompt: no hue at all, which is the
-	 * least tiring to read and the most neutral behind amber text. */
 	{ "grey", { 0x00000000, 0x00404040, 0x00808080, 0x00c0c0c0, 0x00ffffff } },
-
-	/* Amber phosphor. Warm and period-correct, and on an OLED it reads
-	 * closer to yellow than the hex value suggests. */
 	{ "amber", { 0x00000000, 0x00663d00, 0x00b37400, 0x00ffb000, 0x00ffd98a } },
-
-	/* Deeper amber, pushed towards orange to take the yellow out. */
 	{ "orange", { 0x00000000, 0x00552200, 0x00994400, 0x00e06000, 0x00ff9040 } },
-
-	/* Green phosphor, the VT220 end of the range. */
 	{ "green", { 0x00000000, 0x00004400, 0x00008800, 0x0033dd33, 0x0099ff99 } },
-
-	/* Cool white with a trace of blue, which reads as "screen" rather than
-	 * as "paper" on a panel this contrasty. */
 	{ "ice", { 0x00000000, 0x00303842, 0x005d6b7a, 0x00a8bccc, 0x00e8f2ff } },
 };
 
@@ -45,7 +33,7 @@ uint32_t term_color(const struct term *t, int attr)
 const char *term_set_palette(struct term *t, int idx)
 {
 	t->pal = ((idx % N_PALETTES) + N_PALETTES) % N_PALETTES;
-	term_invalidate(t);      /* every cell has to be repainted */
+	term_invalidate(t);
 	return palettes[t->pal].name;
 }
 
@@ -65,8 +53,7 @@ int term_init(struct term *t, uint32_t *fb, unsigned pitch_px,
 	if (t->cols == 0 || t->rows == 0)
 		return -1;
 
-	/* Centre the grid so the leftover pixels are split rather than all
-	 * landing on one edge. They stay black either way. */
+	/* Center the grid within the unused black border. */
 	t->ox = (w - t->cols * FONT_W * scale) / 2;
 	t->oy = (h - t->rows * FONT_H * scale) / 2;
 
@@ -98,8 +85,7 @@ void term_clear(struct term *t)
 
 void term_invalidate(struct term *t)
 {
-	/* 0xff is not a value term_clear or the drawing helpers produce, so
-	 * every cell compares unequal on the next flush. */
+	/* 0xff is not a valid cell value, forcing every cell to repaint. */
 	memset(t->prev, 0xff, (size_t)t->cols * t->rows * sizeof(*t->prev));
 }
 
@@ -162,10 +148,8 @@ void term_hline(struct term *t, unsigned y, unsigned char glyph, int attr)
 		term_putc(t, x, y, glyph, attr);
 }
 
-/* A shape mark across the whole cell: background first, then the outline.
- * Centred where the font's capitals are, rows 2 to 11 of 16, so a mark
- * sits on the line with the word beside it; half the size of the box it
- * fits in is 11 pixels at scale 3, two-pixel lines. */
+/* Clear the cell, then outline a mark centered on capital rows 2..11.
+ * At scale 3 the half-size is 11 pixels and strokes are 2 pixels wide. */
 static void draw_mark(struct term *t, unsigned px0, unsigned py0,
                       unsigned char ch, uint32_t fg, uint32_t bg)
 {
@@ -201,9 +185,8 @@ static uint32_t mix(uint32_t bg, uint32_t fg, unsigned a)   /* a: 0..255 */
 	return out;
 }
 
-/* A two-cell glyph the PS2's way: 26 x 26 with 16 grey levels, scaled to
- * the 48 x 48 of two cells with bilinear filtering, the GS's
- * GS_FILTER_LINEAR, and blended between the cell's colour and black. */
+/* Bilinearly scale a 26 x 26, 16-level glyph to two cells and blend
+ * between the cell color and black. */
 static void draw_ja26(struct term *t, unsigned px0, unsigned py0,
                       const unsigned char *g, uint32_t fg, uint32_t bg)
 {
@@ -307,8 +290,7 @@ void term_flush(struct term *t)
 	for (size_t i = 0; i < n; i++) {
 		if (same(&t->cur[i], &t->prev[i]))
 			continue;
-		/* A two-cell glyph is drawn whole from its left cell, whichever
-		 * half changed. */
+		/* Redraw wide glyphs from the left cell if either half changed. */
 		size_t at = t->cur[i].half == HALF_RIGHT ? i - 1 : i;
 		draw_cell(t, (unsigned)(at % t->cols), (unsigned)(at / t->cols), &t->cur[at]);
 		t->prev[at] = t->cur[at];

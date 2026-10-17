@@ -4,8 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
-/* KEY="value" or KEY=value, as os-release(5) allows. The build never writes
- * escapes inside the quotes, so only the quotes themselves are removed. */
+/* Accept quoted or bare values. Build-generated values contain no escapes. */
 static void take(const char *line, const char *key, char *out, size_t osz)
 {
 	size_t n = strlen(key);

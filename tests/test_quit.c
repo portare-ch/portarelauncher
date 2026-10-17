@@ -64,9 +64,8 @@ static void test_stat(void)
 	CHECK_INT(quit_stat_pgrp("1 (x)", &pg, &pp), -1);
 }
 
-/* Linux only: /proc is how the group is found. A leader that stands in for
- * runemu.sh and a member that stands in for the emulator; the member is
- * signalled, the leader is left to finish. */
+/* Linux /proc integration: signal the emulator stand-in while leaving
+ * the runemu.sh stand-in alive to finish cleanup. */
 static void test_signal_group(void)
 {
 	FILE *probe = fopen("/proc/self/stat", "r");

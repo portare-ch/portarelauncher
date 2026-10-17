@@ -1,22 +1,12 @@
-/* What PortScope shows, kept apart from where it comes from.
- *
- * Events go in as the kernel delivers them, type, code and value; what
- * comes out is which control is held, where each axis is, the last few
- * events and how often the pad reports. No device, no screen: the tests
- * feed this directly.
- *
- * Two layers, one at a time. The virtual pad is what InputPlumber presents
- * and what games read; the raw layer is the MCU's own device and the
- * gpio-keys that carry the paddles, as they are before InputPlumber maps
- * them. They name some controls differently, so each has its own map.
- */
+/* PortScope input model: held controls, axes, recent events and report rate.
+ * Virtual and raw layers map controls separately; raw combines the MCU pad
+ * and gpio-keys paddles. */
 #ifndef PL_SCOPE_H
 #define PL_SCOPE_H
 
 #include <stddef.h>
 
-/* linux/input.h's values, spelled out as quit.h does so this builds and is
- * tested on a machine without that header. portscope.c checks them. */
+/* Linux input constants for portable tests; portscope.c verifies them. */
 #define SC_EV_SYN      0x00
 #define SC_EV_KEY      0x01
 #define SC_EV_ABS      0x03
@@ -68,8 +58,8 @@ enum scope_ctl {
 
 enum scope_axis { AX_LX, AX_LY, AX_RX, AX_RY, AX_LT, AX_RT, N_AX };
 
-#define SCOPE_LAST   2      /* the rows under "Last input"              */
-#define SCOPE_RATE_N 1024   /* report times kept; 200 Hz needs 200      */
+#define SCOPE_LAST   2      /* the rows under "Last input" */
+#define SCOPE_RATE_N 1024   /* report times kept; 200 Hz needs 200 */
 
 struct scope_event {
 	unsigned type, code;
@@ -87,12 +77,11 @@ struct scope {
 	int rate_head, rate_n;
 };
 
-/* Forgets everything and takes the map of the given layer. The ranges
- * start as the virtual pad's, 0..255; scope_range sets the real ones. */
+/* Resets state for the layer with default 0..255 ranges.
+ * scope_range supplies the device's actual ranges. */
 void scope_reset(struct scope *s, enum scope_layer layer);
 
-/* The range the device reports for an ABS code and where the axis is
- * now, from EVIOCGABS. */
+/* Sets an ABS axis range and current value from EVIOCGABS. */
 void scope_range(struct scope *s, unsigned abs_code, int min, int max, int value);
 
 /* One event, at t_ms. Returns 1 when something on screen changes. */
@@ -105,12 +94,10 @@ double scope_axis(const struct scope *s, enum scope_axis a);
 /* A control is lit: a button held, a trigger past zero. */
 int scope_lit(const struct scope *s, enum scope_ctl c);
 
-/* Reports in the second up to now_ms: the pad's rate while it moves, 0
- * once it has been still for a second. */
+/* Reports in the preceding second; 0 after a second without reports. */
 int scope_rate(const struct scope *s, long long now_ms);
 
-/* The kernel's name for a code, "ABS_RY", "BTN_SOUTH"; one it does not
- * know is printed as its number. */
+/* Kernel code name, or a numeric fallback for unknown codes. */
 const char *scope_code_name(unsigned type, unsigned code, char *buf, size_t n);
 
 #endif

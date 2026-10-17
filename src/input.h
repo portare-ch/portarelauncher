@@ -1,13 +1,5 @@
-/* Gamepad and keyboard, straight from evdev.
- *
- * Every /dev/input/event* that reports keys is opened and polled together,
- * so the built-in pad, a paired controller and a USB keyboard all work
- * without knowing which is which.
- *
- * The poll blocks with no timeout while nothing is held, which is where the
- * idle cost of this program goes to zero. A timeout is only used to drive
- * key repeat for a held direction.
- */
+/* Gamepad and keyboard input from evdev. Polls all key-capable devices
+ * and blocks while idle; held directions use a repeat timeout. */
 #ifndef PL_INPUT_H
 #define PL_INPUT_H
 
@@ -19,7 +11,7 @@ enum action {
 	ACT_RIGHT,
 	ACT_CONFIRM,
 	ACT_BACK,
-	ACT_MENU,     /* the settings key            */
+	ACT_MENU,     /* the settings key */
 	ACT_ALT,      /* L1: shift on the keyboard, nothing elsewhere */
 	ACT_HOME,     /* Home: the consoles list, from anywhere */
 	ACT_START,    /* START: "open settings" everywhere except the keyboard */
@@ -35,69 +27,47 @@ enum action {
 struct input {
 	int fd[INPUT_MAX_DEV];
 	int n;
-	/* Something that is not an input device but has to wake the same
-	 * poll: the status notification pipe. Kept separate so its bytes are never parsed as
-	 * evdev events. */
+	/* Status notification pipe, polled separately from evdev events. */
 	int aux_fd;
-	/* inotify on /dev/input. InputPlumber recreates its virtual pad
-	 * whenever it restarts - which happens at the end of a game - and a
-	 * Bluetooth pad comes and goes; either way the devices are reopened
-	 * rather than read through descriptors whose device is gone. */
+	/* Watches /dev/input for hotplug and InputPlumber device recreation. */
 	int notify_fd;
 	int quit_only;         /* the mask input_quit_only set, reapplied */
 	enum action held;      /* direction currently held, for repeat */
-	int repeats;           /* how many repeats have fired          */
+	int repeats;           /* how many repeats have fired */
 };
 
 /* Clears *in before opening anything, so input_set_aux comes after it. */
 int  input_open(struct input *in);
 
-/* For a caller with a poll loop of its own: adds the devices and the
- * hotplug watch to pfd (room for INPUT_MAX_DEV + 1) and returns how many.
- * After poll, input_refresh reopens the devices if one has gone or appeared
- * and returns 1 when it did; the caller then reads nothing from this round,
- * since the descriptors it polled are closed. */
+/* Adds devices and the hotplug watch to pfd (INPUT_MAX_DEV + 1 slots),
+ * returning the count. input_refresh returns 1 after reopening devices;
+ * skip reads from that poll round because its descriptors have been closed. */
 struct pollfd;
 int  input_fill_poll(struct input *in, struct pollfd *pfd);
 int  input_refresh(struct input *in, const struct pollfd *pfd, int n);
 void input_set_aux(struct input *in, int fd);
 void input_close(struct input *in);
 
-/* Which face button does what. The top button opens settings in both
- * styles. retroid=1: the right button confirms and the bottom one goes
- * back. retroid=0, the shape marks: bottom confirms, right goes back. Takes
- * effect on the next press. */
+/* Retroid: right confirms, bottom goes back. Shapes: bottom confirms,
+ * right goes back. Top opens settings in both. Applies on the next press. */
 void input_set_layout(int retroid);
 
-/* Throws away everything the devices buffered while something else had the
- * panel. The launcher's descriptors stay open while an emulator or a tool
- * runs, and the kernel queues every press on them meanwhile - including
- * the combo that quit the thing, which would otherwise arrive the moment
- * the launcher is back: START+SELECT out of the gamepad tester, replayed,
- * opens Settings. */
+/* Discards events queued while a child owned the panel, including its
+ * quit combo, so they do not trigger menu actions on return. */
 void input_drain(struct input *in);
 
-/* While another program has the panel, the launcher only listens for the quit
- * combo (quit.h). on=1 asks the kernel to deliver nothing but Home and START
- * key events on every device, so a game's stick movements do not wake this
- * program hundreds of times a second; on=0 puts everything back. A kernel
- * without EVIOCSMASK just delivers everything, which costs wake-ups but
- * works. */
+/* While a child owns the panel, on=1 masks input to Home and START for
+ * the quit combo; on=0 restores all events. Without EVIOCSMASK, all events
+ * are delivered and filtered by the caller. */
 void input_quit_only(struct input *in, int on);
 
 /* Reads whatever is waiting and returns 1 if it completed Home + START. */
 struct quit_combo;
 int  input_quit_read(struct input *in, struct quit_combo *q);
 
-/* Blocks until something happens and returns one action.
- *
- * idle_ms bounds the wait so the caller can refresh a clock; ACT_TICK says
- * that is why it returned. A negative idle_ms blocks forever. Key repeat
- * shortens the wait on its own when a direction is held, so passing a long
- * idle_ms does not make the pad feel sluggish.
- *
- * ACT_NONE means it woke for something that is not a binding, which the
- * caller can ignore and call again. */
+/* Returns one action. idle_ms bounds the wait; negative waits indefinitely.
+ * Held-direction repeat may shorten it. ACT_TICK marks a timeout; ACT_NONE
+ * marks an unbound event. */
 enum action input_wait(struct input *in, int idle_ms);
 
 #endif

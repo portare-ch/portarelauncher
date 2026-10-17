@@ -13,13 +13,11 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-/* Key repeat, matching what a menu feels like rather than what a text field
- * needs: a pause before the first repeat, then steady. */
+/* Menu repeat: initial delay, then steady repeats. */
 #define REPEAT_DELAY_MS 380
 #define REPEAT_RATE_MS  90
 
-/* Sticks rest near zero but not at it. Anything inside the deadzone is
- * centre; the axis has to return there before it will fire again. */
+/* Stick directions rearm only after returning to the deadzone. */
 #define STICK_EDGE 16000
 
 static int has_keys(int fd)
@@ -34,7 +32,6 @@ static int has_keys(int fd)
 	return 0;
 }
 
-/* Every event device that reports keys, opened fresh. */
 static void open_devices(struct input *in)
 {
 	in->n = 0;
@@ -108,15 +105,12 @@ int input_refresh(struct input *in, const struct pollfd *pfd, int n)
 	int changed = 0;
 	for (int i = 0; i < n; i++) {
 		if (pfd[i].fd == in->notify_fd && (pfd[i].revents & POLLIN)) {
-			/* Only that something changed matters, not what. */
 			char buf[4096];
 			while (read(in->notify_fd, buf, sizeof(buf)) > 0)
 				;
 			changed = 1;
 		} else if (pfd[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
-			/* A device that has gone. Polling it again returns at
-			 * once, forever: that was the launcher at 100% of a core
-			 * after every game. */
+			/* Reopen removed devices to avoid continuous poll wakeups. */
 			changed = 1;
 		}
 	}
@@ -163,25 +157,18 @@ void input_set_layout(int retroid)
 static enum action from_key(unsigned code)
 {
 	switch (code) {
-	/* The face buttons by role. The top one opens settings whatever the
-	 * style, X on a Retroid, the triangle with the shape marks; the left
-	 * one, Y or the square, marks a favourite. The style decides the other
-	 * two. Retroid: A on the right confirms, B at the bottom goes back.
-	 * Shapes: the cross at the bottom confirms, the circle on the right
-	 * goes back. L1 is the keyboard's shift. */
+	/* Top opens settings, left toggles favourites. Retroid confirms on the
+	 * right and backs out at the bottom; shapes reverse those two. L1 shifts. */
 	case BTN_SOUTH:  return retroid_layout ? ACT_BACK    : ACT_CONFIRM;
 	case BTN_EAST:   return retroid_layout ? ACT_CONFIRM : ACT_BACK;
 	case BTN_NORTH:  return ACT_MENU;
 	case BTN_WEST:   return ACT_FAV;
 	case BTN_TL:     return ACT_ALT;
-	/* Their own actions rather than aliases, because the keyboard needs
-	 * START to mean "done" while the left button types a space. Screens
-	 * that have no use for the difference fold START back into MENU. */
+	/* Keep START distinct for keyboard Done; MENU types a space.
+	 * Other screens map START back to MENU. */
 	case BTN_START:  return ACT_START;
 	case BTN_SELECT: return ACT_SELECT;
-	/* Home on its own, while this program has the panel. With START it
-	 * is the quit combo, which only matters while something else does
-	 * (quit.h); here the START that may follow just opens settings. */
+	/* Home returns to systems here; Home + START quits only while a child runs. */
 	case BTN_MODE:   return ACT_HOME;
 
 	case BTN_DPAD_UP:    return ACT_UP;
@@ -189,8 +176,7 @@ static enum action from_key(unsigned code)
 	case BTN_DPAD_LEFT:  return ACT_LEFT;
 	case BTN_DPAD_RIGHT: return ACT_RIGHT;
 
-	/* A keyboard, for working on this over ssh with a USB keyboard
-	 * plugged in, and as the only way out that does not need a pad. */
+	/* USB keyboard bindings, including a keyboard-only exit. */
 	case KEY_UP:     return ACT_UP;
 	case KEY_DOWN:   return ACT_DOWN;
 	case KEY_LEFT:   return ACT_LEFT;
@@ -245,8 +231,7 @@ enum action input_wait(struct input *in, int idle_ms)
 		nfd++;
 	}
 
-	/* Whichever comes first: the caller's refresh, or the next repeat of a
-	 * held direction. */
+	/* Wait until the next refresh or direction repeat, whichever comes first. */
 	int timeout = idle_ms;
 	if (in->held != ACT_NONE) {
 		int rep = in->repeats == 0 ? REPEAT_DELAY_MS : REPEAT_RATE_MS;
@@ -290,7 +275,7 @@ enum action input_wait(struct input *in, int idle_ms)
 					continue;
 				}
 				if (ev.value == 2)            /* kernel autorepeat */
-					continue;                 /* we do our own    */
+					continue;                 /* we do our own */
 			} else if (ev.type == EV_ABS) {
 				a = from_abs(ev.code, ev.value);
 				if (a == ACT_NONE) {
@@ -329,9 +314,8 @@ void input_quit_only(struct input *in, int on)
 {
 	in->quit_only = on;
 #ifdef EVIOCSMASK
-	/* Two masks per device: which event types, then which key codes. Not
-	 * even EV_SYN in the narrow one - a SYN_REPORT follows every stick
-	 * report, and waking for those is exactly what this avoids. */
+	/* Mask event types and key codes. Exclude EV_SYN too, otherwise every
+	 * stick report would still wake the launcher while a game runs. */
 	unsigned char types[EV_CNT / 8 + 1], keys[KEY_CNT / 8 + 1];
 	memset(types, on ? 0 : 0xff, sizeof(types));
 	memset(keys, on ? 0 : 0xff, sizeof(keys));

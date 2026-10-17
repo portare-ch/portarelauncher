@@ -11,12 +11,10 @@ uint64_t color_ctm_fixed(double v)
 		sign = 1ull << 63;
 		v = -v;
 	}
-	/* 31 integer bits is more than any correction needs; clamp rather
-	 * than wrap if a file is nonsense. */
+	/* Clamp to the S31.32 integer range instead of wrapping. */
 	if (v > 2147483647.0)
 		v = 2147483647.0;
-	/* Rounded by hand: llround would pull in libm, and this program links
-	 * against libc and libdrm and nothing else. v is non-negative here. */
+	/* Round the nonnegative magnitude without adding a libm dependency. */
 	return sign | (uint64_t)(v * 4294967296.0 + 0.5);
 }
 

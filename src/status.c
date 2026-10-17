@@ -33,14 +33,10 @@ static int read_int(const char *path, int *out)
 	return 1;
 }
 
-/* A paired DualSense reports its own charge under this directory, as
- * ps-controller-battery-<mac> with type=Battery. Picking the first battery
- * would put the controller's percentage in the handheld's header, so the
- * built-in one is asked for by name and the scan that follows skips anything
- * that names itself a controller. */
+/* Prefer the built-in battery and skip controller batteries in the fallback
+ * scan; a paired DualSense also reports type=Battery here. */
 static int find_battery(char *out, size_t osz)
 {
-	/* PSY plus a 255-byte d_name plus the leaf, with room to spare. */
 	char path[512];
 
 	snprintf(path, sizeof(path), PSY "/battery/capacity");

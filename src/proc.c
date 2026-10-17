@@ -11,7 +11,6 @@
 #include <time.h>
 #include <unistd.h>
 
-
 int proc_run(char *const argv[], void (*cb)(char *line, void *ctx), void *ctx)
 {
 	return proc_run_for(argv, cb, ctx, PROC_CEILING_MS);
@@ -47,8 +46,7 @@ int proc_run_for(char *const argv[], void (*cb)(char *line, void *ctx),
 
 	close(fd[1]);
 
-	/* Read by hand rather than through stdio, because stdio has no way to
-	 * say "and give up at some point". */
+	/* Use read/poll so the deadline also applies while waiting for stdout. */
 	char line[1024];
 	size_t len = 0;
 	long long deadline = now_ms() + ceiling_ms;
@@ -123,8 +121,7 @@ void proc_spawn(char *const argv[])
 		return;
 
 	if (pid == 0) {
-		/* The middle process exits immediately, so the grandchild is
-		 * reparented to init and nobody here has to reap it. */
+		/* The grandchild is reparented when this intermediate process exits. */
 		if (fork() == 0) {
 			int null = open("/dev/null", O_RDWR);
 			if (null >= 0) {

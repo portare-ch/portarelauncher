@@ -31,8 +31,7 @@ int main(void)
 	CHECK_STR(o.device, "SM8550");
 	CHECK_STR(o.cpu, "Snapdragon 8 Gen2");
 
-	/* Unquoted and single-quoted values are allowed too; a key that only
-	 * starts the same way is not the key. */
+	/* Accept bare and single-quoted values; require an exact key match. */
 	fixture_write(p, "OS_VERSION=20261001\nOS_BUILD='release'\nOS_BUILDER=x\n");
 	CHECK_INT(osinfo_read(p, &o), 0);
 	CHECK_STR(o.version, "20261001");

@@ -22,11 +22,8 @@ static void copy_trim(char *dst, size_t dsz, const char *src, size_t n)
 	dst[n] = '\0';
 }
 
-/* Pulls <tag>value</tag> out of one line, and <tag attr="x">value</tag> too.
- *
- * The attribute case is not decoration: the default core is written
- * <core default="true">swanstation</core>, and a matcher that only accepts
- * "<core>" walks straight past it and launches with no core at all. */
+/* Read a tag from one line, including attributes such as
+ * <core default="true">swanstation</core>. */
 static int tag_value(const char *line, const char *tag, char *out, size_t osz)
 {
 	char open[64], close[64];
@@ -58,8 +55,7 @@ static int ext_matches(const char *file, const char *exts)
 	if (!dot)
 		return 0;
 
-	/* exts is a space-separated list of ".cue .chd". Compare case
-	 * insensitively, since roms arrive named however they arrive. */
+	/* Case-insensitive match against space-separated extensions such as ".cue .chd". */
 	const char *p = exts;
 	while (*p) {
 		while (*p == ' ') p++;
@@ -73,9 +69,7 @@ static int ext_matches(const char *file, const char *exts)
 	return 0;
 }
 
-/* A lone "/" in the extensions: a folder holding something this system
- * plays is listed as well, and launching it hands the player the folder.
- * An album is a folder; so is a series. */
+/* A lone "/" extension allows a matching folder to launch as a whole. */
 static int folders_play(const char *exts)
 {
 	for (const char *p = exts; *p; ) {
@@ -137,8 +131,7 @@ static void add_game(struct psystem *s, const char *path, const char *file)
 	char *dot = strrchr(g->name, '.');
 	if (dot)
 		*dot = '\0';
-	/* Composed before the list is sorted: a file copied from a Mac is
-	 * named e + U+0301 and would sort apart from its é neighbours. */
+	/* Compose before sorting so decomposed filenames sort beside equivalents. */
 	text_compose(g->name);
 	s->ngames++;
 }
@@ -166,15 +159,13 @@ static void scan(struct psystem *s, const char *dir, int depth)
 			continue;
 
 		if (S_ISDIR(st.st_mode)) {
-			/* A folder that plays as a whole is its row; its tracks
-			 * are what launching it plays, not rows beside it. */
+			/* List a playable folder once, without its contents. */
 			if (depth > 0 && folders_play(s->exts) &&
 			    holds_games(full, s->exts)) {
 				add_folder(s, full, e->d_name);
 				continue;
 			}
-			/* PS2 and Dreamcast titles arrive as a directory holding
-			 * the disc image, so one level down is worth looking at. */
+			/* Look one level down for PS2 and Dreamcast disc directories. */
 			if (depth > 0)
 				scan(s, full, depth - 1);
 		} else if (ext_matches(e->d_name, s->exts)) {
@@ -189,10 +180,8 @@ static int by_path(const void *a, const void *b)
 	return strcasecmp((const char *)a, (const char *)b);
 }
 
-/* Drops every game that a sheet in the same system names, so a game made
- * of a .cue and its tracks, or an .m3u and its discs, is listed once, as
- * its sheet. Names are compared without regard to case: a sheet written on
- * Windows often spells its tracks differently from the files on the card. */
+/* Hide files referenced by sheets in this system. Compare paths without
+ * case because Windows-generated sheets may differ from on-disk spelling. */
 static void hide_referenced(struct psystem *s)
 {
 	char (*refs)[512] = NULL;
@@ -271,10 +260,7 @@ int catalog_load(struct catalog *c, const char *es_systems, const char *settings
 			in_system = 0;
 			if (!cur.name[0] || !cur.path[0])
 				continue;
-			/* EmulationStation's Tools system: no core, so it could only
-			 * ever say "Cannot launch". The launcher's own Tools row runs
-			 * the same folder (tools.c), and listing both put two rows
-			 * called Tools in the list. */
+			/* Skip ES's Tools system; tools.c supplies the launcher's Tools row. */
 			if (strcmp(cur.name, "tools") == 0)
 				continue;
 
@@ -316,9 +302,7 @@ int catalog_load(struct catalog *c, const char *es_systems, const char *settings
 		else if (tag_value(line, "extension", v, sizeof(v)))
 			str_copy(cur.exts, sizeof(cur.exts), v);
 		else if (tag_value(line, "command", v, sizeof(v))) {
-			/* Only the binary is taken. The arguments are built as an
-			 * argv rather than by substituting into a shell string, so
-			 * a game called Ratchet & Clank cannot become two words. */
+			/* Keep only the binary; launch builds argv without shell substitution. */
 			char *sp = strchr(v, ' ');
 			if (sp)
 				*sp = '\0';
@@ -340,8 +324,7 @@ int catalog_load(struct catalog *c, const char *es_systems, const char *settings
 
 	fclose(f);
 
-	/* No games anywhere is a fresh install, not an error: the launcher
-	 * still has to come up, or Settings and Tools are out of reach too. */
+	/* An empty catalog is valid on a fresh install; Settings and Tools still work. */
 	if (c->n > 0)
 		qsort(c->sys, (size_t)c->n, sizeof(*c->sys), by_fullname);
 	return 0;

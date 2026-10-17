@@ -9,17 +9,13 @@
 
 #define UPDATE_SCRIPT "/usr/bin/portareos-update"
 
-/* The script's own curl calls give up after 30 seconds; this only stops a
- * script that has gone wrong in some other way from holding the panel. */
+/* The script limits curl to 30 seconds; allow extra time for script overhead. */
 #define CHECK_MS 60000
 
-/* 840 MB at a poor 1 MB/s is fourteen minutes. The script ends a download
- * that has stalled for a minute on its own, so this ceiling is only for a
- * connection that crawls without ever quite stopping. */
+/* Allow slow downloads; the script separately aborts minute-long stalls. */
 #define FETCH_MS (90 * 60 * 1000)
 
-/* Splits "key=value" in place. Returns the value, or NULL for a line that is
- * not one, which the script's other output is. */
+/* Return the value for an exact key=value prefix, or NULL. */
 static char *kv(char *line, const char *key)
 {
 	size_t n = strlen(key);
@@ -105,8 +101,7 @@ int update_fetch(void (*progress)(int pct, int verifying, void *ctx),
 	char *const argv[] = { (char *)UPDATE_SCRIPT, (char *)"update-online", NULL };
 	int rc = proc_run_for(argv, cb_fetch, &f, FETCH_MS);
 
-	/* Staged means the script said so and exited cleanly - both, because a
-	 * script killed after printing it has not necessarily synced. */
+	/* Require both staged output and a clean exit: syncing may follow the output. */
 	if (rc == 0 && f.staged)
 		return 0;
 
@@ -126,8 +121,7 @@ int update_set_channel(const char *settings, const char *channel)
 
 int update_staged(const char *dir)
 {
-	/* The name the boot looks for: a .tar, not the .part of a download
-	 * that has not finished or been checked. */
+	/* Only verified .tar files are staged; incomplete downloads use .part. */
 	DIR *d = opendir(dir);
 	if (!d)
 		return 0;

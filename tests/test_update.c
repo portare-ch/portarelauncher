@@ -5,8 +5,7 @@
 #define CHECK_CMD "/usr/bin/portareos-update check-online"
 #define FETCH_CMD "/usr/bin/portareos-update update-online"
 
-/* What the script printed on the device against the real releases, with a
- * newer tag for the "update" case. */
+/* Recorded script output, with a newer tag for the update case. */
 static void test_check(void)
 {
 	struct update_info u;

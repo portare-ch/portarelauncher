@@ -151,8 +151,7 @@ static void test_rate(void)
 	scope_feed(&s, SC_EV_SYN, 3, 0, 3000);
 	CHECK_INT(scope_rate(&s, 3000), 0);
 
-	/* Two reports a millisecond, more in a second than the ring holds:
-	 * the count stops at the ring rather than reading stale slots. */
+	/* Report counts cap at the ring capacity without reading stale slots. */
 	for (int i = 0; i < 4 * SCOPE_RATE_N; i++)
 		scope_feed(&s, SC_EV_SYN, SC_SYN_REPORT, 0, 10000 + i / 2);
 	CHECK_INT(scope_rate(&s, 10000 + 2 * SCOPE_RATE_N), SCOPE_RATE_N);
@@ -169,8 +168,7 @@ static void test_last(void)
 	CHECK_INT(s.last[0].code, SC_ABS_Y);
 	CHECK_INT(s.last[1].code, SC_ABS_X);
 
-	/* A stick moving sends X and Y in turn; the rows stay put and the
-	 * values follow, the latest on top. */
+	/* Alternating X/Y events update stable rows, with the latest code on top. */
 	ABS(SC_ABS_X, 11);
 	CHECK_INT(s.last[0].code, SC_ABS_X);
 	CHECK_INT(s.last[0].value, 11);

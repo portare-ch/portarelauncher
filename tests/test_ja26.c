@@ -21,8 +21,7 @@ static void test_load(void)
 	CHECK(ja26_find(0x3043) == NULL);
 	CHECK(ja26_find(0) == NULL);
 
-	/* Anything that is not this format is refused, and what was loaded
-	 * stays: a bad file never takes the glyphs away. */
+	/* Reject invalid files without replacing the loaded glyphs. */
 	ja26_fixture(path, "PLJA27\0\1", 2, JA26_SIZE, cps, g, 0);
 	CHECK_INT(ja26_load(path), -1);
 	ja26_fixture(path, "PLJA26\0\1", 2, 24, cps, g, 0);

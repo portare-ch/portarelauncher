@@ -111,8 +111,7 @@ static void build_fixture(void)
 	dir("roms/ps2/Game A/extras");
 	touch("roms/ps2/Game A/extras/deep.iso");    /* two levels: not */
 
-	/* Tekken 3 as on the test device: a .cue and three tracks, one of
-	 * them spelt in capitals on the card. */
+	/* A .cue with three tracks, including a case mismatch. */
 	dir("roms/multi");
 	char p[160];
 	snprintf(p, sizeof(p), "%s/roms/multi/Tekken 3 (USA).cue", root);
@@ -135,8 +134,7 @@ static void build_fixture(void)
 	/* CloneCD. */
 	touch("roms/multi/Clone.ccd");
 	touch("roms/multi/Clone.img");
-	/* A PS2 game in its own folder, .bin and .cue side by side, with a
-	 * Windows path in the sheet. */
+	/* PS2 disc directory with a Windows path in the sheet. */
 	dir("roms/multi/Smuggler's Run (USA)");
 	snprintf(p, sizeof(p), "%s/roms/multi/Smuggler's Run (USA)/Smuggler's Run (USA).cue", root);
 	fixture_write(p, "FILE \".\\Smuggler's Run (USA).bin\" BINARY\n");
@@ -172,8 +170,7 @@ static void test_systems(void)
 	struct catalog c;
 	CHECK_INT(catalog_load(&c, cfg, sys_cfg), 0);
 
-	/* psx, ps2, multi and music; tools and the empty snes are gone. By
-	 * full name. */
+	/* Sort systems by full name; omit tools and empty snes. */
 	CHECK_INT(c.n, 4);
 	CHECK_STR(c.sys[0].fullname, "PlayStation");
 	CHECK_STR(c.sys[1].fullname, "PlayStation 2 & Friends");
@@ -205,8 +202,7 @@ static void test_games(void)
 	const struct psystem *psx = find(&c, "psx");
 	CHECK(psx != NULL);
 	if (psx) {
-		/* Sorted without regard to case, extension dropped from the
-		 * name and kept in the path. */
+		/* Sort case-insensitively and strip extensions only from display names. */
 		CHECK_INT(psx->ngames, 4);
 		if (psx->ngames == 4) {
 			CHECK_STR(psx->games[0].name, "alpha");
@@ -258,10 +254,8 @@ static void test_folders(void)
 	struct catalog c;
 	CHECK_INT(catalog_load(&c, cfg, sys_cfg), 0);
 
-	/* A folder holding something the system plays is a row of its own,
-	 * named with a slash and listed before the files. Its tracks are not
-	 * rows: launching the folder plays them. A folder with nothing
-	 * playable in it is not a row. */
+	/* Playable folders sort before files and hide their tracks.
+	 * Empty folders are omitted. */
 	const struct psystem *m = find(&c, "music");
 	CHECK(m != NULL);
 	if (m) {
@@ -275,8 +269,7 @@ static void test_folders(void)
 		}
 	}
 
-	/* Without the slash a folder is only somewhere to look: ps2's
-	 * "Game A" gives its disc, not a row of its own. */
+	/* Without the "/" extension, folders are scanned for individual discs. */
 	const struct psystem *ps2 = find(&c, "ps2");
 	CHECK(ps2 != NULL);
 	if (ps2) {
@@ -311,8 +304,7 @@ static void test_failures(void)
 	catalog_free(&c);
 }
 
-/* A fresh install: systems defined, nothing copied yet. The launcher has to
- * start on that, so it is an empty catalogue rather than a failure. */
+/* A fresh install with no games loads an empty catalog successfully. */
 static void test_empty(void)
 {
 	struct catalog c;
@@ -336,9 +328,8 @@ static void test_empty(void)
 	catalog_free(&c);
 }
 
-/* A file copied from a Mac is named decomposed: e and U+0301. Composed on
- * load, it reads and sorts with its precomposed neighbours. Uncomposed,
- * "Poke\xcc\x81mon Gold" would sort before "Pok\xc3\xa9mon Blue". */
+/* Compose decomposed filenames before sorting so equivalent accents
+ * use the same order. */
 static void test_composed(void)
 {
 	char r[32], p[160], es[128];

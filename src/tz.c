@@ -8,8 +8,7 @@
 #include <sys/stat.h>
 #include <time.h>
 
-/* The continents and oceans the tz database files its zones under. Anything
- * else in the list is a backward-compatible alias of one of these. */
+/* Geographic tz regions; other prefixes are aliases. */
 static const char *const regions[] = {
 	"Africa", "America", "Antarctica", "Arctic", "Asia", "Atlantic",
 	"Australia", "Europe", "Indian", "Pacific",
@@ -54,8 +53,7 @@ int tz_load(struct tzlist *l, const char *list, const char *zoneinfo)
 	fclose(f);
 	qsort(l->zone, (size_t)l->n, sizeof(l->zone[0]), by_zone);
 
-	/* The regions that have something in them, in the table's order, and
-	 * UTC last: it is one zone, not a place. */
+	/* Keep nonempty regions in table order, with UTC last. */
 	for (size_t i = 0; i < sizeof(regions) / sizeof(regions[0]); i++) {
 		int idx;
 		if (tz_in_region(l, regions[i], &idx, 1) > 0)
@@ -91,8 +89,7 @@ void tz_city(const char *zone, char *out, size_t osz)
 
 void tz_clock(const char *zone, char *out, size_t osz)
 {
-	/* TZ for one call, then back to the system's. The launcher is one
-	 * thread, so nothing else can read the time in between. */
+	/* Temporarily set TZ, then restore it. Safe in this single-threaded launcher. */
 	char *old = getenv("TZ");
 	char saved[64] = "";
 	if (old)

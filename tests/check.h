@@ -1,8 +1,5 @@
-/* The whole test framework: a few macros and some fixture helpers.
- *
- * Each tests/test_*.c is its own program, linked against only the modules it
- * tests, and exits non-zero if anything failed. `make test` runs them all.
- */
+/* Test macros and fixture helpers. Each test_*.c builds as a standalone
+ * program; make test runs them all. */
 #ifndef PL_CHECK_H
 #define PL_CHECK_H
 
@@ -49,9 +46,7 @@ static inline int check_report(const char *name)
 	return check_failed ? 1 : 0;
 }
 
-/* A scratch directory under /tmp rather than $TMPDIR: on macOS that is a
- * path long enough to overflow the launcher's own path fields, which would
- * be testing the fixture rather than the code. */
+/* Use /tmp: macOS TMPDIR paths can overflow the launcher's path fields. */
 static inline char *fixture_dir(void)
 {
 	static char dir[32];

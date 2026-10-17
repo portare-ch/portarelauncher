@@ -1,12 +1,5 @@
-# portarelauncher
-#
-# Two dependencies: libc and libdrm.
-#
-# PKG_CONFIG rather than a name of our own: that is the variable cross build
-# systems export to point at the target's pkg-config. Calling bare
-# "pkg-config" finds the host's, or nothing at all, and quietly produces no
-# flags - which surfaces a hundred lines later as a missing <xf86drm.h>.
-# Hence the error below rather than a silent miscompile.
+# Requires libc and libdrm. Honor the cross-build system's PKG_CONFIG
+# to avoid silently using host headers and libraries.
 
 CC         ?= cc
 PKG_CONFIG ?= pkg-config
@@ -14,9 +7,7 @@ PKG_CONFIG ?= pkg-config
 DRM_CFLAGS := $(shell $(PKG_CONFIG) --cflags libdrm 2>/dev/null)
 DRM_LIBS   := $(shell $(PKG_CONFIG) --libs libdrm 2>/dev/null)
 
-# Only when something is actually being compiled: `make mockup` regenerates a
-# text file and has no business demanding a graphics library, least of all on
-# the laptop this is written on.
+# Require libdrm for device builds; host tests and mockups do not need it.
 GOALS := $(or $(MAKECMDGOALS),all)
 ifneq ($(filter-out clean font mockup test tests/%,$(GOALS)),)
 ifeq ($(strip $(DRM_LIBS)),)
@@ -26,19 +17,15 @@ libdrm.so.2 without them, which is why this is cross-built)
 endif
 endif
 
-# Kept out of CFLAGS deliberately. A build system that passes CFLAGS on the
-# make command line overrides everything a makefile appends to it, which
-# would silently drop both the language level and the libdrm include path.
-# Applied in the recipes instead, where nothing can displace them.
+# Keep required flags separate: command-line CFLAGS overrides makefile
+# assignments. Apply PL_CFLAGS in recipes so those flags are retained.
 PL_CFLAGS  := -std=c11 -D_GNU_SOURCE $(DRM_CFLAGS)
 PL_WARN    := -Wall -Wextra -Wshadow -Wvla -Wno-unused-parameter
 
 CFLAGS     ?= -O2 -g
 
-# The version shown under Settings > About. A release tarball has it in
-# VERSION, which git archive fills in from the tag (export-subst, see
-# .gitattributes). A checkout has the placeholder instead, so it asks git,
-# and a copy with neither says "dev".
+# Release archives get VERSION via export-subst; checkouts use git describe.
+# Fall back to "dev" when neither is available.
 PL_VERSION := $(strip $(shell cat VERSION 2>/dev/null))
 ifneq ($(findstring $$Format,$(PL_VERSION)),)
 PL_VERSION := $(strip $(shell git describe --tags --always --dirty 2>/dev/null))
@@ -52,8 +39,7 @@ SRC  := src/text.c src/proc.c src/update.c src/osinfo.c src/tz.c src/quit.c src/
 OBJ  := $(SRC:.c=.o)
 BIN  := portarelauncher
 
-# PortScope, the input diagnostics the launcher opens from Settings: the
-# launcher's panel, grid and palette, and its own model of the pad.
+# PortScope shares the launcher's display code and has its own input model.
 SCOPE_SRC := src/portscope.c src/scope.c src/pix.c src/term.c src/kms.c \
              src/color.c src/quit.c src/settings.c src/glyph.c src/unifont.c src/ja26.c
 SCOPE_OBJ := $(SCOPE_SRC:.c=.o)
@@ -72,14 +58,13 @@ $(SCOPE_BIN): $(SCOPE_OBJ)
 
 src/term.o: src/font8x16.h
 
-# Only main.c prints it, so only main.o carries it.
+# Only main.o needs the version string.
 src/main.o: PL_CFLAGS += -DPL_VERSION='"$(PL_VERSION)"'
 
 clean:
 	rm -f $(OBJ) $(SCOPE_OBJ) $(BIN) $(SCOPE_BIN) $(TESTS)
 
-# Regenerates the font from the kernel's VGA console font. Needs the source
-# file; see tools/mkfont.py for where it comes from.
+# Regenerate the VGA font; FONT_SRC points to Linux's font_8x16.c.
 font: tools/mkfont.py
 	python3 tools/mkfont.py $(FONT_SRC)
 
@@ -90,15 +75,11 @@ mockup:
 
 .PHONY: all clean font mockup test
 
-# ---- tests ------------------------------------------------------------------
+# Host tests need no libdrm or devices. Radio tests replay portnet and
+# bluetoothctl output through fake_proc.c.
 #
-# Host programs, one per module, linked against only what they test - never
-# kms.c or input.c, so they need no libdrm and run on the laptop as well as in
-# CI. bt.c and net.c are linked with tests/fake_proc.c instead of proc.c, which
-# replays recorded nmcli and bluetoothctl output rather than running them.
-#
-#   make test          build and run them all
-#   make test SAN=1    the same under AddressSanitizer and UBSan
+#   make test          build and run all tests
+#   make test SAN=1    enable AddressSanitizer and UBSan
 
 TEST_CFLAGS := -std=c11 -D_GNU_SOURCE -Isrc -Itests -O1 -g -Werror
 ifeq ($(SAN),1)

@@ -16,14 +16,11 @@ int notify_open(struct notify *o)
 		fprintf(stderr, "mkfifo %s: %s\n", NOTIFY_PATH, strerror(errno));
 		return -1;
 	}
-	/* mkfifo's mode goes through the umask, which on this system leaves
-	 * 0600 and means only root could ever write. Set it for real, so a
-	 * writer that is not root can still request a status refresh. */
+	/* Override umask so non-root writers can request a refresh. */
 	if (chmod(NOTIFY_PATH, 0622) < 0)
 		fprintf(stderr, "chmod %s: %s\n", NOTIFY_PATH, strerror(errno));
 
-	/* Read-write rather than read-only: a read-only FIFO with no writer
-	 * reports EOF continuously and would spin the poll loop. */
+	/* Open read-write to avoid continuous EOF wakeups when no writer is present. */
 	o->fd = open(NOTIFY_PATH, O_RDWR | O_NONBLOCK | O_CLOEXEC);
 	if (o->fd < 0) {
 		fprintf(stderr, "open %s: %s\n", NOTIFY_PATH, strerror(errno));

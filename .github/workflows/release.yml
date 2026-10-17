@@ -1,17 +1,6 @@
-# Publishes a release for every version tag (v0.1.0, v0.2.0, ...).
-#
-# The tarball is made here, once, with git archive, and uploaded with its
-# checksum. PortareOS pins that file by version and sha256, so the file must
-# never change after publication. GitHub's own "Source code" archives are
-# generated on demand and are not something to hang a checksum on.
-#
-# The same build and tests as CI run first, so a tag that does not build
-# publishes nothing.
-#
-# A release made on the GitHub page first (which also creates the tag) is
-# fine: the files are added to it rather than a second one being refused.
-# Run it by hand with a tag to (re)publish an existing one; a re-run would
-# use the workflow as it was at that tag.
+# Publish a tested git archive and SHA-256 checksum for each version tag.
+# PortareOS pins these assets, so published archives must remain stable.
+# Manual runs can add assets to an existing release.
 name: Release
 
 on:
@@ -56,8 +45,7 @@ jobs:
         run: |
           VER="${TAG#v}"
           mkdir dist
-          # The prefix is the directory PortareOS's build unpacks into:
-          # ${PKG_NAME}-${PKG_VERSION}.
+          # Match PortareOS's extraction directory: ${PKG_NAME}-${PKG_VERSION}.
           git archive --format=tar.gz --prefix="portarelauncher-${VER}/" \
             -o "dist/portarelauncher-${VER}.tar.gz" "${TAG}"
           # The tag has to reach VERSION, or the launcher shows "dev".

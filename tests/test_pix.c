@@ -17,10 +17,8 @@ static int count(void)
 	return n;
 }
 
-/* The same set of pixels mirrored left to right. Round shapes are centred
- * on a pixel, cx; lines on pixel edges, so a line-drawn mark centred on cx
- * is symmetric about the edge left of it, and pixel x mirrors to
- * 2 cx - 1 - x. */
+/* Round shapes center on pixels; line-drawn marks center on edges.
+ * For the latter, x mirrors to 2 * cx - 1 - x. */
 static int mirrored(int cx, int edge)
 {
 	for (int y = 0; y < H; y++)
@@ -38,11 +36,11 @@ static void test_ring_disc(void)
 {
 	clear();
 	pix_ring(&p, 24, 24, 10, 2, 1);
-	CHECK(at(24, 15));             /* in the band, top    */
-	CHECK(at(15, 24));             /* in the band, left   */
+	CHECK(at(24, 15));             /* in the band, top */
+	CHECK(at(15, 24));             /* in the band, left */
 	CHECK(!at(24, 24));            /* the middle is empty */
-	CHECK(!at(24, 17));            /* inside the band     */
-	CHECK(!at(24, 13));            /* outside the ring    */
+	CHECK(!at(24, 17));            /* inside the band */
+	CHECK(!at(24, 13));            /* outside the ring */
 	CHECK(mirrored(24, 0));
 
 	clear();
@@ -104,8 +102,7 @@ static void test_marks(void)
 
 static void test_clip(void)
 {
-	/* Off every edge, and nothing is written outside the buffer: the
-	 * guard words around it stay as they were. */
+	/* Clip at every edge without modifying guard words around the buffer. */
 	static uint32_t big[(H + 2) * W];
 	struct pix q = { big + W, W, W, H };
 	for (int i = 0; i < (H + 2) * W; i++)
