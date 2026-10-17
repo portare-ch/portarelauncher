@@ -141,3 +141,107 @@ void proc_spawn(char *const argv[])
 	while (waitpid(pid, &status, 0) < 0 && errno == EINTR)
 		;
 }
+
+#ifdef __linux__
+#include <sys/syscall.h>
+#endif
+#include <limits.h>
+
+void proc_job_init(struct proc_job *j)
+{
+	memset(j, 0, sizeof(*j));
+	j->fd = j->done_fd = -1;
+	j->status = PROC_FAILED;
+}
+static void job_close(struct proc_job *j)
+{
+	if (j->fd >= 0) close(j->fd);
+	if (j->done_fd >= 0) close(j->done_fd);
+	j->fd = j->done_fd = -1;
+	j->pid = 0;
+}
+void proc_job_cancel(struct proc_job *j)
+{
+	if (j->pid > 0) {
+		kill(j->pid, SIGKILL);
+		while (waitpid(j->pid, NULL, 0) < 0 && errno == EINTR) {}
+	}
+	job_close(j);
+	j->status = PROC_FAILED;
+}
+int proc_job_start(struct proc_job *j, char *const argv[], int ceiling_ms)
+{
+	if (j->pid || ceiling_ms <= 0) return -1;
+	proc_job_init(j);
+	int p[2];
+	if (pipe(p)) return -1;
+	fcntl(p[0], F_SETFD, FD_CLOEXEC);
+	fcntl(p[1], F_SETFD, FD_CLOEXEC);
+	pid_t pid = fork();
+	if (!pid) {
+		close(p[0]);
+		dup2(p[1], STDOUT_FILENO);
+		close(p[1]);
+		int null = open("/dev/null", O_RDWR);
+		if (null >= 0) {
+			dup2(null, STDIN_FILENO); dup2(null, STDERR_FILENO);
+			if (null > 2) close(null);
+		}
+		execvp(argv[0], argv);
+		_exit(127);
+	}
+	close(p[1]);
+	if (pid < 0) { close(p[0]); return -1; }
+	j->pid = pid; j->fd = p[0];
+	fcntl(j->fd, F_SETFL, O_NONBLOCK);
+#if defined(__linux__) && defined(SYS_pidfd_open)
+	j->done_fd = (int)syscall(SYS_pidfd_open, pid, 0);
+#endif
+	/* Without completion notification, keep filenames rather than poll a timer. */
+	if (j->done_fd < 0) { proc_job_cancel(j); return -1; }
+	fcntl(j->done_fd, F_SETFD, FD_CLOEXEC);
+	j->deadline = now_ms() + ceiling_ms;
+	return 0;
+}
+static void job_read(struct proc_job *j)
+{
+	char b[512];
+	/* Bounded work even if an accidentally substituted helper floods stdout. */
+	for (int i = 0; i < 8 && j->fd >= 0; i++) {
+		ssize_t n = read(j->fd, b, sizeof(b));
+		if (n <= 0) {
+			if (!n || (errno != EAGAIN && errno != EINTR)) {
+				close(j->fd); j->fd = -1;
+			}
+			break;
+		}
+		for (ssize_t k = 0; k < n; k++) {
+			if (j->length < sizeof(j->output)-1) j->output[j->length++] = b[k];
+			else j->overflow = 1;
+		}
+	}
+	j->output[j->length] = 0;
+}
+int proc_job_step(struct proc_job *j)
+{
+	if (!j->pid) return 0;
+	job_read(j);
+	int st;
+	pid_t r = waitpid(j->pid, &st, WNOHANG);
+	if (r == j->pid || (r < 0 && errno != EINTR)) {
+		job_read(j);
+		j->status = r > 0 && WIFEXITED(st) ? WEXITSTATUS(st) : PROC_FAILED;
+		job_close(j);
+		return 1;
+	}
+	if (now_ms() >= j->deadline) {
+		proc_job_cancel(j); j->status = PROC_TIMEOUT; return 1;
+	}
+	return 0;
+}
+int proc_job_left(const struct proc_job *j)
+{
+	if (!j->pid) return -1;
+	long long left = j->deadline - now_ms();
+	return left <= 0 ? 0 : left > INT_MAX ? INT_MAX : (int)left;
+}

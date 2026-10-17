@@ -25,4 +25,19 @@ int proc_run_for(char *const argv[], void (*cb)(char *line, void *ctx),
 /* Starts argv without waiting. Double-forks to avoid zombies. */
 void proc_spawn(char *const argv[]);
 
+/* One asynchronous child, woken by stdout or Linux pidfd completion.
+ * Call init before first use; start never waits for the command. */
+struct proc_job {
+	int pid, fd, done_fd, status;
+	long long deadline;
+	char output[64];
+	size_t length;
+	int overflow;
+};
+void proc_job_init(struct proc_job *j);
+int proc_job_start(struct proc_job *j, char *const argv[], int ceiling_ms);
+/* Returns 1 once collected, 0 while running. Never waits for a live child. */
+int proc_job_step(struct proc_job *j);
+void proc_job_cancel(struct proc_job *j);
+int proc_job_left(const struct proc_job *j);
 #endif

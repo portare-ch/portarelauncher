@@ -4,4 +4,6 @@ portarelauncher
 portscope
 tests/test_*
 !tests/test_*.c
+!tests/test_*.py
 __pycache__/
+ps-chd-id

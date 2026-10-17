@@ -1,6 +1,7 @@
 /* portarelauncher: KMS launcher for PortareOS. */
 #include "bt.h"
 #include "catalog.h"
+#include "disc_titles.h"
 #include "lists.h"
 #include "color.h"
 #include "input.h"
@@ -115,6 +116,11 @@ enum { QUICK_RECENT = 0, QUICK_FAVS = 1 };
 #define LISTS_DIR   "/storage/.config/portarelauncher"
 #define RECENT_FILE LISTS_DIR "/recent"
 #define FAVS_FILE   LISTS_DIR "/favourites"
+#define PS2_TITLES "/usr/share/portarelauncher/ps2-titles.tsv"
+#define PSX_TITLES "/usr/share/portarelauncher/psx-titles.tsv"
+#define PSP_TITLES "/usr/share/portarelauncher/psp-titles.tsv"
+#define DISC_CACHE  "/storage/.cache/portarelauncher/disc-identities"
+#define DISC_HELPER "/usr/bin/ps-chd-id"
 
 /* Selected titles pause, scroll one column per step, pause at the end, then reset. */
 #define MARQUEE_WAIT_MS 1000
@@ -131,6 +137,7 @@ struct ui {
 	struct kms kms;
 	struct input in;
 	struct catalog cat;
+	struct disc_titles discs;
 
 	const char *pal_name;
 	struct color_profile profiles[N_PROFILES];
@@ -423,6 +430,13 @@ static struct xrow *add_game_row(struct xlist *l, const struct ui *u,
 		str_copy(x->label, sizeof(x->label), x->game->name);
 	else
 		name_from_path(path, x->label, sizeof(x->label));
+	if (!x->game && disc_titles_eligible(x->sysname, path, 0)) {
+		struct game g = {0};
+		str_copy(g.path, sizeof(g.path), path);
+		str_copy(g.name, sizeof(g.name), x->label);
+		disc_titles_apply(&u->discs, x->sysname, &g);
+		str_copy(x->label, sizeof(x->label), g.name);
+	}
 	short_system(x->sysname, lang_get() == LANG_JA, x->right, sizeof(x->right));
 	l->ngames++;
 	return x;
@@ -1677,6 +1691,7 @@ static int reclaim_panel(struct ui *u, int patience_ms)
 static int hand_over(struct ui *u, char *const argv[], const char *cwd)
 {
 	int status = -1;
+	disc_titles_stop(&u->discs);
 
 	/* If master is already lost, the panel is available to the child. */
 	if (!u->panel_lost && kms_drop_master(&u->kms) < 0)
@@ -1818,6 +1833,7 @@ static void join(struct ui *u, const char *password)
  * selected system by name and retain the old catalog if loading fails. */
 static void refresh_catalog(struct ui *u)
 {
+	disc_titles_stop(&u->discs);
 	char keep[64] = "";
 	int on_tools = on_tools_row(u);
 	int quick = u->sys_sel < QUICK_ROWS ? u->sys_sel : -1;
@@ -1826,7 +1842,7 @@ static void refresh_catalog(struct ui *u)
 	if (sys_index(u) >= 0)
 		str_copy(keep, sizeof(keep), u->cat.sys[sys_index(u)].name);
 
-	if (catalog_load(&fresh, ES_SYSTEMS, SETTINGS) < 0)
+	if (catalog_load_titles(&fresh, ES_SYSTEMS, SETTINGS, &u->discs) < 0)
 		return;
 	catalog_free(&u->cat);
 	u->cat = fresh;
@@ -1851,6 +1867,7 @@ static void show_list(struct ui *u, enum screen which)
 	prune_lists(u);
 	u->list_sel = u->list_top = 0;
 	u->screen = which;
+	disc_titles_begin_catalog(&u->discs, &u->cat);
 }
 
 static void show_systems(struct ui *u)
@@ -1916,6 +1933,7 @@ static void on_action(struct ui *u, enum action a)
 			} else if (sys_index(u) >= 0) {
 				u->screen = SCR_GAMES;
 				u->game_sel = u->game_top = 0;
+				disc_titles_begin(&u->discs, &u->cat.sys[sys_index(u)]);
 			}
 		} else if (a == ACT_MENU) {
 			u->screen = SCR_SETTINGS;
@@ -2336,6 +2354,7 @@ static void wake_panel(struct ui *u)
  * Retry declined requests after a minute. */
 static void idle_sleep(struct ui *u)
 {
+	disc_titles_stop(&u->discs);
 	char *const argv[] = { (char *)POWER_HANDLER, (char *)"idle", NULL };
 	if (proc_run_for(argv, NULL, NULL, 10000) != 0) {
 		u->sleep_retry = now_ms() + IDLE_RETRY_MS;
@@ -2355,12 +2374,16 @@ int main(void)
 	signal(SIGUSR1, on_signal);
 	signal(SIGUSR2, on_signal);
 
-	if (catalog_load(&u.cat, ES_SYSTEMS, SETTINGS) < 0)
+	disc_titles_init(&u.discs, PS2_TITLES, PSX_TITLES, PSP_TITLES, DISC_CACHE, DISC_HELPER);
+	if (catalog_load_titles(&u.cat, ES_SYSTEMS, SETTINGS, &u.discs) < 0) {
+		disc_titles_free(&u.discs);
 		return 1;
+	}
 	recents_load(&u.recent, RECENT_FILE);
 	favs_load(&u.favs, FAVS_FILE);
 
 	if (kms_open(&u.kms, CARD) < 0) {
+		disc_titles_free(&u.discs);
 		catalog_free(&u.cat);
 		return 1;
 	}
@@ -2372,12 +2395,14 @@ int main(void)
 	if (term_init(&u.term, u.kms.map, u.kms.pitch_px,
 	              u.kms.mode.hdisplay, u.kms.mode.vdisplay, SCALE) < 0) {
 		fprintf(stderr, "term init failed\n");
+		disc_titles_free(&u.discs);
 		kms_close(&u.kms);
 		catalog_free(&u.cat);
 		return 1;
 	}
 
 	if (input_open(&u.in) < 0) {
+		disc_titles_free(&u.discs);
 		term_free(&u.term);
 		kms_close(&u.kms);
 		catalog_free(&u.cat);
@@ -2491,6 +2516,23 @@ int main(void)
 	redraw(&u);
 
 	while (u.running && !stop_requested) {
+		if (disc_titles_step(&u.discs)) {
+			for (int i = 0; i < u.cat.n; i++) {
+				struct psystem *s = &u.cat.sys[i];
+				if (!disc_titles_supported(s->name)) continue;
+				char keep[512] = "";
+				int visible = u.screen == SCR_GAMES && sys_index(&u) == i;
+				if (visible && u.game_sel < s->ngames)
+					str_copy(keep, sizeof(keep), s->games[u.game_sel].path);
+				for (int k = 0; k < s->ngames; k++)
+					if (!strcmp(s->games[k].path, u.discs.completed))
+						disc_titles_apply(&u.discs, s->name, &s->games[k]);
+				int selected = catalog_sort_games(s, keep);
+				if (visible) u.game_sel = selected;
+			}
+			marquee_reset(&u);
+			if (!u.blanked) redraw(&u);
+		}
 		/* Start with the minute boundary; pending work may shorten the wait. */
 		int idle = status_ms_to_next_minute();
 		if (u.panel_lost && idle > 1000)
@@ -2515,7 +2557,11 @@ int main(void)
 				idle = blank_left;
 		}
 
-		enum action a = input_wait(&u.in, idle);
+		int metadata_left = proc_job_left(&u.discs.job);
+		if (u.discs.queue && !u.discs.job.pid) metadata_left = 0;
+		if (metadata_left >= 0 && (idle < 0 || metadata_left < idle)) idle = metadata_left;
+		enum action a = input_wait_job(&u.in, idle, u.discs.job.fd, u.discs.job.done_fd);
+		if (a == ACT_METADATA) continue;
 		net_poll(&u);
 
 		if (blank_requested) {
@@ -2570,6 +2616,7 @@ int main(void)
 	}
 
 	notify_close(&u.notify);
+	disc_titles_free(&u.discs);
 	input_close(&u.in);
 	term_free(&u.term);
 	kms_close(&u.kms);

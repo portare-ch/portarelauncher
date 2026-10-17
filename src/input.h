@@ -19,6 +19,7 @@ enum action {
 	ACT_FAV,      /* the left face button: favourite on and off, in any list of games */
 	ACT_TICK,     /* the idle timeout expired; nothing was pressed */
 	ACT_AUX,      /* the auxiliary fd has something to read */
+	ACT_METADATA, /* metadata stdout or child completion; no user activity */
 	ACT_QUIT,     /* only bound to a keyboard escape hatch */
 };
 
@@ -69,5 +70,6 @@ int  input_quit_read(struct input *in, struct quit_combo *q);
  * Held-direction repeat may shorten it. ACT_TICK marks a timeout; ACT_NONE
  * marks an unbound event. */
 enum action input_wait(struct input *in, int idle_ms);
+enum action input_wait_job(struct input *in, int idle_ms, int output_fd, int done_fd);
 
 #endif

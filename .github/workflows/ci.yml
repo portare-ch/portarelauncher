@@ -18,7 +18,7 @@ jobs:
       - name: Install libdrm headers
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libdrm-dev
+          sudo apt-get install -y --no-install-recommends libdrm-dev cmake python3-yaml mame-tools
 
       - name: Build
         run: make CFLAGS="-O2 -g -Werror"
@@ -26,5 +26,11 @@ jobs:
       - name: Tests
         run: make test
 
+      - name: PlayStation helper and title generator fixtures
+        run: make test-chd
+
       - name: Tests under ASan and UBSan
         run: make test SAN=1
+
+      - name: PlayStation decoder under ASan and UBSan
+        run: make test-chd-san

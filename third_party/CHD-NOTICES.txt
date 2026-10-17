@@ -1,0 +1,367 @@
+PortareLauncher PS1/PS2/PSP CHD helper dependencies
+
+libchdr https://github.com/rtissera/libchdr
+Pinned revision 47d794151b2b64f6aba60304e6480f4f5a2bc24b (2026-10-11).
+The vendored upstream files are unmodified except for the added Zstandard
+LICENSE file referenced by its sources. Portare's wrapper is tools/ps-chd-id.c.
+Bundled codec versions: miniz 3.1.2, LZMA SDK 26.02, Zstandard 1.5.7;
+dr_flac is included at this libchdr revision. No codec was implemented here.
+
+libchdr (BSD 3-Clause)
+Copyright Romain Tisserand
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of the <organization> nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+MAME CHD implementation (BSD 3-Clause)
+/***************************************************************************
+
+    chd.c
+
+    MAME Compressed Hunks of Data file format
+
+****************************************************************************
+
+    Copyright Aaron Giles
+    All rights reserved.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+        * Redistributions of source code must retain the above copyright
+          notice, this list of conditions and the following disclaimer.
+        * Redistributions in binary form must reproduce the above copyright
+          notice, this list of conditions and the following disclaimer in
+          the documentation and/or other materials provided with the
+          distribution.
+        * Neither the name 'MAME' nor the names of its contributors may be
+          used to endorse or promote products derived from this software
+          without specific prior written permission.
+
+    THIS SOFTWARE IS PROVIDED BY AARON GILES ''AS IS'' AND ANY EXPRESS OR
+    IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+    WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+    DISCLAIMED. IN NO EVENT SHALL AARON GILES BE LIABLE FOR ANY DIRECT,
+    INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+    (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+    SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+    HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+    STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+    IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+    POSSIBILITY OF SUCH DAMAGE.
+
+***************************************************************************/
+
+
+Additional upstream copyright holders:
+codec_avhuff.h: /* license:BSD-3-Clause
+ * copyright-holders:Aaron Giles
+ *
+ * codec_avhuff.h
+ *
+ * AVHuff (audio/video) codec decompressor private data.
+ * Used by CHDv5 'avhu' codec for laserdisc CHDs.
+ */
+libchdr_bitstream.c: /* license:BSD-3-Clause
+ * copyright-holders:Aaron Giles
+***************************************************************************
+
+    bitstream.c
+
+    Helper classes for reading/writing at the bit level.
+
+***************************************************************************/
+libchdr_cdrom.c: /* license:BSD-3-Clause
+ * copyright-holders:Aaron Giles
+***************************************************************************
+
+    cdrom.c
+
+    Generic MAME CD-ROM utilities - build IDE and SCSI CD-ROMs on top of this
+
+****************************************************************************
+
+    IMPORTANT:
+    "physical" block addresses are the actual addresses on the emulated CD.
+    "chd" block addresses are the block addresses in the CHD file.
+    Because we pad each track to a 4-frame boundary, these addressing
+    schemes will differ after track 1!
+
+***************************************************************************/
+libchdr_codec_avhuff.c: /* license:BSD-3-Clause
+ * copyright-holders:Aaron Giles
+ *
+ * libchdr_codec_avhuff.c
+ *
+ * AVHuff decompressor for CHDv5 'avhu' hunks and CHDv3/v4 CHDCOMPRESSION_AV
+ * hunks. Decompression-only port of MAME's src/lib/util/avhuff.cpp with the
+ * encoder, C++ scaffolding, and emucore dependencies removed.
+ *
+ * Reuses libchdr's existing primitives:
+ *   - huffman decoder (src/libchdr_huffman.c)
+ *   - bitstream reader (src/libchdr_bitstream.c)
+ *   - FLAC via dr_flac wrapper (src/libchdr_flac.c)
+ */
+libchdr_flac.c: /* license:BSD-3-Clause
+ * copyright-holders:Aaron Giles
+***************************************************************************
+
+    flac.c
+
+    FLAC compression wrappers
+
+***************************************************************************/
+libchdr_huffman.c: /* license:BSD-3-Clause
+ * copyright-holders:Aaron Giles
+****************************************************************************
+
+    huffman.c
+
+    Static Huffman compression and decompression helpers.
+
+****************************************************************************
+
+    Maximum codelength is officially (alphabetsize - 1). This would be 255 bits
+    (since we use 1 byte values). However, it is also dependent upon the number
+    of samples used, as follows:
+
+         2 bits -> 3..4 samples
+         3 bits -> 5..7 samples
+         4 bits -> 8..12 samples
+         5 bits -> 13..20 samples
+         6 bits -> 21..33 samples
+         7 bits -> 34..54 samples
+         8 bits -> 55..88 samples
+         9 bits -> 89..143 samples
+        10 bits -> 144..232 samples
+        11 bits -> 233..376 samples
+        12 bits -> 377..609 samples
+        13 bits -> 610..986 samples
+        14 bits -> 987..1596 samples
+        15 bits -> 1597..2583 samples
+        16 bits -> 2584..4180 samples   -> note that a 4k data size guarantees codelength <= 16 bits
+        17 bits -> 4181..6764 samples
+        18 bits -> 6765..10945 samples
+        19 bits -> 10946..17710 samples
+        20 bits -> 17711..28656 samples
+        21 bits -> 28657..46367 samples
+        22 bits -> 46368..75024 samples
+        23 bits -> 75025..121392 samples
+        24 bits -> 121393..196417 samples
+        25 bits -> 196418..317810 samples
+        26 bits -> 317811..514228 samples
+        27 bits -> 514229..832039 samples
+        28 bits -> 832040..1346268 samples
+        29 bits -> 1346269..2178308 samples
+        30 bits -> 2178309..3524577 samples
+        31 bits -> 3524578..5702886 samples
+        32 bits -> 5702887..9227464 samples
+
+    Looking at it differently, here is where powers of 2 fall into these buckets:
+
+          256 samples -> 11 bits max
+          512 samples -> 12 bits max
+           1k samples -> 14 bits max
+           2k samples -> 15 bits max
+           4k samples -> 16 bits max
+           8k samples -> 18 bits max
+          16k samples -> 19 bits max
+          32k samples -> 21 bits max
+          64k samples -> 22 bits max
+         128k samples -> 24 bits max
+         256k samples -> 25 bits max
+         512k samples -> 27 bits max
+           1M samples -> 28 bits max
+           2M samples -> 29 bits max
+           4M samples -> 31 bits max
+           8M samples -> 32 bits max
+
+****************************************************************************
+
+    Delta-RLE encoding works as follows:
+
+    Starting value is assumed to be 0. All data is encoded as a delta
+    from the previous value, such that final[i] = final[i - 1] + delta.
+    Long runs of 0s are RLE-encoded as follows:
+
+        0x100 = repeat count of 8
+        0x101 = repeat count of 9
+        0x102 = repeat count of 10
+        0x103 = repeat count of 11
+        0x104 = repeat count of 12
+        0x105 = repeat count of 13
+        0x106 = repeat count of 14
+        0x107 = repeat count of 15
+        0x108 = repeat count of 16
+        0x109 = repeat count of 32
+        0x10a = repeat count of 64
+        0x10b = repeat count of 128
+        0x10c = repeat count of 256
+        0x10d = repeat count of 512
+        0x10e = repeat count of 1024
+        0x10f = repeat count of 2048
+
+    Note that repeat counts are reset at the end of a row, so if a 0 run
+    extends to the end of a row, a large repeat count may be used.
+
+    The reason for starting the run counts at 8 is that 0 is expected to
+    be the most common symbol, and is typically encoded in 1 or 2 bits.
+
+***************************************************************************/
+
+miniz (MIT and public-domain notices from miniz.c)
+/**************************************************************************
+ *
+ * Copyright 2013-2014 RAD Game Tools and Valve Software
+ * Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC
+ * All Rights Reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ *
+ **************************************************************************/
+/*
+  This is free and unencumbered software released into the public domain.
+
+  Anyone is free to copy, modify, publish, use, compile, sell, or
+  distribute this software, either in source code form or as a compiled
+  binary, for any purpose, commercial or non-commercial, and by any
+  means.
+
+  In jurisdictions that recognize copyright laws, the author or authors
+  of this software dedicate any and all copyright interest in the
+  software to the public domain. We make this dedication for the benefit
+  of the public at large and to the detriment of our heirs and
+  successors. We intend this dedication to be an overt act of
+  relinquishment in perpetuity of all present and future rights to this
+  software under copyright law.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+  IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+  OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  OTHER DEALINGS IN THE SOFTWARE.
+
+  For more information, please refer to <http://unlicense.org/>
+*/
+/**************************************************************************
+ *
+ * Copyright 2013-2014 RAD Game Tools and Valve Software
+ * Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC
+ * Copyright 2016 Martin Raiber
+ * All Rights Reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ *
+ **************************************************************************/
+
+LZMA SDK
+LZMA SDK is placed in the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute the original LZMA SDK code, either in source code form or as a compiled binary, for any purpose, commercial or non-commercial, and by any means.
+Zstandard (BSD license option)
+BSD License
+
+For Zstandard software
+
+Copyright (c) Meta Platforms, Inc. and affiliates. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+ * Neither the name Facebook, nor Meta, nor the names of its contributors may
+   be used to endorse or promote products derived from this software without
+   specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+dr_flac (MIT No Attribution option)
+ALTERNATIVE 2 - MIT No Attribution
+===============================================================================
+Copyright 2023 David Reid
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+

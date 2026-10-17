@@ -221,14 +221,29 @@ static enum action from_abs(unsigned code, int value)
 
 enum action input_wait(struct input *in, int idle_ms)
 {
-	struct pollfd pfd[INPUT_MAX_DEV + 2];
+	return input_wait_job(in, idle_ms, -1, -1);
+}
+
+enum action input_wait_job(struct input *in, int idle_ms, int output_fd, int done_fd)
+{
+	struct pollfd pfd[INPUT_MAX_DEV + 4];
 	int ndev = input_fill_poll(in, pfd);
 	int nfd = ndev;
+	int aux = -1, output = -1, done = -1;
 	if (in->aux_fd >= 0) {
+		aux = nfd;
 		pfd[nfd].fd = in->aux_fd;
 		pfd[nfd].events = POLLIN;
 		pfd[nfd].revents = 0;
 		nfd++;
+	}
+	if (output_fd >= 0) {
+		output = nfd;
+		pfd[nfd++] = (struct pollfd){.fd = output_fd, .events = POLLIN};
+	}
+	if (done_fd >= 0) {
+		done = nfd;
+		pfd[nfd++] = (struct pollfd){.fd = done_fd, .events = POLLIN};
 	}
 
 	/* Wait until the next refresh or direction repeat, whichever comes first. */
@@ -250,8 +265,10 @@ enum action input_wait(struct input *in, int idle_ms)
 		return ACT_TICK;
 	}
 
-	if (in->aux_fd >= 0 && (pfd[nfd - 1].revents & POLLIN))
+	if (aux >= 0 && (pfd[aux].revents & POLLIN))
 		return ACT_AUX;
+	if ((output >= 0 && pfd[output].revents) || (done >= 0 && pfd[done].revents))
+		return ACT_METADATA;
 
 	if (input_refresh(in, pfd, ndev))
 		return ACT_NONE;

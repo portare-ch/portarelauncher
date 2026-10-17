@@ -3,6 +3,7 @@
 #include "settings.h"
 #include "sheets.h"
 #include "text.h"
+#include "disc_titles.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -227,6 +228,21 @@ static int by_name(const void *a, const void *b)
 	return strcasecmp(ga->name, gb->name);
 }
 
+static int by_title(const void *a, const void *b)
+{
+	int c = by_name(a,b);
+	return c ? c : strcmp(((const struct game *)a)->path,((const struct game *)b)->path);
+}
+
+int catalog_sort_games(struct psystem *s, const char *selected_path)
+{
+	qsort(s->games, (size_t)s->ngames, sizeof(*s->games),
+	      disc_titles_supported(s->name) ? by_title : by_name);
+	for (int i = 0; selected_path && i < s->ngames; i++)
+		if (!strcmp(s->games[i].path, selected_path)) return i;
+	return 0;
+}
+
 static int by_fullname(const void *a, const void *b)
 {
 	return strcasecmp(((const struct psystem *)a)->fullname,
@@ -234,6 +250,12 @@ static int by_fullname(const void *a, const void *b)
 }
 
 int catalog_load(struct catalog *c, const char *es_systems, const char *settings)
+{
+	return catalog_load_titles(c, es_systems, settings, NULL);
+}
+
+int catalog_load_titles(struct catalog *c, const char *es_systems, const char *settings,
+                        const struct disc_titles *titles)
 {
 	memset(c, 0, sizeof(*c));
 
@@ -276,11 +298,14 @@ int catalog_load(struct catalog *c, const char *es_systems, const char *settings
 
 			scan(&cur, cur.path, 1);
 			hide_referenced(&cur);
+			if (titles)
+				for (int i = 0; i < cur.ngames; i++)
+					disc_titles_apply(titles, cur.name, &cur.games[i]);
 			if (cur.ngames == 0) {
 				free(cur.games);
 				continue;
 			}
-			qsort(cur.games, (size_t)cur.ngames, sizeof(*cur.games), by_name);
+			catalog_sort_games(&cur,NULL);
 
 			struct psystem *ns = realloc(c->sys, (size_t)(c->n + 1) * sizeof(*ns));
 			if (!ns) {

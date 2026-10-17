@@ -5,7 +5,7 @@
 #define PL_CATALOG_H
 
 struct game {
-	char name[192];   /* shown in the list, extension stripped */
+	char name[192];   /* display title; defaults to filename without extension */
 	char path[512];
 	int folder;       /* a folder that plays as a whole, "name/" */
 };
@@ -27,6 +27,12 @@ struct catalog {
 	struct psystem *sys;
 	int n;
 };
+
+struct disc_titles;
+int catalog_load_titles(struct catalog *c, const char *es_systems,
+                        const char *settings, const struct disc_titles *titles);
+/* Sort without changing the selected path. Equal titles remain separate rows. */
+int catalog_sort_games(struct psystem *s, const char *selected_path);
 
 /* Drops empty systems. An empty catalog succeeds; returns -1 only when
  * es_systems.cfg cannot be read. */
