@@ -3,7 +3,6 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <poll.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -31,8 +30,9 @@ static const drmModeModeInfo *pick_mode(const drmModeConnector *c)
 	/* The fastest mode of the preferred mode's size. The preferred one
 	 * is the panel's native 1280x960 at 119.88 Hz, and the others are a
 	 * fraction of a hertz apart for the emulators; variable refresh runs
-	 * on the fastest, 120.198 Hz, where two refreshes fit a 60 Hz frame.
-	 * Taking it here saves a second mode set when kms_vrr turns it on. */
+	 * on the fastest, 120.198 Hz, which sets the scan timing while the
+	 * blanking stretches to whatever rate the panel is at. Taking it
+	 * here saves a second mode set when kms_vrr turns it on. */
 	const drmModeModeInfo *pref = &c->modes[0], *best;
 	for (int i = 0; i < c->count_modes; i++)
 		if (c->modes[i].type & DRM_MODE_TYPE_PREFERRED)
@@ -204,9 +204,7 @@ int kms_present(struct kms *k)
 		return -1;
 	}
 	clear_other_planes(k);
-	/* A mode set ends any flip in flight, and whoever had the panel in
-	 * between may have cleared the property. */
-	k->flip_pending = 0;
+	/* Whoever had the panel in between may have cleared the property. */
 	if (k->vrr)
 		set_vrr(k, 1);
 	return 0;
@@ -218,7 +216,6 @@ int kms_blank(struct kms *k)
 		fprintf(stderr, "blank: %s\n", strerror(errno));
 		return -1;
 	}
-	k->flip_pending = 0;
 	return 0;
 }
 
@@ -226,33 +223,6 @@ int kms_vrr(struct kms *k, int on)
 {
 	k->vrr = on;
 	return set_vrr(k, on);
-}
-
-static void flip_done(int fd, unsigned seq, unsigned sec, unsigned usec, void *data)
-{
-	(void)fd; (void)seq; (void)sec; (void)usec;
-	((struct kms *)data)->flip_pending = 0;
-}
-
-int kms_flip(struct kms *k)
-{
-	if (k->flip_pending) {
-		struct pollfd p = { .fd = k->fd, .events = POLLIN };
-		if (poll(&p, 1, 0) > 0) {
-			drmEventContext ev = {
-				.version = DRM_EVENT_CONTEXT_VERSION,
-				.page_flip_handler = flip_done,
-			};
-			drmHandleEvent(k->fd, &ev);
-		}
-		if (k->flip_pending)
-			return 0;
-	}
-	if (drmModePageFlip(k->fd, k->crtc_id, k->fb_id,
-	                    DRM_MODE_PAGE_FLIP_EVENT, k) < 0)
-		return errno == EBUSY ? 0 : -1;
-	k->flip_pending = 1;
-	return 0;
 }
 
 int kms_drop_master(struct kms *k)

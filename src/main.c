@@ -29,7 +29,6 @@
 
 #include <errno.h>
 #include <poll.h>
-#include <time.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -150,19 +149,7 @@ enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI, SCR_BT,
               SCR_TZ, SCR_POWER, SCR_CONSOLES, SCR_RECENT, SCR_FAVS,
               SCR_DIAG, SCR_REGION };
 
-/* A flip of the buffer every 1/60 s under variable refresh. */
-#define FLIP_NS 16666667LL
-
-static long long now_ns(void)
-{
-	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return ts.tv_sec * 1000000000LL + ts.tv_nsec;
-}
-
 struct ui {
-	long long next_flip;   /* CLOCK_MONOTONIC ns, the next kms_flip */
-	int flip_failed;       /* said so once */
 	struct term term;
 	struct kms kms;
 	struct input in;
@@ -2578,9 +2565,10 @@ int main(void)
 		return 1;
 	}
 
-	/* Variable refresh, as for every game: the panel follows the frames,
-	 * and the loop below flips the buffer 60 times a second so there are
-	 * frames. Without it the panel runs the mode at its fixed rate. */
+	/* Variable refresh, as for every game. The menu sends no frames, so
+	 * the panel settles at the floor the kernel gives it; writes into the
+	 * buffer are picked up by whatever refresh comes next. Without it the
+	 * panel runs the mode at its fixed rate, which is fine too. */
 	if (kms_vrr(&u.kms, 1) < 0)
 		fprintf(stderr, "variable refresh is off\n");
 
@@ -2752,29 +2740,7 @@ int main(void)
 				idle = blank_left;
 		}
 
-		/* 60 flips a second of the one buffer keep the kernel showing
-		 * it twice a frame, the panel at 120 Hz; without them it would
-		 * fall to its floor. Not while dark or someone else's. A wake
-		 * for a flip alone is no tick for the rest. */
-		int flipping = u.kms.vrr && !u.blanked && !u.panel_lost;
-		long long work_at = idle < 0 ? -1 : now_ms() + idle;
-		if (flipping) {
-			long long left = (u.next_flip - now_ns() + 999999) / 1000000;
-			if (left < 0)
-				left = 0;
-			if (idle < 0 || left < idle)
-				idle = (int)left;
-		}
 		enum action a = input_wait(&u.in, idle);
-		if (flipping && now_ns() >= u.next_flip) {
-			if (kms_flip(&u.kms) < 0 && !u.flip_failed) {
-				fprintf(stderr, "flip: %s\n", strerror(errno));
-				u.flip_failed = 1;
-			}
-			u.next_flip += FLIP_NS;
-			if (u.next_flip < now_ns())
-				u.next_flip = now_ns() + FLIP_NS;
-		}
 		net_poll(&u);
 
 		if (blank_requested) {
@@ -2788,8 +2754,6 @@ int main(void)
 			}
 			continue;
 		}
-		if (a == ACT_TICK && work_at >= 0 && now_ms() < work_at)
-			continue;
 
 		/* A press while dark is the press that brings the panel back
 		 * and nothing else: waking is not a menu action, and coming
