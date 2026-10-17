@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Pinned Libretro/Redump PS1 DAT -> sorted serial<TAB>title, offline at build time."""
+"""Pinned Libretro/Redump PS1 DAT -> sorted serial<TAB>title, regenerated offline."""
 import argparse
 import hashlib
 import json
+import lzma
 from pathlib import Path
 import re
 
@@ -74,6 +75,8 @@ def main():
     p.add_argument('source',type=Path); p.add_argument('output',type=Path)
     p.add_argument('--collisions',type=Path,required=True)
     args=p.parse_args(); source=args.source.read_bytes()
+    if args.source.suffix == '.xz':
+        source=lzma.decompress(source)
     if hashlib.sha256(source).hexdigest() != SOURCE_SHA256:
         raise SystemExit('PS1 DAT checksum differs from pinned source; update provenance explicitly')
     table,collisions=export(source)

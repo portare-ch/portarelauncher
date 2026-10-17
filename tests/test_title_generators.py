@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import json
+import lzma
 spec=importlib.util.spec_from_file_location('generator',Path(__file__).resolve().parents[1]/'tools/gen_ps2_titles.py')
 g=importlib.util.module_from_spec(spec); spec.loader.exec_module(g)
 class GeneratorTests(unittest.TestCase):
@@ -45,21 +46,29 @@ class PS1GeneratorTests(unittest.TestCase):
         for source in ('game ( name "A"', 'game ( name "A" name "B" )', 'game ( name "A" ) )'):
             with self.assertRaises(ValueError): psx.export(source)
 
-class PSPGeneratorTests(unittest.TestCase):
-    def test_pinned_export(self):
+class PinnedGeneratorTests(unittest.TestCase):
+    def test_pinned_exports(self):
         root=Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory() as directory:
-            out=Path(directory)/'psp.tsv'; collisions=Path(directory)/'collisions.json'
-            subprocess.run([sys.executable,str(root/'tools/gen_psp_titles.py'),
-                str(root/'third_party/libretro/PlayStationPortable.dat'),str(out),
-                '--collisions',str(collisions)],check=True,capture_output=True)
-            self.assertEqual(out.read_bytes(),(root/'data/psp-titles.tsv').read_bytes())
-            self.assertEqual(json.loads(collisions.read_text()),json.loads((root/'data/psp-title-collisions.json').read_text()))
-            self.assertIn(b'UCUS-98646\tKillzone - Liberation (USA)',out.read_bytes())
-            # Source substitutions must be explicit, including attribution/hash updates.
-            source=Path(directory)/'changed.dat'; source.write_text('game ( name "Changed" )')
-            result=subprocess.run([sys.executable,str(root/'tools/gen_psp_titles.py'),str(source),
-                str(out),'--collisions',str(collisions)],capture_output=True)
-            self.assertNotEqual(result.returncode,0)
-            self.assertIn(b'checksum differs',result.stderr)
+            for system,source_path in (
+                ('ps2','pcsx2/GameIndex.yaml.xz'),
+                ('psx','libretro/PlayStation.dat.xz'),
+                ('psp','libretro/PlayStationPortable.dat.xz'),
+            ):
+                with self.subTest(system=system):
+                    out=Path(directory)/f'{system}.tsv'; collisions=Path(directory)/'collisions.json'
+                    command=[sys.executable,str(root/f'tools/gen_{system}_titles.py')]
+                    extra=['--collisions',str(collisions)] if system != 'ps2' else []
+                    subprocess.run(command+[str(root/'third_party'/source_path),str(out)]+extra,
+                                   check=True,capture_output=True)
+                    self.assertEqual(out.read_bytes(),(root/f'data/{system}-titles.tsv').read_bytes())
+                    if extra:
+                        self.assertEqual(json.loads(collisions.read_text()),
+                                         json.loads((root/f'data/{system}-title-collisions.json').read_text()))
+                    # Check the decompressed source hash, rather than accepting
+                    # a substituted catalogue inside a valid XZ container.
+                    source=Path(directory)/'changed.xz'; source.write_bytes(lzma.compress(b'changed'))
+                    result=subprocess.run(command+[str(source),str(out)]+extra,capture_output=True)
+                    self.assertNotEqual(result.returncode,0)
+                    self.assertIn(b'checksum differs',result.stderr)
 if __name__=='__main__': unittest.main()

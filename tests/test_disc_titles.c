@@ -217,7 +217,36 @@ static void language_labels(void)
 	CHECK(!disc_titles_lookup(&m,"psx","UCUS-00001"));
 	disc_titles_free(&m); fixture_cleanup(root);
 }
+static void table_validation(void)
+{
+	char root[32]; strcpy(root,fixture_dir()); char table[128];
+	snprintf(table,sizeof(table),"%s/titles",root);
+	const char *bad[] = {"", "SLUS-20946\tTitle", "SLUS-20946\tTitle\ntrailing",
+		"SLUS-20946\tTitle\n\n", "SLUS-20946\tTitle\nSLUS-20946\tDuplicate\n"};
+	struct disc_titles m;
+	for (unsigned i = 0; i < sizeof(bad)/sizeof(*bad); i++) {
+		fixture_write(table,bad[i]);
+		disc_titles_init(&m,table,NULL,NULL,"/nonexistent/cache","/nonexistent/helper");
+		CHECK_INT(m.ps2.ntitles,0);
+		disc_titles_free(&m);
+	}
+	FILE *f = fopen(table,"w"); CHECK(f != NULL);
+	if (f) {
+		for (unsigned i = 0; i < 32768; i++) fprintf(f,"AAAA-%05u\tTitle %u\n",i,i);
+		fclose(f);
+		disc_titles_init(&m,table,NULL,NULL,"/nonexistent/cache","/nonexistent/helper");
+		CHECK_INT(m.ps2.ntitles,32768);
+		CHECK_STR(disc_titles_lookup(&m,"ps2","AAAA-32767"),"Title 32767");
+		disc_titles_free(&m);
+		f = fopen(table,"a"); CHECK(f != NULL);
+		if (f) { fputs("AAAA-32768\tOver limit\n",f); fclose(f); }
+		disc_titles_init(&m,table,NULL,NULL,"/nonexistent/cache","/nonexistent/helper");
+		CHECK_INT(m.ps2.ntitles,0);
+		disc_titles_free(&m);
+	}
+	fixture_cleanup(root);
+}
 int main(void)
 {
-	serials(); truncation(); cache(); jobs(); supported_systems(); language_labels(); return check_report("disc titles");
+	serials(); truncation(); cache(); jobs(); supported_systems(); language_labels(); table_validation(); return check_report("disc titles");
 }

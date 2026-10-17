@@ -13,8 +13,8 @@ Written in C, it draws directly to the display through KMS using libc and libdrm
 
 ## Build
 
-On Linux, install a C compiler, make, CMake, pkg-config, the libdrm development
-headers and Python 3 with PyYAML, then run:
+On Linux, install a C compiler, make, CMake, pkg-config and the libdrm development
+headers, then run:
 
 ```sh
 make
@@ -52,6 +52,10 @@ make test SAN=1  # AddressSanitizer and UBSan
 make test-chd    # PS1/PS2/PSP helper; compressed fixtures also use chdman if installed
 make test-chd-san
 ```
+
+CHD tests and title-table regeneration require Python 3 with PyYAML.
+Normal builds use the checked-in title tables. `make regen-disc-title-tables`
+recreates them offline from the compressed upstream catalogues.
 
 CI builds and runs both test modes on arm64. Version tags (`v*`) publish a
 source archive and SHA-256 checksum through the release workflow.

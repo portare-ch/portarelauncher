@@ -9,7 +9,7 @@ DRM_LIBS   := $(shell $(PKG_CONFIG) --libs libdrm 2>/dev/null)
 
 # Require libdrm for device builds; host tests and mockups do not need it.
 GOALS := $(or $(MAKECMDGOALS),all)
-ifneq ($(filter-out clean font mockup test test-chd test-chd-san install-disc-titles ps-chd-id disc-title-tables tests/%,$(GOALS)),)
+ifneq ($(filter-out clean font mockup test test-chd test-chd-san install-disc-titles ps-chd-id disc-title-tables regen-disc-title-tables tests/%,$(GOALS)),)
 ifeq ($(strip $(DRM_LIBS)),)
 $(error libdrm not found by '$(PKG_CONFIG)'. Point PKG_CONFIG at the one for \
 the target, or install the libdrm development headers. The device ships \
@@ -134,25 +134,24 @@ CMAKE ?= cmake
 PS_BUILD ?= build/ps-helper
 PS_CMAKE_ARGS ?=
 ps-chd-id: src/ps_sfo.c src/ps_sfo.h tools/ps-chd-id.c src/ps_iso.c src/ps_iso.h src/ps_serial.c src/ps_serial.h tools/ps-helper/CMakeLists.txt
-	$(CMAKE) -S tools/ps-helper -B $(PS_BUILD) -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER="$(CC)" $(PS_CMAKE_ARGS)
+	$(CMAKE) -S tools/ps-helper -B $(PS_BUILD) -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_C_COMPILER="$(CC)" $(PS_CMAKE_ARGS)
 	+$(CMAKE) --build $(PS_BUILD) --target ps-chd-id
 	cp $(PS_BUILD)/ps-chd-id $@
 
 disc-title-tables: data/ps2-titles.tsv data/psx-titles.tsv data/psp-titles.tsv
-data/ps2-titles.tsv: third_party/pcsx2/GameIndex.yaml tools/gen_ps2_titles.py
-	python3 tools/gen_ps2_titles.py $< $@
 
-data/psx-titles.tsv: third_party/libretro/PlayStation.dat tools/gen_psx_titles.py
-	python3 tools/gen_psx_titles.py $< $@ --collisions data/psx-title-collisions.json
-
-data/psp-titles.tsv: third_party/libretro/PlayStationPortable.dat tools/gen_psp_titles.py tools/gen_psx_titles.py
-	python3 tools/gen_psp_titles.py $< $@ --collisions data/psp-title-collisions.json
+# Normal builds use the checked-in tables. Only explicit regeneration needs
+# Python/PyYAML and the losslessly compressed upstream catalogues.
+regen-disc-title-tables:
+	python3 tools/gen_ps2_titles.py third_party/pcsx2/GameIndex.yaml.xz data/ps2-titles.tsv
+	python3 tools/gen_psx_titles.py third_party/libretro/PlayStation.dat.xz data/psx-titles.tsv --collisions data/psx-title-collisions.json
+	python3 tools/gen_psp_titles.py third_party/libretro/PlayStationPortable.dat.xz data/psp-titles.tsv --collisions data/psp-title-collisions.json
 
 test-chd: ps-chd-id disc-title-tables
 	python3 tests/test_ps_chd.py ./ps-chd-id
 	python3 tests/test_title_generators.py
 
-.PHONY: disc-title-tables test-chd
+.PHONY: disc-title-tables regen-disc-title-tables test-chd
 
 # ASan needs its large virtual address mapping; production memory bounds stay on.
 test-chd-san: disc-title-tables

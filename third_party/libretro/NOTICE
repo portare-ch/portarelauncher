@@ -12,8 +12,12 @@ PSP source: Libretro database, Redump Sony - PlayStation Portable DAT
 https://github.com/libretro/libretro-database/blob/12c21cf79f1e20eff6ac68b80875816c717d0a7a/metadat/redump/Sony%20-%20PlayStation%20Portable.dat
 PSP uses the same revision, retrieval date, credits and license.
 
-The original DATs are retained unmodified as PlayStation.dat and
-PlayStationPortable.dat.
+The original DATs are retained unmodified inside PlayStation.dat.xz and
+PlayStationPortable.dat.xz (lossless XZ compression). Decompressed SHA-256:
+PS1: 52978215854d307bfb5353052c9ce3c34995310a970d586f0100bb67f7de01a8
+PSP: 9e7ad38dd1c53720b27914ca4379a3bd6eddfd5519370b592e8131c886ede313
+Normal builds use the checked-in tables; make regen-disc-title-tables
+regenerates them offline and verifies the original source checksums.
 PortareLauncher generated the derivative serial/title table on 2026-10-17,
 using game name and rom.serial only. Parenthesized Rev/version labels are
 removed. Multiple records with the same resulting title are collapsed. Serials
