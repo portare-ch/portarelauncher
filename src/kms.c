@@ -3,12 +3,15 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <drm_fourcc.h>
 #include <drm_mode.h>
+
+static int set_vrr(struct kms *k, int on);
 
 static drmModeConnector *pick_connector(int fd, drmModeRes *res)
 {
@@ -25,14 +28,22 @@ static drmModeConnector *pick_connector(int fd, drmModeRes *res)
 
 static const drmModeModeInfo *pick_mode(const drmModeConnector *c)
 {
-	/* The preferred mode is the panel's native one. On this device that is
-	 * 1280x960 at 119.88011988, and the second mode exists only so
-	 * SwanStation can ask for exactly twice its frame rate - which is not
-	 * this program's business. */
+	/* The fastest mode of the preferred mode's size. The preferred one
+	 * is the panel's native 1280x960 at 119.88 Hz, and the others are a
+	 * fraction of a hertz apart for the emulators; variable refresh runs
+	 * on the fastest, 120.198 Hz, where two refreshes fit a 60 Hz frame.
+	 * Taking it here saves a second mode set when kms_vrr turns it on. */
+	const drmModeModeInfo *pref = &c->modes[0], *best;
 	for (int i = 0; i < c->count_modes; i++)
 		if (c->modes[i].type & DRM_MODE_TYPE_PREFERRED)
-			return &c->modes[i];
-	return &c->modes[0];
+			pref = &c->modes[i];
+	best = pref;
+	for (int i = 0; i < c->count_modes; i++)
+		if (c->modes[i].hdisplay == pref->hdisplay &&
+		    c->modes[i].vdisplay == pref->vdisplay &&
+		    c->modes[i].clock > best->clock)
+			best = &c->modes[i];
+	return best;
 }
 
 static uint32_t pick_crtc(int fd, drmModeRes *res, drmModeConnector *conn)
@@ -193,6 +204,11 @@ int kms_present(struct kms *k)
 		return -1;
 	}
 	clear_other_planes(k);
+	/* A mode set ends any flip in flight, and whoever had the panel in
+	 * between may have cleared the property. */
+	k->flip_pending = 0;
+	if (k->vrr)
+		set_vrr(k, 1);
 	return 0;
 }
 
@@ -202,6 +218,40 @@ int kms_blank(struct kms *k)
 		fprintf(stderr, "blank: %s\n", strerror(errno));
 		return -1;
 	}
+	k->flip_pending = 0;
+	return 0;
+}
+
+int kms_vrr(struct kms *k, int on)
+{
+	k->vrr = on;
+	return set_vrr(k, on);
+}
+
+static void flip_done(int fd, unsigned seq, unsigned sec, unsigned usec, void *data)
+{
+	(void)fd; (void)seq; (void)sec; (void)usec;
+	((struct kms *)data)->flip_pending = 0;
+}
+
+int kms_flip(struct kms *k)
+{
+	if (k->flip_pending) {
+		struct pollfd p = { .fd = k->fd, .events = POLLIN };
+		if (poll(&p, 1, 0) > 0) {
+			drmEventContext ev = {
+				.version = DRM_EVENT_CONTEXT_VERSION,
+				.page_flip_handler = flip_done,
+			};
+			drmHandleEvent(k->fd, &ev);
+		}
+		if (k->flip_pending)
+			return 0;
+	}
+	if (drmModePageFlip(k->fd, k->crtc_id, k->fb_id,
+	                    DRM_MODE_PAGE_FLIP_EVENT, k) < 0)
+		return errno == EBUSY ? 0 : -1;
+	k->flip_pending = 1;
 	return 0;
 }
 
@@ -225,6 +275,8 @@ void kms_close(struct kms *k)
 	if (k->fd < 0)
 		return;
 
+	if (k->vrr)
+		set_vrr(k, 0);
 	if (k->saved) {
 		drmModeSetCrtc(k->fd, k->saved->crtc_id, k->saved->buffer_id,
 		               k->saved->x, k->saved->y, &k->conn_id, 1,
@@ -263,6 +315,21 @@ static uint32_t crtc_prop(struct kms *k, const char *name)
 	}
 	drmModeFreeObjectProperties(props);
 	return id;
+}
+
+static int set_vrr(struct kms *k, int on)
+{
+	uint32_t prop = crtc_prop(k, "VRR_ENABLED");
+	if (!prop) {
+		fprintf(stderr, "kms: the crtc has no VRR_ENABLED property\n");
+		return -1;
+	}
+	if (drmModeObjectSetProperty(k->fd, k->crtc_id, DRM_MODE_OBJECT_CRTC,
+	                             prop, on ? 1 : 0) < 0) {
+		fprintf(stderr, "kms: VRR_ENABLED: %s\n", strerror(errno));
+		return -1;
+	}
+	return 0;
 }
 
 static int set_blob(struct kms *k, const char *name, const void *data, size_t len)
