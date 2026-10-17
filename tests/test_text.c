@@ -41,8 +41,7 @@ static void test_strip_ansi(void)
 	strip_ansi(s);
 	CHECK_STR(s, "ab");
 
-	/* Cut off mid-sequence: nothing past the escape survives, and
-	 * nothing reads past the end. */
+	/* A truncated escape discards the tail without reading past the string. */
 	strcpy(s, "name\033[1;3");
 	strip_ansi(s);
 	CHECK_STR(s, "name");

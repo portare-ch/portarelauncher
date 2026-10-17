@@ -11,8 +11,7 @@
 
 #include "text.h"
 
-/* mkdir -p for the file's directory, so the first save does not need a
- * package to have made it. */
+/* Create parent directories on the first save. */
 static void make_parents(const char *file)
 {
 	char tmp[512];
@@ -30,8 +29,7 @@ static void make_parents(const char *file)
 	mkdir(path, 0755);
 }
 
-/* Written to a sibling and renamed over the old file, so a power cut mid
- * write leaves the previous list rather than half of one. */
+/* Write and rename a sibling file to preserve the old list if interrupted. */
 static FILE *open_replacement(const char *file, char *tmp, size_t tsz)
 {
 	make_parents(file);
@@ -98,8 +96,7 @@ int recents_save(const struct recents *r, const char *file)
 void recents_add(struct recents *r, const char *sys, const char *path,
                  long long when)
 {
-	/* Out with the older entry for the same game first, so the list is
-	 * ten games and not ten launches. */
+	/* Deduplicate by game so repeated launches do not consume extra slots. */
 	for (int i = 0; i < r->n; i++) {
 		if (strcmp(r->e[i].path, path) == 0) {
 			memmove(&r->e[i], &r->e[i + 1],
@@ -217,8 +214,7 @@ int favs_prune(struct favs *f, int (*exists)(const char *path))
 
 /* ---- headings and names ------------------------------------------------ */
 
-/* Midnight of the local day `t` falls on, so two launches are on the same
- * day when their midnights agree, whatever the hour. */
+/* Local midnight for comparing calendar days. */
 static long long midnight(long long t)
 {
 	time_t tt = (time_t)t;

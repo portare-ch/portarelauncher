@@ -1,12 +1,6 @@
-/* The launcher in English or Japanese (docs/japanese.md).
- *
- * The language is system.language in system.cfg, en_US or ja_JP; anything
- * else reads as English. Every string the launcher owns is in one table,
- * both languages side by side, with the most columns it may take where it
- * is drawn; tests/test_lang.c holds every entry to that. Titles, network
- * and device names, time zone IDs, versions and addresses come from
- * outside and are drawn as they are.
- */
+/* English and Japanese UI strings (docs/japanese.md). system.language
+ * selects en_US or ja_JP, defaulting to English. Each table entry has a
+ * column limit checked by tests/test_lang.c; external names are displayed as given. */
 #ifndef PL_LANG_H
 #define PL_LANG_H
 
@@ -80,15 +74,13 @@ enum str {
 	N_STR
 };
 
-/* The string in the language in use. */
 const char *tr(enum str s);
-/* For the tests: in a given language, and the columns it may take. A
- * format is measured with %c as one column, %d as three, %s as none. */
+/* Translation and column limit for tests. Formats count %c as one column,
+ * %d as three and %s as zero. */
 const char *tr_in(enum lang l, enum str s);
 int tr_max(enum str s);
 
-/* A system as the language in use calls it: the name it was sold under in
- * Japan, or es_systems.cfg's full name. */
+/* Localized console name, falling back to es_systems.cfg's full name. */
 const char *lang_system(const char *name, const char *fullname);
 /* A value that comes from elsewhere as an English word. */
 const char *lang_palette(const char *name);

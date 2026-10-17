@@ -16,14 +16,8 @@
 
 /* ---- Wi-Fi ---------------------------------------------------------- */
 
-/* portnet prints one tab-separated line per network:
- *
- *   SSID \t known \t connected \t signal \t type
- *
- * which is both of the nmcli passes this used to make. "known" is iwd
- * having a passphrase for it, which is what "saved" meant here. A network
- * iwd knows but cannot see has no entry in the scan, so its signal comes
- * back -1, the same as a saved profile out of range did before. */
+/* portnet output: SSID \t known \t connected \t signal \t type.
+ * Known networks outside scan range report signal -1. */
 static void cb_net(char *line, void *ctx)
 {
 	struct net_list *l = ctx;
@@ -43,8 +37,7 @@ static void cb_net(char *line, void *ctx)
 	e->saved  = atoi(f[1]);
 	e->active = atoi(f[2]);
 	e->signal = atoi(f[3]);
-	/* iwd names the security by key type - psk, open, 8021x, wep - where
-	 * NetworkManager named the protocol. net_min_password reads both. */
+	/* portnet reports iwd key types rather than WPA protocol names. */
 	str_copy(e->security, sizeof(e->security), strcmp(f[4], "open") ? f[4] : "");
 }
 
@@ -60,8 +53,7 @@ void net_scan(struct net_list *l, int rescan)
 {
 	memset(l, 0, sizeof(*l));
 
-	/* One call. portnet waits for the scan to finish when asked to
-	 * rescan, so there is nothing to sleep on here. */
+	/* portnet waits for a requested rescan to finish. */
 	char *const scan[]  = { (char *)PORTNET, (char *)"list", (char *)"--rescan", NULL };
 	char *const cache[] = { (char *)PORTNET, (char *)"list", NULL };
 	proc_run_for(rescan ? scan : cache, cb_net, l, 20000);
@@ -86,11 +78,8 @@ int net_wifi_enabled(void)
 
 void net_wifi_set(int on)
 {
-	/* Both switches, and in this order. The boot turns Wi-Fi off with
-	 * wifictl, which is an rfkill block, and powering the adapter does
-	 * not lift that - so "on" through the adapter alone left the radio
-	 * blocked. That was true of NetworkManager's switch and is true of
-	 * iwd's: rfkill sits underneath both. */
+	/* Lift the boot-time rfkill block before powering the iwd adapter;
+	 * adapter power alone cannot unblock the radio. */
 	char *const rf[] = { (char *)WIFICTL, (char *)(on ? "enable" : "disable"),
 	                     NULL };
 	char *const radio[] = { (char *)PORTNET, (char *)"radio",
@@ -135,21 +124,9 @@ int net_connect(const char *name)
 
 int net_join(const char *ssid, const char *password)
 {
-	/* The password goes on portnet's command line, where anything running
-	 * as root can read it for the second or two the join takes. That is
-	 * accepted rather than engineered around: iwd stores the same
-	 * passphrase in plain text under /var/lib/iwd the moment this
-	 * succeeds, and everything on this device runs as root. What would
-	 * not be acceptable is a long-lived process holding it there, which
-	 * is the problem with the file server in portareos#239.
-	 *
-	 * Nothing has to be undone when this fails. iwd is told the
-	 * passphrase through an agent and only writes it once the association
-	 * succeeds, so a wrong one leaves no saved network behind - which is
-	 * what the NetworkManager path needed an explicit delete for.
-	 *
-	 * portnet's exit codes are this function's: 0, 4 for a refused
-	 * passphrase, 10 for a network that is no longer there. */
+	/* The password is briefly visible in portnet's argv to root processes;
+	 * iwd also stores it in plaintext after association succeeds. Failed joins
+	 * leave no saved network. Return portnet's status (4 rejected, 10 gone). */
 	char *const argv_pw[] = { (char *)PORTNET, (char *)"join", (char *)ssid,
 	                          (char *)password, NULL };
 	char *const argv_open[] = { (char *)PORTNET, (char *)"connect",
@@ -162,14 +139,10 @@ int net_min_password(const char *security)
 {
 	if (!security || !security[0])
 		return 0;
-	/* iwd names these by key type rather than by protocol. 8021x wants a
-	 * username as well, which this cannot ask for. */
+	/* 802.1X also requires a username, which this UI cannot request. */
 	if (!strcmp(security, "8021x"))
 		return -1;
-	/* psk covers WPA and WPA2 personal, an 8 to 63 character passphrase,
-	 * and WPA3 as well - SAE has no floor in the standard. WEP keys are 5
-	 * or 13 characters. iwd refuses what is wrong for either, so 1 is
-	 * enough here to stop an empty submit. */
+	/* Require eight characters for PSK; leave other key validation to iwd. */
 	if (!strcmp(security, "psk"))
 		return 8;
 	return 1;
@@ -181,9 +154,7 @@ int net_disconnect(void)
 	return proc_run(argv, NULL, NULL);
 }
 
-/* Wi-Fi first, then whatever else is up: a docked device with Ethernet and
- * Wi-Fi shows the one a person would type. Loopback and the USB gadget's
- * link-local subnet are not addresses anyone reaches the device on. */
+/* Prefer Wi-Fi over other active interfaces; exclude loopback and link-local. */
 static int addr_rank(const char *ifname, const struct sockaddr_in *sa)
 {
 	unsigned a = ntohl(sa->sin_addr.s_addr);
@@ -217,9 +188,7 @@ int net_address_pick(const struct ifaddrs *list, char *out, size_t osz)
 
 void net_address(char *out, size_t osz)
 {
-	/* The kernel's own list, not nmcli: this is asked every few seconds
-	 * while the launcher waits for the network to come up, and a process
-	 * per ask would be felt. */
+	/* Frequent startup polling uses getifaddrs to avoid spawning a process. */
 	struct ifaddrs *list = NULL;
 	if (getifaddrs(&list) < 0) {
 		out[0] = '\0';

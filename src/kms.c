@@ -10,6 +10,8 @@
 #include <drm_fourcc.h>
 #include <drm_mode.h>
 
+static int set_vrr(struct kms *k, int on);
+
 static drmModeConnector *pick_connector(int fd, drmModeRes *res)
 {
 	for (int i = 0; i < res->count_connectors; i++) {
@@ -25,14 +27,19 @@ static drmModeConnector *pick_connector(int fd, drmModeRes *res)
 
 static const drmModeModeInfo *pick_mode(const drmModeConnector *c)
 {
-	/* The preferred mode is the panel's native one. On this device that is
-	 * 1280x960 at 119.88011988, and the second mode exists only so
-	 * SwanStation can ask for exactly twice its frame rate - which is not
-	 * this program's business. */
+	/* Use the fastest mode at the preferred resolution for VRR scan timing,
+	 * avoiding a second modeset when VRR is enabled. */
+	const drmModeModeInfo *pref = &c->modes[0], *best;
 	for (int i = 0; i < c->count_modes; i++)
 		if (c->modes[i].type & DRM_MODE_TYPE_PREFERRED)
-			return &c->modes[i];
-	return &c->modes[0];
+			pref = &c->modes[i];
+	best = pref;
+	for (int i = 0; i < c->count_modes; i++)
+		if (c->modes[i].hdisplay == pref->hdisplay &&
+		    c->modes[i].vdisplay == pref->vdisplay &&
+		    c->modes[i].clock > best->clock)
+			best = &c->modes[i];
+	return best;
 }
 
 static uint32_t pick_crtc(int fd, drmModeRes *res, drmModeConnector *conn)
@@ -71,8 +78,7 @@ int kms_open(struct kms *k, const char *card)
 		fprintf(stderr, "open %s: %s\n", card, strerror(errno));
 		return -1;
 	}
-	/* Every plane, cursor included, so kms_present can find and clear the
-	 * ones another program left behind. */
+	/* Expose all planes, including cursors, for cleanup in kms_present. */
 	drmSetClientCap(k->fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
 
 	drmModeRes *res = drmModeGetResources(k->fd);
@@ -157,15 +163,8 @@ fail_fd:
 	return -1;
 }
 
-/* Switches off every plane on our CRTC that is not showing our buffer.
- *
- * A program that set a cursor through the legacy cursor call leaves it on
- * the CRTC after it exits: the kernel made that framebuffer itself, so it is
- * not among the program's own and is not removed with them. gmu - SDL - left
- * a 512x512 arrow in the top-left corner that then showed over SwanStation,
- * ARMSX2 and the launcher alike, since none of them touches the cursor
- * plane. The launcher is the one thing that runs between every program, so
- * it clears the slate each time it takes the panel back. */
+/* Disable other planes on our CRTC. Legacy cursor framebuffers can survive
+ * a client's exit and otherwise remain visible over later programs. */
 static void clear_other_planes(struct kms *k)
 {
 	drmModeSetCursor(k->fd, k->crtc_id, 0, 0, 0);
@@ -193,6 +192,9 @@ int kms_present(struct kms *k)
 		return -1;
 	}
 	clear_other_planes(k);
+	/* Whoever had the panel in between may have cleared the property. */
+	if (k->vrr)
+		set_vrr(k, 1);
 	return 0;
 }
 
@@ -203,6 +205,12 @@ int kms_blank(struct kms *k)
 		return -1;
 	}
 	return 0;
+}
+
+int kms_vrr(struct kms *k, int on)
+{
+	k->vrr = on;
+	return set_vrr(k, on);
 }
 
 int kms_drop_master(struct kms *k)
@@ -225,6 +233,8 @@ void kms_close(struct kms *k)
 	if (k->fd < 0)
 		return;
 
+	if (k->vrr)
+		set_vrr(k, 0);
 	if (k->saved) {
 		drmModeSetCrtc(k->fd, k->saved->crtc_id, k->saved->buffer_id,
 		               k->saved->x, k->saved->y, &k->conn_id, 1,
@@ -244,8 +254,7 @@ void kms_close(struct kms *k)
 	k->fd = -1;
 }
 
-/* Property IDs are per object and per driver, so they are looked up by name
- * every time rather than remembered. */
+/* Look up properties by name; IDs vary by object and driver. */
 static uint32_t crtc_prop(struct kms *k, const char *name)
 {
 	uint32_t id = 0;
@@ -265,6 +274,21 @@ static uint32_t crtc_prop(struct kms *k, const char *name)
 	return id;
 }
 
+static int set_vrr(struct kms *k, int on)
+{
+	uint32_t prop = crtc_prop(k, "VRR_ENABLED");
+	if (!prop) {
+		fprintf(stderr, "kms: the crtc has no VRR_ENABLED property\n");
+		return -1;
+	}
+	if (drmModeObjectSetProperty(k->fd, k->crtc_id, DRM_MODE_OBJECT_CRTC,
+	                             prop, on ? 1 : 0) < 0) {
+		fprintf(stderr, "kms: VRR_ENABLED: %s\n", strerror(errno));
+		return -1;
+	}
+	return 0;
+}
+
 static int set_blob(struct kms *k, const char *name, const void *data, size_t len)
 {
 	uint32_t prop = crtc_prop(k, name);
@@ -281,8 +305,7 @@ static int set_blob(struct kms *k, const char *name, const void *data, size_t le
 	                                   prop, blob);
 	if (ret < 0)
 		fprintf(stderr, "kms: set %s: %s\n", name, strerror(errno));
-	/* The kernel holds its own reference while the property points at
-	 * it; ours can go straight away. */
+	/* The kernel retains its reference while the property uses this blob. */
 	if (blob)
 		drmModeDestroyPropertyBlob(k->fd, blob);
 	return ret < 0 ? -1 : 0;
@@ -309,8 +332,7 @@ int kms_color_apply(struct kms *k, const struct color_profile *p)
 {
 	int ret = 0;
 
-	/* The de-gamma first: it is first in the pipeline, and a controller
-	 * without it has no property to clear. */
+	/* Apply degamma first; only clear it if the CRTC exposes the property. */
 	if (p && p->has_degamma) {
 		static struct drm_color_lut dg[COLOR_DEGAMMA_LEN];
 		for (int i = 0; i < COLOR_DEGAMMA_LEN; i++) {

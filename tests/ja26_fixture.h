@@ -15,8 +15,8 @@ static inline void ja26_put32(FILE *f, uint32_t v)
 	fputc((int)(v >> 24 & 0xFF), f);
 }
 
-/* n glyphs for the code points in cps, glyph i from glyphs[i]; size is
- * what the header says; cut drops that many bytes from the end. */
+/* Writes n glyphs for cps. size overrides the header field; cut truncates
+ * that many bytes from the end. */
 static inline void ja26_fixture(const char *path, const char *magic, uint32_t n,
                                 uint32_t size, const uint32_t *cps,
                                 const unsigned char (*glyphs)[JA26_BYTES], size_t cut)

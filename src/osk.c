@@ -16,18 +16,14 @@
 #define COLS       10
 #define CELL       5      /* columns per key: a 120 px target on the panel */
 
-/* The digits sit on top of both layers so they are always one press up.
- * - _ . @ live on the letter layer because they turn up in passwords far
- * more than the rest; the other 28 symbols fill the second layer, which is
- * why its last row ends two cells early. Between them: all 95 printable
- * ASCII characters, each exactly once (space is on the bottom row). */
+/* Both layers share digits. Letters include - _ . @; the symbol layer
+ * ends two cells early. Together with SPACE, all printable ASCII is reachable. */
 static const char layers[2][ROWS][COLS + 1] = {
 	{ "1234567890", "qwertyuiop", "asdfghjkl-", "zxcvbnm_.@" },
 	{ "1234567890", "!\"#$%&'()*", "+,/:;<=>?[", "\\]^`{|}~" },
 };
 
-/* The bottom row is the same ten cells spent unevenly: the keys you reach
- * for without looking are the wide ones. */
+/* Action keys share ten cells, with extra width for common actions. */
 enum { BK_SHIFT, BK_LAYER, BK_SPACE, BK_DEL, BK_DONE, N_BK };
 static const struct { int col, width; } bottom[N_BK] = {
 	{ 0, 2 }, { 2, 2 }, { 4, 3 }, { 7, 1 }, { 8, 2 },
@@ -54,8 +50,7 @@ static int valid(const struct osk *k, int row, int col)
 	return row == ROWS || layers[k->layer][row][col] != '\0';
 }
 
-/* After a move, or a layer change, may have left focus on one of the two
- * empty cells at the end of the symbols layer. Step left until it is not. */
+/* Skip the two empty symbol cells after moving or changing layers. */
 static void settle(struct osk *k)
 {
 	while (!valid(k, k->row, k->col))
@@ -68,7 +63,7 @@ void osk_init(struct osk *k, int min_len)
 {
 	memset(k, 0, sizeof(*k));
 	k->min_len = min_len;
-	k->row = 1;                 /* q: where a hand starts on a keyboard */
+	k->row = 1;                 /* start at q */
 }
 
 static void type(struct osk *k, char c)
@@ -77,8 +72,7 @@ static void type(struct osk *k, char c)
 		return;
 	k->text[k->len++] = c;
 	k->text[k->len] = '\0';
-	/* Shift once is for one letter, as on a phone. A digit typed while it
-	 * is set leaves it set, because the digit did not use it. */
+	/* One-shot shift is consumed by a letter, not a digit. */
 	if (k->shift == 1 && isalpha((unsigned char)c))
 		k->shift = 0;
 }
@@ -122,7 +116,7 @@ static void move_h(struct osk *k, int dir)
 		k->col = bottom[i].col;
 		return;
 	}
-	/* Wrap, skipping the empty cells: right from '~' lands on '\'. */
+	/* Wrap past empty cells: right from ~ reaches backslash. */
 	do {
 		k->col = (k->col + dir + COLS) % COLS;
 	} while (!valid(k, k->row, k->col));
@@ -130,7 +124,7 @@ static void move_h(struct osk *k, int dir)
 
 static void move_v(struct osk *k, int dir)
 {
-	/* Wraps too, so DONE is one press up from the digits. */
+	/* Vertical wrapping makes DONE one press up from digits. */
 	k->row = (k->row + dir + ROWS + 1) % (ROWS + 1);
 	settle(k);
 }
@@ -175,9 +169,7 @@ static void draw_field(const struct osk *k, struct term *t, unsigned y)
 	term_putc(t, x0, y + 1, G_BOX_V, ATTR_DIM);
 	term_putc(t, x0 + w - 1, y + 1, G_BOX_V, ATTR_DIM);
 
-	/* The text plus a cursor. Sixty-three characters do not fit in the
-	 * box, so it shows the end - the part being typed - behind a marker
-	 * that says there is more to the left. */
+	/* Show the text tail and cursor, with a left-overflow marker. */
 	unsigned total = (unsigned)k->len + 1;
 	unsigned first = 0, x = x0 + 2;
 	if (total > inner) {
@@ -233,7 +225,7 @@ unsigned osk_draw(const struct osk *k, struct term *t, unsigned y)
 		case BK_SHIFT:
 			label = shift_label[k->shift];
 			if (k->shift)
-				attr = ATTR_TEXT;      /* lit while it applies */
+				attr = ATTR_TEXT;
 			break;
 		case BK_LAYER: label = k->layer ? "abc" : "#+="; break;
 		case BK_SPACE: label = "SPACE"; break;
@@ -241,7 +233,7 @@ unsigned osk_draw(const struct osk *k, struct term *t, unsigned y)
 		case BK_DONE:
 			label = "DONE";
 			if (k->len < k->min_len)
-				attr = ATTR_DIM;       /* not yet: too short */
+				attr = ATTR_DIM;
 			break;
 		}
 		draw_key(t, left + (unsigned)(CELL * bottom[i].col), by,

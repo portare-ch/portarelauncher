@@ -2,15 +2,15 @@
 #include "glyph.h"
 
 /* UTF-8 spelled out, so the file says exactly which bytes are tested. */
-#define E_ACUTE      "\xc3\xa9"            /* é, precomposed      */
-#define COMB_ACUTE   "\xcc\x81"            /* U+0301              */
-#define KA           "\xe3\x82\xab"        /* カ                  */
-#define DAKUTEN      "\xe3\x82\x99"        /* U+3099, combining   */
-#define GA           "\xe3\x82\xac"        /* ガ                  */
-#define S_COMMA      "\xc8\x99"            /* ș, U+0219           */
-#define ROMAN_4      "\xe2\x85\xa3"        /* Ⅳ, U+2163           */
-#define KIN          "\xe9\x87\x91"        /* 金                  */
-#define PO_HANGUL    "\xed\x8f\xac"        /* 포, U+D3EC          */
+#define E_ACUTE      "\xc3\xa9"            /* é, precomposed */
+#define COMB_ACUTE   "\xcc\x81"            /* U+0301 */
+#define KA           "\xe3\x82\xab"        /* カ */
+#define DAKUTEN      "\xe3\x82\x99"        /* U+3099, combining */
+#define GA           "\xe3\x82\xac"        /* ガ */
+#define S_COMMA      "\xc8\x99"            /* ș, U+0219 */
+#define ROMAN_4      "\xe2\x85\xa3"        /* Ⅳ, U+2163 */
+#define KIN          "\xe9\x87\x91"        /* 金 */
+#define PO_HANGUL    "\xed\x8f\xac"        /* 포, U+D3EC */
 #define MOTHER2      "MOTHER2 \xe3\x82\xae\xe3\x83\xbc\xe3\x82\xb0\xe3\x81\xae" \
                      "\xe9\x80\x86\xe8\xa5\xb2"   /* MOTHER2 ギーグの逆襲 */
 
@@ -34,16 +34,15 @@ static void test_decode(void)
 	CHECK_INT(text_next(&s), 0x30AC);
 	CHECK_INT(text_next(&s), 0);
 
-	/* A mark that composes with nothing is dropped; one at the start
-	 * belongs to nothing. */
+	/* Drop unsupported and leading combining marks. */
 	s = "q" COMB_ACUTE "z";
 	CHECK_INT(text_next(&s), 'q');
 	CHECK_INT(text_next(&s), 'z');
 	s = COMB_ACUTE "a";
 	CHECK_INT(text_next(&s), 'a');
 
-	/* Not UTF-8: each byte is Latin-1. A cut sequence, a lone
-	 * continuation byte, an overlong slash, a surrogate. */
+	/* Invalid UTF-8 uses Latin-1 bytes: truncated, lone continuation,
+	 * overlong and surrogate sequences. */
 	CHECK_INT(first("\xe9t\xe9"), 0xE9);
 	CHECK_INT(first("\xe3\x82"), 0xE3);
 	CHECK_INT(first("\x80"), 0x80);
@@ -115,10 +114,8 @@ static void test_width(void)
 	CHECK_INT(text_fit(KIN, 1), 0);
 }
 
-/* The marquee as the launcher runs it: a column a tick, the view starting
- * at the character the column falls in. Over MOTHER2 ギーグの逆襲 in a
- * field 12 wide: ASCII leaves a column a tick, each kana holds two ticks,
- * and the scroll stops with the end in view. */
+/* Marquee offsets are columns: ASCII advances each tick, wide glyphs
+ * every two ticks. Stop with the title end visible in a 12-column field. */
 static void test_marquee(void)
 {
 	const char *s = MOTHER2;
@@ -153,8 +150,7 @@ static void test_compose(void)
 	text_compose(c);
 	CHECK_STR(c, "qz");
 
-	/* Latin-1 stays as it was: rewriting it as UTF-8 would not fit, and
-	 * it reads the same either way. */
+	/* Keep Latin-1 when UTF-8 expansion would not fit. */
 	char d[] = "caf\xe9";
 	text_compose(d);
 	CHECK_STR(d, "caf\xe9");

@@ -7,10 +7,8 @@ static void press(struct osk *k, enum action a, int times)
 		osk_action(k, a);
 }
 
-/* Every printable ASCII character can be typed, because a WPA passphrase
- * may use any of them. Found by searching the keyboard the way a thumb
- * would: every state reachable with the d-pad, shift and the layer key,
- * and what CONFIRM types from each. */
+/* Search states reachable through directions, shift and layer changes
+ * to verify that every printable ASCII character can be typed. */
 static void test_reach(void)
 {
 	enum { MAXQ = 4096 };
@@ -119,8 +117,7 @@ static void test_limits(void)
 
 static void test_wrap(void)
 {
-	/* Right from the last key of a row wraps to its first, and up from the
-	 * digits reaches the bottom row. */
+	/* Horizontal and vertical navigation wrap. */
 	struct osk k;
 	osk_init(&k, 0);
 	press(&k, ACT_LEFT, 1);             /* q -> p */

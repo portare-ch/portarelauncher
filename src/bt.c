@@ -11,21 +11,11 @@
 #define BTCTL "/usr/bin/bluetoothctl"
 #define BTSCRIPT "/usr/bin/portareos-bluetooth"
 
-/* Same file as every other setting on the device. See settings.h. */
 #define KEY_AUTOCONNECT "bluetooth.autoconnect"
 
-/* bluetoothctl's --timeout is a floor, not a ceiling: measured on the
- * device, `--timeout 5 devices` takes five seconds to print what it already
- * had in 14 ms. Four of those to build one list is twenty seconds of frozen
- * panel, so none of these calls passes it.
- *
- * What --timeout does not do is stop anything hanging. `connect` against a
- * device that is not there never returns; with the service stopped, every
- * call waits forever for org.bluez to appear on the bus. Both were measured.
- * The ceiling that actually holds is proc_run_for's.
- *
- * A query answers from bluetoothd's cache, so a second is already generous
- * and five is only there to bound the damage. Radio work gets thirty. */
+/* bluetoothctl --timeout delays cached queries and does not bound hangs
+ * when BlueZ or a device is unavailable. Use proc_run_for deadlines;
+ * reserve --timeout for discovery duration. */
 #define BT_QUERY_MS 5000
 #define BT_RADIO_MS 30000
 
@@ -34,12 +24,8 @@ static int hexpair(const char *s)
 	return isxdigit((unsigned char)s[0]) && isxdigit((unsigned char)s[1]);
 }
 
-/* Finds a MAC anywhere in the line and returns where it starts, or NULL.
- *
- * By position rather than by field number: bluetoothctl prefixes lines with
- * a coloured "[bluetooth]#" prompt in some builds and not in others, and a
- * device name can contain anything at all. The address is the one token in
- * the line whose shape is fixed. */
+/* Find a MAC by shape: prompts change field positions, and device names
+ * may contain spaces. */
 static char *find_mac(char *line)
 {
 	for (char *p = line; p[0] && p[1]; p++) {
@@ -77,13 +63,7 @@ static struct bt_device *find_dev(struct bt_list *l, const char *addr)
 	return NULL;
 }
 
-/* An unnamed device is listed under its own address with dashes for colons:
- *
- *     Device C0:28:8D:87:51:82 C0-28-8D-87-51-82
- *
- * Which is every BLE beacon within thirty metres. Twelve of them turned up
- * in one eight-second scan on a quiet evening at home, and a wall of hex is
- * not a list somebody finds their headphones in. */
+/* bluetoothctl uses a dash-separated address as the name of unnamed devices. */
 static int name_is_address(const char *name, const char *addr)
 {
 	for (int i = 0; i < 17; i++) {
@@ -101,10 +81,7 @@ static void cb_device(char *line, void *ctx)
 	struct add_ctx *a = ctx;
 	strip_ansi(line);
 
-	/* Only the listing, never the running commentary. bluetoothctl writes
-	 * `[NEW] Device ...` and `[DEL] Device ...` to the same stdout as it
-	 * goes, and those lines carry an address that would otherwise be
-	 * parsed as a device this command was asked about. */
+	/* Ignore [NEW]/[DEL] commentary mixed into stdout; parse only listings. */
 	if (strncmp(line, "Device ", 7) != 0)
 		return;
 
@@ -122,9 +99,7 @@ static void cb_device(char *line, void *ctx)
 
 	struct bt_device *d = find_dev(a->l, addr);
 	if (!d) {
-		/* Nameless and not one of ours: noise. Something already
-		 * paired is kept whatever it calls itself, because the user
-		 * has to be able to see what they paired. */
+		/* Hide unnamed scan results, but keep paired devices visible. */
 		if (!a->paired && !a->trusted && !a->connected &&
 		    (!*name || name_is_address(name, addr)))
 			return;
@@ -139,7 +114,7 @@ static void cb_device(char *line, void *ctx)
 		str_copy(d->name, sizeof(d->name), name);
 	}
 
-	/* The four listings overlap; each one only ever adds a fact. */
+	/* Merge facts from overlapping listings. */
 	d->paired    |= a->paired;
 	d->trusted   |= a->trusted;
 	d->connected |= a->connected;
@@ -167,9 +142,7 @@ void bt_list(struct bt_list *l)
 {
 	memset(l, 0, sizeof(*l));
 
-	/* Four calls whatever the number of devices, rather than one `info`
-	 * per device. After a scan in a cafe that is the difference between
-	 * four processes and forty. */
+	/* Four bulk queries avoid an info process per device. */
 	list_kind(l, "Connected", 0, 0, 1);
 	list_kind(l, "Paired",    1, 0, 0);
 	list_kind(l, "Trusted",   0, 1, 0);
@@ -185,13 +158,10 @@ void bt_scan(struct bt_list *l, int seconds)
 		seconds = 8;
 	snprintf(secs, sizeof(secs), "%d", seconds);
 
-	/* --timeout is what makes this work at all. Without it bluetoothctl
-	 * starts discovery, exits, and BlueZ stops discovering again because
-	 * the client that asked for it is gone. */
+	/* Keep bluetoothctl alive during discovery; BlueZ stops scanning when
+	 * the requesting client exits. */
 	char *const argv[] = { (char *)BTCTL, (char *)"--timeout", secs,
 	                       (char *)"scan", (char *)"on", NULL };
-	/* The one place --timeout is the right tool: here it is how long to
-	 * listen, which is the whole point. The ceiling sits above it. */
 	proc_run_for(argv, NULL, NULL, seconds * 1000 + BT_QUERY_MS);
 
 	bt_list(l);
@@ -208,11 +178,8 @@ static void cb_powered(char *line, void *ctx)
 		*on = 1;
 }
 
-/* What the OS thinks. Asked first because with the service stopped
- * bluetoothctl waits forever for org.bluez to appear on the bus - it is the
- * ceiling that ends the call, not bluetoothctl - and "bluetooth is off" is
- * the common case on a handheld used without headphones. Reading a line out
- * of a file beats burning the ceiling to learn the same thing. */
+/* Check the saved setting first: with BlueZ stopped, bluetoothctl hangs
+ * until the process deadline. Off is the common case. */
 static int bt_enabled(void)
 {
 	char v[8];
@@ -248,11 +215,8 @@ static int btctl(const char *cmd, const char *addr, int ceiling_ms)
 
 int bt_connect(const char *addr)
 {
-	/* pair and trust are idempotent and both fail harmlessly on a device
-	 * that is already either, so there is no state to check first. Trust
-	 * before connect regardless of the auto-connect setting: without it
-	 * the headphones cannot call back, and the setting governs what
-	 * happens to the devices you are not touching right now. */
+	/* Pair and trust are idempotent. Trust before connecting so this device
+	 * can reconnect even if auto-connect is disabled for other paired devices. */
 	btctl("pair", addr, BT_RADIO_MS);
 	btctl("trust", addr, BT_QUERY_MS);
 	return btctl("connect", addr, BT_RADIO_MS);
@@ -268,8 +232,6 @@ int bt_disconnect(const char *addr)
 int bt_autoconnect(void)
 {
 	char v[16];
-	/* Default on. Somebody who has paired headphones wants them to come
-	 * back, and the cost of being wrong is one toggle. */
 	if (!settings_get(SETTINGS_PATH, KEY_AUTOCONNECT, v, sizeof(v)))
 		return 1;
 	return strcmp(v, "0") != 0 && strcasecmp(v, "no") != 0;
@@ -289,10 +251,8 @@ void bt_set_autoconnect(int on)
 			continue;
 		btctl(on ? "trust" : "untrust", l.d[i].addr, BT_QUERY_MS);
 
-		/* One attempt from this side, detached, for a device that was
-		 * already switched on and waiting. Detached because it blocks
-		 * for the page timeout when the device is not there, and the
-		 * panel is not allowed to stop for that. */
+		/* One detached attempt for a device already switched on; an unavailable
+		 * device can block for the connection timeout. */
 		if (on && !l.d[i].connected) {
 			char *const argv[] = { (char *)BTCTL, (char *)"connect",
 			                       l.d[i].addr, NULL };

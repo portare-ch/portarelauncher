@@ -63,16 +63,14 @@ static void test_status(void)
 	struct lines L;
 	CHECK_INT(sh("exit 3", &L, 5000), 3);
 
-	/* Not there at all: the child's exec fails and it exits 127, the
-	 * shell's convention for "command not found". */
+	/* A failed exec returns 127, matching the shell convention. */
 	char *const argv[] = { (char *)"/nonexistent/tool", NULL };
 	CHECK_INT(proc_run_for(argv, NULL, NULL, 5000), 127);
 }
 
 static void test_stdin_is_empty(void)
 {
-	/* cat reads stdin until EOF. /dev/null ends it at once; an inherited
-	 * terminal would hang it until the ceiling. */
+	/* /dev/null gives cat immediate EOF instead of waiting for terminal input. */
 	struct lines L;
 	long long t0 = now_ms();
 	CHECK_INT(sh("cat", &L, 3000), 0);
@@ -81,8 +79,7 @@ static void test_stdin_is_empty(void)
 
 static void test_ceiling(void)
 {
-	/* The reason proc_run_for exists: bluetoothctl connect to a device
-	 * that is not there never returns. */
+	/* Bound a hung command, as with an unavailable Bluetooth device. */
 	struct lines L;
 	long long t0 = now_ms();
 	CHECK_INT(sh("echo started; sleep 10", &L, 300), PROC_TIMEOUT);

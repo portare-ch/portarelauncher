@@ -1,8 +1,4 @@
-# Build and test on every push to main and every pull request.
-#
-# arm64, like the device. The launcher is built with warnings as errors, and
-# the tests run twice: plain, and under AddressSanitizer and UBSan, because a
-# memory bug in the one program that owns the panel is a black screen.
+# Build on arm64 with warnings as errors; test normally and with ASan/UBSan.
 name: CI
 
 on:

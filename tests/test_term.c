@@ -40,27 +40,22 @@ static void test_marks(void)
 		CHECK(in > 30);
 		CHECK_INT(lit_in(0, 0, 24, 96, text) + lit_in(48, 0, 24, 96, text) +
 		          lit_in(24, 48, 24, 48, text), 0);
-		/* Not the font's glyph for that code: an outline, so the
-		 * middle of three of the four is empty. The cross crosses
-		 * its own middle. */
+		/* Outlines have empty centers except for the cross. */
 		if (marks[i] != G_MARK_CROSS)
 			CHECK(fb[21 * W + 36] != text);
 
-		/* A colour change redraws it in the new colour, nothing
-		 * of the old left. */
+		/* Recolor without leaving old pixels. */
 		term_putc(&t, 1, 0, marks[i], ATTR_BRIGHT);
 		term_flush(&t);
 		CHECK_INT(lit_in(24, 0, 24, 48, text), 0);
 		CHECK_INT(lit_in(24, 0, 24, 48, bright), in);
 
-		/* And a space over it leaves the cell black. */
 		term_putc(&t, 1, 0, ' ', ATTR_TEXT);
 		term_flush(&t);
 		CHECK_INT(lit_in(24, 0, 24, 48, bright), 0);
 	}
 
-	/* The codes around them are still the font's: the left arrow and
-	 * the selection caret. */
+	/* Adjacent codes still use the VGA font. */
 	memset(fb, 0, sizeof(fb));
 	term_clear(&t);
 	term_invalidate(&t);
@@ -69,8 +64,7 @@ static void test_marks(void)
 	term_flush(&t);
 	CHECK(lit_in(0, 48, 24, 48, text) > 0);
 	CHECK(lit_in(24, 48, 24, 48, text) > 0);
-	/* Font pixels come in 3 x 3 blocks at scale 3; a two-pixel outline
-	 * cannot. The caret's top-left lit pixel starts a full block. */
+	/* VGA pixels scale to 3 x 3 blocks; two-pixel outlines do not. */
 	int found = 0;
 	for (int y = 48; y < 96 && !found; y++)
 		for (int x = 24; x < 48 && !found; x++)
@@ -103,8 +97,7 @@ static void test_text(void)
 	CHECK_INT(term_init(&t, tfb, TW, TW, TH, 3), 0);
 	CHECK_INT(t.cols, 10);
 
-	/* Mixed ASCII and Japanese: the kanji takes two cells, halves
-	 * marked, and the text after it carries on from the third. */
+	/* Mark both cells of the kanji; following ASCII starts after them. */
 	CHECK_INT(term_puts(&t, 0, 0, "a" KIN "b", ATTR_TEXT), 4);
 	CHECK_INT(at(&t, 0)->g, 'a');
 	CHECK(at(&t, 1)->g >= GLYPH_UNI);
@@ -130,8 +123,7 @@ static void test_text(void)
 	CHECK_INT(at(&t, 1)->half, HALF_LEFT);
 	CHECK_INT(at(&t, 2)->half, HALF_RIGHT);
 
-	/* At the right edge a kanji that would need two cells is not drawn
-	 * by half: the line stops. */
+	/* Stop before a wide glyph would cross the right edge. */
 	term_clear(&t);
 	CHECK_INT(term_puts(&t, 7, 0, "ab" KIN, ATTR_TEXT), 2);
 	CHECK_INT(at(&t, 9)->g, ' ');
@@ -148,8 +140,7 @@ static void test_text(void)
 	CHECK_INT(at(&t, 3)->half, HALF_RIGHT);
 	CHECK_INT(at(&t, 6)->half, HALF_LEFT);
 
-	/* Decomposed ガ is one character, two cells, and it is ガ that is
-	 * drawn, not カ with its mark dropped. */
+	/* Compose カ + dakuten to ガ before drawing its two cells. */
 	term_clear(&t);
 	CHECK_INT(term_puts(&t, 0, 0, GA, ATTR_TEXT), 2);
 	CHECK_INT(at(&t, 0)->g, glyph_of(0x30AC).code);
@@ -183,10 +174,8 @@ static void test_text(void)
 	term_free(&t);
 }
 
-/* A two-cell glyph from the 26-pixel file: scaled to 48 x 48 with
- * bilinear filtering and blended, so its edges take colours between the
- * text and the black, and nothing lands outside its two cells. A glyph
- * the file does not have is Unifont's, in the two colours only. */
+/* Scale 26-pixel glyphs to two cells with blended edges, staying within
+ * their bounds. Missing glyphs fall back to two-color Unifont. */
 static void test_ja26(void)
 {
 	char *dir = fixture_dir(), path[64];

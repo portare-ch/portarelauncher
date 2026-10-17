@@ -18,9 +18,8 @@ enum lang lang_parse(const char *value)
 const char *lang_value(enum lang l) { return l == LANG_JA ? "ja_JP" : "en_US"; }
 const char *lang_name(enum lang l)  { return l == LANG_JA ? "日本語" : "English"; }
 
-/* Japanese per Nintendo, Sony and Sega's own usage in Japan; the hints keep
- * the key letter and translate the verb. 決定 where A enters or confirms,
- * 変更 where it changes a value in place. */
+/* Use Japanese console names and keep button letters in hints.
+ * 決定 confirms or enters; 変更 changes a value in place. */
 static const struct {
 	const char *s[N_LANG];
 	int max;
@@ -225,8 +224,7 @@ int tr_max(enum str s)
 	return s >= 0 && s < N_STR ? table[s].max : 0;
 }
 
-/* The Japanese names, by es_systems.cfg's name. Not listed: shown as the
- * full name, which is what a name like ScummVM or MAME is in Japan too. */
+/* Japanese names keyed by es_systems.cfg name; others use the full name. */
 static const struct { const char *name, *ja; } systems[] = {
 	{ "arcade",          "アーケード" },
 	{ "atomiswave",      "アトミスウェイブ" },

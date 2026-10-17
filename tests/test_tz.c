@@ -25,8 +25,7 @@ static void test_load(void)
 	snprintf(list, sizeof(list), "%s/tz", root);
 	snprintf(zi, sizeof(zi), "%s/zoneinfo", root);
 
-	/* The shape of the image's list: zones, nested zones, aliases, a
-	 * single-word zone, and one the image has no file for. */
+	/* Include nested zones, aliases, UTC and a zone with no zoneinfo file. */
 	fixture_write(list,
 		"Europe/Berlin\n"
 		"America/New_York\n"
@@ -53,8 +52,7 @@ static void test_load(void)
 	CHECK_STR(l.zone[0], "America/Argentina/Buenos_Aires");   /* sorted */
 	CHECK_STR(l.zone[4], "UTC");
 
-	/* Regions that have zones, in table order, UTC last. No Asia: its
-	 * only zone had no file. No US, Etc or Cuba: aliases. */
+	/* Keep nonempty geographic regions in table order, then UTC; omit aliases. */
 	CHECK_INT(l.nregions, 3);
 	CHECK_STR(l.region[0], "America");
 	CHECK_STR(l.region[1], "Europe");
@@ -86,8 +84,7 @@ static void test_city(void)
 
 static void test_clock(void)
 {
-	/* UTC against gmtime, retried once in case a minute turns over
-	 * between the two readings. */
+	/* Compare UTC with gmtime; retry once if the minute rolls over. */
 	for (int attempt = 0; attempt < 2; attempt++) {
 		char got[8], want[8];
 		time_t now = time(NULL);

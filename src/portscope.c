@@ -1,21 +1,10 @@
-/* PortScope: every button and stick of the pad, as the kernel reports it.
+/* PortScope: virtual or raw evdev input diagnostics using the launcher's
+ * KMS grid and pixel stick indicators. Hold SELECT for one second to switch
+ * layers; Home + START exits.
  *
- * Started by the launcher from Settings > Diagnostics, with the panel
- * handed over the way a game gets it. One more launcher screen on the
- * launcher's own pieces: kms.c, the 8x16 grid, the palette, the shape
- * marks the grid draws for every screen. The sticks are drawn in pixels:
- * a round ring each, with a dot at the panel's resolution.
- *
- * One layer at a time. By default the virtual pad InputPlumber presents,
- * which is what games read. Holding SELECT for a second switches to the
- * MCU's own device and the gpio-keys, and back. InputPlumber grabs those
- * (EVIOCGRAB), so a second reader gets nothing while it runs: the raw
- * layer stops InputPlumber, and it is started again when the layer is
- * left and whenever this program ends. The launcher starts it again as
- * well, for the one way out that runs no code here, SIGKILL.
- *
- * Home + START leaves, the combo that leaves everything on the device.
- */
+ * Raw mode stops InputPlumber to release its EVIOCGRAB on the MCU and
+ * gpio-keys devices. Restore it on layer exit and shutdown; the launcher
+ * also restores it after SIGKILL. */
 #include "kms.h"
 #include "pix.h"
 #include "quit.h"
@@ -60,9 +49,9 @@ extern char **environ;
 #define INPUTPLUMBER "inputplumber.service"
 #define SCALE       3
 #define MAX_DEV     16
-#define HOLD_MS     1000     /* SELECT held this long switches the layer   */
-#define FRAME_MS    8        /* the panel's 120 Hz, near enough            */
-#define SETTLE_MS   5000     /* for the devices of a new layer to appear   */
+#define HOLD_MS     1000     /* SELECT held this long switches the layer */
+#define FRAME_MS    8        /* the panel's 120 Hz, near enough */
+#define SETTLE_MS   5000     /* for the devices of a new layer to appear */
 
 static volatile sig_atomic_t stop_requested;
 static void on_signal(int sig) { (void)sig; stop_requested = 1; }
@@ -97,11 +86,8 @@ static void close_devs(struct devs *d)
 	d->n = d->npads = 0;
 }
 
-/* Which devices a layer is made of. A pad is anything with BTN_SOUTH: the
- * virtual pad while InputPlumber runs, the MCU once it does not. The raw
- * layer adds the device that carries the paddles, gpio-keys, and so takes
- * whatever reports BTN_Z or BTN_C as well. Ranges and rest positions come
- * from the first pad. */
+/* Pads report BTN_SOUTH. Raw mode also includes GPIO paddles reporting
+ * BTN_Z or BTN_C. Axis ranges and initial positions come from the first pad. */
 static void open_devs(struct devs *d, struct scope *s)
 {
 	close_devs(d);
@@ -116,7 +102,7 @@ static void open_devs(struct devs *d, struct scope *s)
 		if (strncmp(e->d_name, "event", 5) == 0)
 			num[nn++] = atoi(e->d_name + 5);
 	closedir(dir);
-	/* In event number order, so "the first pad" is the same one each time. */
+	/* Sort event numbers to keep first-pad selection stable. */
 	for (int i = 1; i < nn; i++)
 		for (int j = i; j > 0 && num[j] < num[j - 1]; j--) {
 			int tmp = num[j];
@@ -169,8 +155,7 @@ static int systemctl(const char *verb)
 	return WIFEXITED(st) && WEXITSTATUS(st) == 0 ? 0 : -1;
 }
 
-/* Waits for the layer's pad to show up: InputPlumber takes a moment to
- * create its virtual pad, and to give the MCU's node back when it stops. */
+/* Wait for InputPlumber to create its virtual pad or release the raw node. */
 static void settle(struct devs *d, struct scope *s)
 {
 	long long until = now_ms() + SETTLE_MS;
@@ -204,14 +189,13 @@ struct view {
 	struct term *t;
 	struct pix px;
 	int shapes;          /* launcher.buttons: the shape marks, not letters */
-	/* What the pixel layer last drew, so only what changed is redrawn. */
+	/* Cached pixel state for incremental redraws. */
 	int valid;
 	int dot_x[2], dot_y[2], ring_lit[2];
 	int shown_rate;
 };
 
-/* Rounded as printed, so a stick resting a hair left of centre reads
- * +0.00 like one a hair right of it, not -0.00. */
+/* Round before formatting to avoid displaying -0.00 near center. */
 static double shown(double v)
 {
 	double r = round(v * 100) / 100;
@@ -316,9 +300,7 @@ static void draw_pixels(struct view *v, const struct scope *s)
 	const uint32_t dim = term_color(t, ATTR_DIM);
 	const uint32_t bright = term_color(t, ATTR_BRIGHT);
 
-	/* The sticks: five rows tall, centred on row 11, under the D-pad and
-	 * the face buttons. The dot travels inside the ring and never
-	 * reaches it, so moving the dot never has to repaint the ring. */
+	/* Keep stick dots inside the rings so movement never requires ring repainting. */
 	static const double ring_col[2] = { 9.5, 41.5 };
 	const int r = 5 * ch / 2 - 8, dot = 8, travel = r - 12;
 	for (int i = 0; i < 2; i++) {
@@ -355,9 +337,8 @@ static void draw_pixels(struct view *v, const struct scope *s)
 static void draw(struct view *v, const struct scope *s, long long now)
 {
 	draw_text(v, s, now);
-	/* Cells first: a cell repainted after the pixels would black out
-	 * whatever was drawn across it. The ring rows stay blank in the grid,
-	 * so only a full repaint touches them, and that clears v->valid. */
+	/* Draw cells before pixels. A full grid repaint clears the ring rows
+	 * and invalidates the pixel cache. */
 	term_flush(v->t);
 	draw_pixels(v, s);
 }
@@ -459,8 +440,7 @@ int main(int argc, char **argv)
 			dirty = 0;
 		}
 
-		/* Asleep unless something is due: the next frame, the end of a
-		 * SELECT hold, or the rate falling back once the pad is still. */
+		/* Wake for a frame, SELECT hold deadline or report-rate expiry. */
 		long long due = -1;
 		if (dirty)
 			due = drawn_at + FRAME_MS;
@@ -510,8 +490,7 @@ int main(int argc, char **argv)
 			}
 		}
 		if (reopen && !stop_requested) {
-			/* A pad that went or came: InputPlumber restarting, a
-			 * Bluetooth pad. What is held is forgotten with it. */
+			/* Hotplug invalidates held state and requires reopening devices. */
 			enum scope_layer l = s.layer;
 			scope_reset(&s, l);
 			open_devs(&d, &s);

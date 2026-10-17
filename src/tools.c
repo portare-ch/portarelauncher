@@ -19,8 +19,7 @@ static char *read_all(const char *path)
 	FILE *f = fopen(path, "r");
 	if (!f)
 		return NULL;
-	/* The one this reads is 15 KB. The cap only stops a stray file of
-	 * the same name from being read whole into memory. */
+	/* Cap metadata reads to bound memory use for unexpected files. */
 	size_t cap = 256 * 1024, len = 0;
 	char *buf = malloc(cap + 1);
 	if (buf) {
@@ -56,8 +55,7 @@ static int tag_in(const char *from, const char *end, const char *tag,
 	return 1;
 }
 
-/* Fills in name and description from the <game> whose <path> is this
- * file, if the gamelist has one. */
+/* Read metadata from the <game> block matching this path. */
 static void describe(struct tool *t, const char *xml)
 {
 	if (!xml)
@@ -69,7 +67,6 @@ static void describe(struct tool *t, const char *xml)
 	if (!p)
 		return;
 
-	/* The block around it: back to its <game>, on to its </game>. */
 	const char *start = xml, *g;
 	for (const char *s = xml; (g = strstr(s, "<game>")) && g < p; s = g + 1)
 		start = g;
@@ -106,7 +103,6 @@ int tools_load_from(struct tools *ts, const char *dir)
 		return 0;
 	str_copy(ts->dir, sizeof(ts->dir), dir);
 
-	/* The folder, a slash, and a name as long as a directory entry can be. */
 	char path[sizeof(ts->dir) + 1 + 256];
 	snprintf(path, sizeof(path), "%s/gamelist.xml", ts->dir);
 	char *xml = read_all(path);

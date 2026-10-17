@@ -20,10 +20,8 @@ int sheet_is(const char *file)
 	       !strcasecmp(e, ".ccd");
 }
 
-/* dir/name, with a Windows rip's backslashes made slashes and a leading
- * "./" dropped - ".\\Game.bin" is written by some rippers, and the path it
- * resolves to has to be spelt the way the folder scan spells it. An
- * absolute name is kept as it is. */
+/* Resolve relative names against dir; normalize backslashes and leading
+ * "./" to match catalog paths. Preserve absolute paths. */
 static void resolve(const char *dir, const char *name, char *out, size_t osz)
 {
 	char n[512];
@@ -35,16 +33,15 @@ static void resolve(const char *dir, const char *name, char *out, size_t osz)
 	while (r[0] == '.' && r[1] == '/')
 		r += 2;
 
-	/* A path too long for the buffer names nothing, rather than a cut-off
-	 * prefix that could hide some other file. */
+	/* Reject long paths instead of hiding a file that matches a truncated prefix. */
 	int w = r[0] == '/' ? snprintf(out, osz, "%s", r)
 	                    : snprintf(out, osz, "%s/%s", dir, r);
 	if (w < 0 || (size_t)w >= osz)
 		out[0] = '\0';
 }
 
-/* The n-th whitespace-separated field of line, where a "quoted field" may
- * contain spaces. Returns 1 and fills out when there is one. */
+/* Read the n-th whitespace-separated field, allowing quoted spaces.
+ * Returns 1 and fills out if present. */
 static int field(const char *line, int n, char *out, size_t osz)
 {
 	const char *p = line;
@@ -106,8 +103,7 @@ int sheet_refs(const char *path, char out[][512], int max)
 
 	char line[1024], name[512];
 	int lineno = 0;
-	/* A sheet is a few lines. A file this large with a sheet's extension
-	 * is not one, and is not read to the end. */
+	/* Cap reads so a mislabeled large file cannot stall the scan. */
 	while (n < max && lineno < 4096 && fgets(line, sizeof(line), f)) {
 		lineno++;
 		line[strcspn(line, "\r\n")] = '\0';
@@ -122,7 +118,7 @@ int sheet_refs(const char *path, char out[][512], int max)
 			resolve(dir, p, out[n++], 512);
 		} else if (!strcasecmp(e, ".gdi")) {
 			/* First line is the track count, then
-			 *   <track> <lba> <type> <sector size> <file> <offset>  */
+			 *   <track> <lba> <type> <sector size> <file> <offset> */
 			if (lineno == 1)
 				continue;
 			if (field(line, 4, name, sizeof(name)))

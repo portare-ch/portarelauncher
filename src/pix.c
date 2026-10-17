@@ -16,10 +16,8 @@ void pix_fill(struct pix *p, int x, int y, int w, int h, uint32_t c)
 			put(p, i, j, c);
 }
 
-/* Both round shapes test every pixel of the bounding box against the
- * squared radius. The boxes are a few hundred pixels across at most and
- * only the pixels that are set touch the framebuffer, which is the slow
- * part; a scan-line algorithm would save nothing that shows. */
+/* Test squared radii within the small bounding box; only lit pixels
+ * write to the framebuffer. */
 void pix_disc(struct pix *p, int cx, int cy, int r, uint32_t c)
 {
 	for (int dy = -r; dy <= r; dy++)
@@ -44,10 +42,7 @@ void pix_ring(struct pix *p, int cx, int cy, int r, int thick, uint32_t c)
 static int imin(int a, int b) { return a < b ? a : b; }
 static int imax(int a, int b) { return a > b ? a : b; }
 
-/* Every pixel of the segment's bounding box, widened by the thickness,
- * whose distance to the segment is under half the thickness. Exact for any
- * angle, which the marks need: a diagonal drawn by stepping looks thinner
- * than a vertical one of the same nominal width. */
+/* Distance-based coverage keeps diagonal and axial strokes equally thick. */
 void pix_line(struct pix *p, int x0, int y0, int x1, int y1, int thick, uint32_t c)
 {
 	int half = thick / 2;
@@ -55,8 +50,7 @@ void pix_line(struct pix *p, int x0, int y0, int x1, int y1, int thick, uint32_t
 	int by0 = imin(y0, y1) - half - 1, by1 = imax(y0, y1) + half + 1;
 	long vx = x1 - x0, vy = y1 - y0;
 	long len2 = vx * vx + vy * vy;
-	/* Pixel centres sit at .5; comparing squared distances scaled by 4
-	 * keeps everything in integers. */
+	/* Scale squared distances by 4 to use integer pixel centers at .5. */
 	long limit2 = (long)thick * thick;   /* (2 * thick/2)^2 */
 
 	for (int y = by0; y <= by1; y++)
@@ -84,8 +78,7 @@ void pix_line(struct pix *p, int x0, int y0, int x1, int y1, int thick, uint32_t
 
 void pix_triangle(struct pix *p, int cx, int cy, int s, int thick, uint32_t c)
 {
-	/* Apex up, base a little below centre so the mass sits where a
-	 * letter's would. */
+	/* Place the triangle's visual center on the text line. */
 	int ax = cx, ay = cy - s;
 	int bx = cx - s, by = cy + s * 3 / 4;
 	int dx = cx + s, dy = by;

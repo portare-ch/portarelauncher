@@ -2,9 +2,8 @@
 #include "glyph.h"
 #include "lang.h"
 
-/* A format as it is drawn: %c is a key letter, one column; %d a number,
- * three at most where these are used; %s is filled from another entry and
- * checked where the two are put together. */
+/* Measure formats with %c as one column and %d as three.
+ * %s entries are checked at their call sites. */
 static int fmt_width(const char *f)
 {
 	char buf[512];
@@ -58,8 +57,7 @@ static void test_table(void)
 		CHECK(fmt_width(en) <= tr_max((enum str)s));
 		CHECK(fmt_width(ja) <= tr_max((enum str)s));
 
-		/* The same arguments in the same order, or snprintf reads the
-		 * wrong ones. */
+		/* Format arguments must match in type and order across languages. */
 		convs(en, ce, sizeof(ce));
 		convs(ja, cj, sizeof(cj));
 		if (strcmp(ce, cj) != 0)
@@ -68,8 +66,7 @@ static void test_table(void)
 	}
 }
 
-/* The footer of a list of games: the hint with its verb, and the position
- * at the right, "999 / 9999", with a gap. 53 columns from column 1. */
+/* The hint, verb and "999 / 9999" count must share the 53-column footer. */
 static void test_footers(void)
 {
 	for (int l = 0; l < N_LANG; l++) {
@@ -107,8 +104,7 @@ static void test_language(void)
 	CHECK_STR(lang_usb_mode("network"),
 	          "\xe3\x83\x8d\xe3\x83\x83\xe3\x83\x88\xe3\x83\xaf\xe3\x83\xbc\xe3\x82\xaf");
 
-	/* Every Japanese console name fits the Systems row: from column 4,
-	 * with a count of up to four digits right-aligned at 51. */
+	/* Japanese console names must fit from column 4 before a four-digit count. */
 	const char *names[] = { "arcade", "atomiswave", "dreamcast", "famicom", "fds",
 		"gamecube", "gamegear", "gb", "gba", "gbah", "gbav", "gbc", "gbch", "gbh",
 		"genesis", "genh", "ggh", "imageviewer", "mastersystem", "megacd",
