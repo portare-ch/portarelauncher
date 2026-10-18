@@ -613,10 +613,8 @@ static void draw_systems(struct ui *u)
 
 	/* Quick Access, a separator, then systems; no blank row on the 20-row grid. */
 	term_puts(t, 2, 3, tr(S_QUICK), ATTR_MID);
-	snprintf(buf, sizeof(buf), "%d", u->recent.n);
-	draw_row(u, 4, u->sys_sel == QUICK_RECENT, tr(S_RECENT), buf);
-	snprintf(buf, sizeof(buf), "%d", u->favs.n);
-	draw_row(u, 5, u->sys_sel == QUICK_FAVS, tr(S_FAVS), buf);
+	draw_row(u, 4, u->sys_sel == QUICK_RECENT, tr(S_RECENT), NULL);
+	draw_row(u, 5, u->sys_sel == QUICK_FAVS, tr(S_FAVS), NULL);
 	term_hline(t, 6, G_HLINE, ATTR_DIM);
 	term_puts(t, 2, 7, tr(S_SYSTEMS), ATTR_MID);
 
@@ -629,14 +627,12 @@ static void draw_systems(struct ui *u)
 	for (int i = 0; i < visible && u->sys_top + i < rows; i++) {
 		int idx = u->sys_top + i;
 		if (idx == u->cat.n) {
-			snprintf(buf, sizeof(buf), "%d", u->tools.n);
-			draw_row(u, top + (unsigned)i, idx == sel, tr(S_TOOLS), buf);
+			draw_row(u, top + (unsigned)i, idx == sel, tr(S_TOOLS), NULL);
 			continue;
 		}
 		const struct psystem *s = &u->cat.sys[idx];
-		snprintf(buf, sizeof(buf), "%d", s->ngames);
 		draw_row(u, top + (unsigned)i, idx == sel,
-		         lang_system(s->name, s->fullname), buf);
+		         lang_system(s->name, s->fullname), NULL);
 	}
 
 	if (u->cat.n == 0) {
