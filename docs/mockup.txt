@@ -48,9 +48,9 @@
 
     SETTINGS
     .....................................................  <- 53 columns
-     Settings                                            |
+     Settings           VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
-        Wi-Fi                                Hofmann-5G  |
+        WiFi                                 Hofmann-5G  |
         SSH                                          on  |
         Bluetooth                            WH-1000XM4  |
         USB mode                                network  |
@@ -59,7 +59,7 @@
         Color                                      grey  |
         Color profile                             stock  |
         Charging LED                                 on  |
-        Time zone                         Europe/Zurich  |
+        Timezone                          Europe/Zurich  |
         Diagnostics                                      |
         About                         v0.2.6 2026-09-26  |
         Power                                            |
@@ -72,7 +72,7 @@
 
     SETTINGS - CONSOLES
     .....................................................  <- 53 columns
-     Settings  ›  Consoles                               |
+     Settings  ›  Consoles                         23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
       ▸ SNES                                   PRMPT on  |
@@ -96,7 +96,7 @@
 
     BLUETOOTH
     .....................................................  <- 53 columns
-     Settings  ›  Bluetooth                              |
+     Settings  ›  Bluetooth                        23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
         Bluetooth                                    on  |
@@ -120,7 +120,7 @@
 
     KEYBOARD - letters
     .....................................................  <- 53 columns
-     Settings  ›  Wi-Fi VOL 50%  BRI 70%  BAT 87%  23:59 |
+     Settings  ›  WiFi  VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
       NETWORK  FRITZ!Box 7520 JI                         |
       PASSWORD                       4 / 63  at least 8  |
@@ -144,7 +144,7 @@
 
     KEYBOARD - shift, shape marks
     .....................................................  <- 53 columns
-     Settings  ›  Wi-Fi VOL 50%  BRI 70%  BAT 87%  23:59 |
+     Settings  ›  WiFi  VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
       NETWORK  FRITZ!Box 7520 JI                         |
       PASSWORD                                  11 / 63  |
@@ -168,7 +168,7 @@
 
     KEYBOARD - symbols, password hidden, DONE selected
     .....................................................  <- 53 columns
-     Settings  ›  Wi-Fi VOL 50%  BRI 70%  BAT 87%  23:59 |
+     Settings  ›  WiFi  VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
       NETWORK  FRITZ!Box 7520 JI                         |
       PASSWORD                                  14 / 63  |
@@ -192,7 +192,7 @@
 
     KEYBOARD - join failed
     .....................................................  <- 53 columns
-     Settings  ›  Wi-Fi VOL 50%  BRI 70%  BAT 87%  23:59 |
+     Settings  ›  WiFi  VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
       NETWORK  FRITZ!Box 7520 JI                         |
       PASSWORD                                  14 / 63  |
@@ -384,7 +384,7 @@
 
     SETTINGS - DIAGNOSTICS
     .....................................................  <- 53 columns
-     Settings  ›  Diagnostics                            |
+     Settings  ›  Diagnostics                      23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
       ▸ PortScope                                        |
@@ -530,7 +530,7 @@
     .....................................................  <- 53 columns
      設定          音量 50%  明るさ 70%  電池 87%  23:59 |
      ═══════════════════════════════════════════════════ |
-        Wi-Fi                                Hofmann-5G  |
+        WiFi                                 Hofmann-5G  |
         SSH                                        オン  |
         Bluetooth                            WH-1000XM4  |
         USBモード                          ネットワーク  |
@@ -580,7 +580,7 @@
      ═══════════════════════════════════════════════════ |
                                                          |
       ▸ Language / 言語                         English  |
-        Time zone                         Europe/Zurich  |
+        Timezone                          Europe/Zurich  |
                                                          |
                                                          |
                                                          |

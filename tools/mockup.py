@@ -86,11 +86,14 @@ def item(sel, label, right=""):
 
 RULE = " " + "\u2550" * (COLS - 2)
 
-# Match draw_frame: right-aligned status, then a two-column gap to the breadcrumb.
+# Match draw_frame: status yields to the breadcrumb, keeping the clock.
 STATUS = "VOL 50%  BRI 70%  BAT 87%  23:59 "
 CLOCK = "23:59 "
 def header(crumb, status=STATUS):
-    room = COLS - 1 - width(status) - 2 - 1
+    room = COLS - width(status) - 3  # status includes the right margin
+    if width(crumb) > room:
+        status = CLOCK
+        room = COLS - width(status) - 3
     return row(" " + fit(crumb, room), status)
 
 # Game-list headers show only the clock beside the breadcrumb.
@@ -114,14 +117,14 @@ games += [item(n == "Tekken 3", n) for n in GAMES]
 games += [""] * (ROWS - 2 - len(games))
 games += [THIN, row(" A LAUNCH   B BACK", "8 / 112 ")]
 
-SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
+SET = [("WiFi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
        ("USB mode", "network"), ("Button style", "Retroid"),
        ("Consoles", "2 changed"),
        ("Color", "grey"), ("Color profile", "stock"), ("Charging LED", "on"),
-       ("Time zone", "Europe/Zurich"), ("Diagnostics", ""),
+       ("Timezone", "Europe/Zurich"), ("Diagnostics", ""),
        ("About", "v0.2.6 2026-09-26"), ("Power", "")]
 # Settings fill rows 2..14; the three-row button diagram also uses the upper rule.
-settings = [row(" Settings", ""), RULE]
+settings = [header("Settings"), RULE]
 settings += [item(i == 4, n, v) for i, (n, v) in enumerate(SET)]
 settings += ["         X          X confirm",
              "      Y     A       A back",
@@ -135,7 +138,7 @@ CONSOLES = [("SNES", "PRMPT on"), ("NES", "PRMPT off"),
             ("Game Boy Color", "PRMPT off"), ("Game Boy Advance", "PRMPT off"),
             ("Genesis", "PRMPT off")]
 def consoles_screen(sel):
-    lines = [row(" Settings  \u203a  Consoles", ""), RULE, ""]
+    lines = [header("Settings  \u203a  Consoles"), RULE, ""]
     lines += [item(i == sel, n, v) for i, (n, v) in enumerate(CONSOLES)]
     lines += [THIN, "    Experimental."]
     lines += ["    PRMPT adds a pre-emptive frame to reduce",
@@ -147,14 +150,14 @@ def consoles_screen(sel):
 consoles = consoles_screen(0)
 
 DIAG = [("PortScope", "")]
-diagnostics = [row(" Settings  \u203a  Diagnostics", ""), RULE, ""]
+diagnostics = [header("Settings  \u203a  Diagnostics"), RULE, ""]
 diagnostics += [item(i == 0, n, v) for i, (n, v) in enumerate(DIAG)]
 diagnostics += [""] * (ROWS - 2 - len(diagnostics))
 diagnostics += [THIN, row(" A OPEN   B BACK", "\u2191\u2193 MOVE ")]
 
 BT = [("WH-1000XM4", "connected"), ("DualSense Edge", "paired"),
       ("Bose QC35", "paired"), ("JBL Flip 5", "new")]
-bluetooth = [row(" Settings  \u203a  Bluetooth", ""), RULE, "",
+bluetooth = [header("Settings  \u203a  Bluetooth"), RULE, "",
              item(False, "Bluetooth", "on"),
              item(False, "Auto-connect paired devices", "yes"),
              THIN,
@@ -218,7 +221,7 @@ def kb_screen(ssid, text, layer, sel=None, bottom_sel=None, hidden=False,
     n = len(text)
     count = f"{n} / 63" if n >= 8 else f"{n} / 63  at least 8"
     # A 32-byte SSID needs its own line below the status header.
-    out = [row(" Settings  ›  Wi-Fi", "VOL 50%  BRI 70%  BAT 87%  23:59 "),
+    out = [header("Settings  ›  WiFi"),
            RULE, "  NETWORK  " + ssid, row("  PASSWORD", count + "  ")]
     out += field(text, hidden)
     out += [""]
@@ -473,7 +476,7 @@ ja_recent += [""] * (ROWS - 2 - len(ja_recent))
 ja_recent += [THIN, row(" A \u8d77\u52d5   B \u623b\u308b   Y \u89e3\u9664", "")]
 
 # Language & region shares one Settings row and shows the language in its own script.
-JA_SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "\u30aa\u30f3"), ("Bluetooth", "WH-1000XM4"),
+JA_SET = [("WiFi", "Hofmann-5G"), ("SSH", "\u30aa\u30f3"), ("Bluetooth", "WH-1000XM4"),
           ("USB\u30e2\u30fc\u30c9", "\u30cd\u30c3\u30c8\u30ef\u30fc\u30af"),
           ("\u30dc\u30bf\u30f3\u8868\u8a18", "Retroid"),
           ("\u30b2\u30fc\u30e0\u6a5f", "\u5909\u66f4 2\u4ef6"),
@@ -497,7 +500,7 @@ def lang_screen(ja):
     else:
         lines = [header("Settings  \u203a  Language & region", CLOCK), RULE, ""]
         lines += [item(True, "Language / \u8a00\u8a9e", "English"),
-                  item(False, "Time zone", "Europe/Zurich")]
+                  item(False, "Timezone", "Europe/Zurich")]
         hint = " A CHANGE   B BACK"
     lines += [""] * (ROWS - 2 - len(lines))
     return lines + [THIN, row(hint, "")]
