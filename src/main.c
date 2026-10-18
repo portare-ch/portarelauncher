@@ -278,7 +278,7 @@ static void draw_frame_right(struct ui *u, const char *crumb, int status)
 
 	term_clear(t);
 
-	/* Game lists show only the clock; other screens include device status. */
+	/* Game lists show only the clock; other screens include status when it fits. */
 	int n = 0;
 	if (status && u->st.volume >= 0)
 		n += snprintf(right + n, sizeof(right) - n, "%s %d%%  ", tr(S_VOL), u->st.volume);
@@ -288,6 +288,9 @@ static void draw_frame_right(struct ui *u, const char *crumb, int status)
 		n += snprintf(right + n, sizeof(right) - n, "%s %d%%  ",
 		              tr(u->st.charging ? S_CHG : S_BAT), u->st.capacity);
 	snprintf(right + n, sizeof(right) - n, "%s", u->st.clock);
+	/* Keep the full breadcrumb ahead of the optional device status. */
+	if (text_width(crumb) + text_width(right) + 4 > (int)t->cols)
+		str_copy(right, sizeof(right), u->st.clock);
 	term_puts_right(t, t->cols - 1, 0, right, ATTR_MID);
 
 	/* Leave two columns between the breadcrumb and the variable-width status. */
@@ -613,10 +616,8 @@ static void draw_systems(struct ui *u)
 
 	/* Quick Access, a separator, then systems; no blank row on the 20-row grid. */
 	term_puts(t, 2, 3, tr(S_QUICK), ATTR_MID);
-	snprintf(buf, sizeof(buf), "%d", u->recent.n);
-	draw_row(u, 4, u->sys_sel == QUICK_RECENT, tr(S_RECENT), buf);
-	snprintf(buf, sizeof(buf), "%d", u->favs.n);
-	draw_row(u, 5, u->sys_sel == QUICK_FAVS, tr(S_FAVS), buf);
+	draw_row(u, 4, u->sys_sel == QUICK_RECENT, tr(S_RECENT), NULL);
+	draw_row(u, 5, u->sys_sel == QUICK_FAVS, tr(S_FAVS), NULL);
 	term_hline(t, 6, G_HLINE, ATTR_DIM);
 	term_puts(t, 2, 7, tr(S_SYSTEMS), ATTR_MID);
 
@@ -629,14 +630,12 @@ static void draw_systems(struct ui *u)
 	for (int i = 0; i < visible && u->sys_top + i < rows; i++) {
 		int idx = u->sys_top + i;
 		if (idx == u->cat.n) {
-			snprintf(buf, sizeof(buf), "%d", u->tools.n);
-			draw_row(u, top + (unsigned)i, idx == sel, tr(S_TOOLS), buf);
+			draw_row(u, top + (unsigned)i, idx == sel, tr(S_TOOLS), NULL);
 			continue;
 		}
 		const struct psystem *s = &u->cat.sys[idx];
-		snprintf(buf, sizeof(buf), "%d", s->ngames);
 		draw_row(u, top + (unsigned)i, idx == sel,
-		         lang_system(s->name, s->fullname), buf);
+		         lang_system(s->name, s->fullname), NULL);
 	}
 
 	if (u->cat.n == 0) {
@@ -992,7 +991,7 @@ static void draw_wifi(struct ui *u)
 
 	draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SETTINGS), tr(S_SET_WIFI), NULL));
 
-	draw_row(u, 3, u->wifi_sel == 0, "Wi-Fi", tr(u->wifi_on ? S_ON : S_OFF));
+	draw_row(u, 3, u->wifi_sel == 0, tr(S_SET_WIFI), tr(u->wifi_on ? S_ON : S_OFF));
 
 	if (!u->wifi_on) {
 		term_puts(t, 4, LIST_TOP + 1, tr(S_WIFI_TURN_ON), ATTR_DIM);
@@ -1262,8 +1261,8 @@ static void draw_tz(struct ui *u)
 			         r, here ? tr(S_CURRENT) : NULL);
 		}
 	} else {
-		draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SET_REGION), tr(S_TIMEZONE),
-		                       u->tz.region[u->tz_region]));
+		draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_TIMEZONE),
+		                       u->tz.region[u->tz_region], NULL));
 		term_puts(t, 2, 3, tr(S_CITY), ATTR_MID);
 		snprintf(buf, sizeof(buf), "%d", u->tz_nidx);
 		term_puts_right(t, t->cols - 2, 3, buf, ATTR_MID);

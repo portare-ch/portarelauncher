@@ -37,7 +37,7 @@ enum str {
 	S_FACE_CONFIRM, S_FACE_BACK, S_FACE_SETTINGS,
 	/* Settings > Consoles */
 	S_PRMPT_ON, S_PRMPT_OFF, S_EXPERIMENTAL, S_PRMPT_DESC,
-	/* Settings > Language & region */
+	/* Settings > Language & time */
 	S_LANGUAGE_ROW, S_TIMEZONE,
 	/* Wi-Fi */
 	S_WIFI_TURN_ON, S_NETWORKS, S_N_FOUND, S_SAVED, S_HINT_WIFI_SWITCH,

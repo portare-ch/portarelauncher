@@ -3,16 +3,16 @@
      PortareOS          VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
-      ▸ GameCube                                     24  |
-        Nintendo 64                                   9  |
-        PlayStation                                 112  |
-        PlayStation 2                                 2  |
-        PlayStation Portable                         31  |
-        SNES                                        204  |
-        Mega Drive                                   88  |
-        Game Boy Advance                            140  |
-        Dreamcast                                     6  |
-        Arcade                                       47  |
+      ▸ GameCube                                         |
+        Nintendo 64                                      |
+        PlayStation                                      |
+        PlayStation 2                                    |
+        PlayStation Portable                             |
+        SNES                                             |
+        Mega Drive                                       |
+        Game Boy Advance                                 |
+        Dreamcast                                        |
+        Arcade                                           |
                                                          |
                                                          |
                                                          |
@@ -48,9 +48,9 @@
 
     SETTINGS
     .....................................................  <- 53 columns
-     Settings                                            |
+     Settings           VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
-        Wi-Fi                                Hofmann-5G  |
+        WiFi                                 Hofmann-5G  |
         SSH                                          on  |
         Bluetooth                            WH-1000XM4  |
         USB mode                                network  |
@@ -59,7 +59,7 @@
         Color                                      grey  |
         Color profile                             stock  |
         Charging LED                                 on  |
-        Time zone                         Europe/Zurich  |
+        Timezone                          Europe/Zurich  |
         Diagnostics                                      |
         About                         v0.2.6 2026-09-26  |
         Power                                            |
@@ -72,7 +72,7 @@
 
     SETTINGS - CONSOLES
     .....................................................  <- 53 columns
-     Settings  ›  Consoles                               |
+     Settings  ›  Consoles                         23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
       ▸ SNES                                   PRMPT on  |
@@ -96,7 +96,7 @@
 
     BLUETOOTH
     .....................................................  <- 53 columns
-     Settings  ›  Bluetooth                              |
+     Settings  ›  Bluetooth                        23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
         Bluetooth                                    on  |
@@ -120,7 +120,7 @@
 
     KEYBOARD - letters
     .....................................................  <- 53 columns
-     Settings  ›  Wi-Fi VOL 50%  BRI 70%  BAT 87%  23:59 |
+     Settings  ›  WiFi  VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
       NETWORK  FRITZ!Box 7520 JI                         |
       PASSWORD                       4 / 63  at least 8  |
@@ -144,7 +144,7 @@
 
     KEYBOARD - shift, shape marks
     .....................................................  <- 53 columns
-     Settings  ›  Wi-Fi VOL 50%  BRI 70%  BAT 87%  23:59 |
+     Settings  ›  WiFi  VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
       NETWORK  FRITZ!Box 7520 JI                         |
       PASSWORD                                  11 / 63  |
@@ -168,7 +168,7 @@
 
     KEYBOARD - symbols, password hidden, DONE selected
     .....................................................  <- 53 columns
-     Settings  ›  Wi-Fi VOL 50%  BRI 70%  BAT 87%  23:59 |
+     Settings  ›  WiFi  VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
       NETWORK  FRITZ!Box 7520 JI                         |
       PASSWORD                                  14 / 63  |
@@ -192,7 +192,7 @@
 
     KEYBOARD - join failed
     .....................................................  <- 53 columns
-     Settings  ›  Wi-Fi VOL 50%  BRI 70%  BAT 87%  23:59 |
+     Settings  ›  WiFi  VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
       NETWORK  FRITZ!Box 7520 JI                         |
       PASSWORD                                  14 / 63  |
@@ -268,20 +268,20 @@
      ═══════════════════════════════════════════════════ |
                                                          |
       QUICK ACCESS                                       |
-      ▸ Recently played                              10  |
-        Favourites                                    7  |
+      ▸ Recently played                                  |
+        Favourites                                       |
      ─────────────────────────────────────────────────── |
       SYSTEMS                                            |
-        GameCube                                     24  |
-        Nintendo 64                                   9  |
-        PlayStation                                 112  |
-        PlayStation 2                                 2  |
-        PlayStation Portable                         31  |
-        SNES                                        204  |
-        Mega Drive                                   88  |
-        Game Boy Advance                            140  |
-        Dreamcast                                     6  |
-        Arcade                                       47  |
+        GameCube                                         |
+        Nintendo 64                                      |
+        PlayStation                                      |
+        PlayStation 2                                    |
+        PlayStation Portable                             |
+        SNES                                             |
+        Mega Drive                                       |
+        Game Boy Advance                                 |
+        Dreamcast                                        |
+        Arcade                                           |
      ─────────────────────────────────────────────────── |
      A SELECT   X SETTINGS                               |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
@@ -384,7 +384,7 @@
 
     SETTINGS - DIAGNOSTICS
     .....................................................  <- 53 columns
-     Settings  ›  Diagnostics                            |
+     Settings  ›  Diagnostics                      23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
       ▸ PortScope                                        |
@@ -460,20 +460,20 @@
      ═══════════════════════════════════════════════════ |
                                                          |
       クイックアクセス                                   |
-      ▸ 最近遊んだゲーム                             10  |
-        お気に入り                                    7  |
+      ▸ 最近遊んだゲーム                                 |
+        お気に入り                                       |
      ─────────────────────────────────────────────────── |
       ゲーム機                                           |
-        ニンテンドー ゲームキューブ                  24  |
-        NINTENDO64                                    9  |
-        プレイステーション                          112  |
-        プレイステーション2                           2  |
-        プレイステーション・ポータブル               31  |
-        スーパーファミコン                          204  |
-        メガドライブ                                 88  |
-        ゲームボーイアドバンス                      140  |
-        ドリームキャスト                              6  |
-        アーケード                                   47  |
+        ニンテンドー ゲームキューブ                      |
+        NINTENDO64                                       |
+        プレイステーション                               |
+        プレイステーション2                              |
+        プレイステーション・ポータブル                   |
+        スーパーファミコン                               |
+        メガドライブ                                     |
+        ゲームボーイアドバンス                           |
+        ドリームキャスト                                 |
+        アーケード                                       |
      ─────────────────────────────────────────────────── |
      A 決定   X 設定                                     |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
@@ -530,7 +530,7 @@
     .....................................................  <- 53 columns
      設定          音量 50%  明るさ 70%  電池 87%  23:59 |
      ═══════════════════════════════════════════════════ |
-        Wi-Fi                                Hofmann-5G  |
+        WiFi                                 Hofmann-5G  |
         SSH                                        オン  |
         Bluetooth                            WH-1000XM4  |
         USBモード                          ネットワーク  |
@@ -550,7 +550,7 @@
      A 決定   B 戻る                                     |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
-    PROPOSED - JAPANESE, LANGUAGE & REGION
+    PROPOSED - JAPANESE, LANGUAGE & TIME
     .....................................................  <- 53 columns
      設定  ›  言語と地域                           23:59 |
      ═══════════════════════════════════════════════════ |
@@ -574,13 +574,13 @@
      A 変更   B 戻る                                     |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
-    PROPOSED - LANGUAGE & REGION
+    PROPOSED - LANGUAGE & TIME
     .....................................................  <- 53 columns
-     Settings  ›  Language & region                23:59 |
+     Settings  ›  Language & time                  23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
       ▸ Language / 言語                         English  |
-        Time zone                         Europe/Zurich  |
+        Timezone                          Europe/Zurich  |
                                                          |
                                                          |
                                                          |

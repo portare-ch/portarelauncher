@@ -86,11 +86,14 @@ def item(sel, label, right=""):
 
 RULE = " " + "\u2550" * (COLS - 2)
 
-# Match draw_frame: right-aligned status, then a two-column gap to the breadcrumb.
+# Match draw_frame: status yields to the breadcrumb, keeping the clock.
 STATUS = "VOL 50%  BRI 70%  BAT 87%  23:59 "
 CLOCK = "23:59 "
 def header(crumb, status=STATUS):
-    room = COLS - 1 - width(status) - 2 - 1
+    room = COLS - width(status) - 3  # status includes the right margin
+    if width(crumb) > room:
+        status = CLOCK
+        room = COLS - width(status) - 3
     return row(" " + fit(crumb, room), status)
 
 # Game-list headers show only the clock beside the breadcrumb.
@@ -98,13 +101,12 @@ def crumb(name):
     return header("PortareOS  \u203a  " + name, CLOCK)
 THIN = " " + "\u2500" * (COLS - 2)
 
-SYS = [("GameCube", 24), ("Nintendo 64", 9), ("PlayStation", 112),
-       ("PlayStation 2", 2), ("PlayStation Portable", 31), ("SNES", 204),
-       ("Mega Drive", 88), ("Game Boy Advance", 140), ("Dreamcast", 6),
-       ("Arcade", 47)]
+SYS = ["GameCube", "Nintendo 64", "PlayStation",
+       "PlayStation 2", "PlayStation Portable", "SNES",
+       "Mega Drive", "Game Boy Advance", "Dreamcast", "Arcade"]
 
 systems = [header("PortareOS"), RULE, ""]
-systems += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(SYS)]
+systems += [item(i == 0, n) for i, n in enumerate(SYS)]
 systems += [""] * (ROWS - 2 - len(systems))
 systems += [THIN, row(" A SELECT   X SETTINGS", "")]
 
@@ -115,14 +117,14 @@ games += [item(n == "Tekken 3", n) for n in GAMES]
 games += [""] * (ROWS - 2 - len(games))
 games += [THIN, row(" A LAUNCH   B BACK", "8 / 112 ")]
 
-SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
+SET = [("WiFi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
        ("USB mode", "network"), ("Button style", "Retroid"),
        ("Consoles", "2 changed"),
        ("Color", "grey"), ("Color profile", "stock"), ("Charging LED", "on"),
-       ("Time zone", "Europe/Zurich"), ("Diagnostics", ""),
+       ("Timezone", "Europe/Zurich"), ("Diagnostics", ""),
        ("About", "v0.2.6 2026-09-26"), ("Power", "")]
 # Settings fill rows 2..14; the three-row button diagram also uses the upper rule.
-settings = [row(" Settings", ""), RULE]
+settings = [header("Settings"), RULE]
 settings += [item(i == 4, n, v) for i, (n, v) in enumerate(SET)]
 settings += ["         X          X confirm",
              "      Y     A       A back",
@@ -136,7 +138,7 @@ CONSOLES = [("SNES", "PRMPT on"), ("NES", "PRMPT off"),
             ("Game Boy Color", "PRMPT off"), ("Game Boy Advance", "PRMPT off"),
             ("Genesis", "PRMPT off")]
 def consoles_screen(sel):
-    lines = [row(" Settings  \u203a  Consoles", ""), RULE, ""]
+    lines = [header("Settings  \u203a  Consoles"), RULE, ""]
     lines += [item(i == sel, n, v) for i, (n, v) in enumerate(CONSOLES)]
     lines += [THIN, "    Experimental."]
     lines += ["    PRMPT adds a pre-emptive frame to reduce",
@@ -148,14 +150,14 @@ def consoles_screen(sel):
 consoles = consoles_screen(0)
 
 DIAG = [("PortScope", "")]
-diagnostics = [row(" Settings  \u203a  Diagnostics", ""), RULE, ""]
+diagnostics = [header("Settings  \u203a  Diagnostics"), RULE, ""]
 diagnostics += [item(i == 0, n, v) for i, (n, v) in enumerate(DIAG)]
 diagnostics += [""] * (ROWS - 2 - len(diagnostics))
 diagnostics += [THIN, row(" A OPEN   B BACK", "\u2191\u2193 MOVE ")]
 
 BT = [("WH-1000XM4", "connected"), ("DualSense Edge", "paired"),
       ("Bose QC35", "paired"), ("JBL Flip 5", "new")]
-bluetooth = [row(" Settings  \u203a  Bluetooth", ""), RULE, "",
+bluetooth = [header("Settings  \u203a  Bluetooth"), RULE, "",
              item(False, "Bluetooth", "on"),
              item(False, "Auto-connect paired devices", "yes"),
              THIN,
@@ -219,7 +221,7 @@ def kb_screen(ssid, text, layer, sel=None, bottom_sel=None, hidden=False,
     n = len(text)
     count = f"{n} / 63" if n >= 8 else f"{n} / 63  at least 8"
     # A 32-byte SSID needs its own line below the status header.
-    out = [row(" Settings  ›  Wi-Fi", "VOL 50%  BRI 70%  BAT 87%  23:59 "),
+    out = [header("Settings  ›  WiFi"),
            RULE, "  NETWORK  " + ssid, row("  PASSWORD", count + "  ")]
     out += field(text, hidden)
     out += [""]
@@ -256,12 +258,12 @@ launching += ["           Tekken 3 (USA)", "",
 launching += [""] * 9
 
 # ---- quick access, recent, favourites, long titles ----------------------
-QUICK = [("Recently played", 10), ("Favourites", 7)]
+QUICK = ["Recently played", "Favourites"]
 systems_quick = [header("PortareOS"), RULE, "",
                  row("  QUICK ACCESS", "")]
-systems_quick += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(QUICK)]
+systems_quick += [item(i == 0, n) for i, n in enumerate(QUICK)]
 systems_quick += [THIN, row("  SYSTEMS", "")]
-systems_quick += [item(False, n, str(c)) for n, c in SYS]
+systems_quick += [item(False, n) for n in SYS]
 systems_quick += [THIN, row(" A SELECT   X SETTINGS", "")]
 
 # Unselected titles use ellipses. Selected titles pause 1 s, scroll a column
@@ -405,23 +407,23 @@ def ja_header(crumb):
 def ja_crumb(name):
     return header("PortareOS  \u203a  " + name, CLOCK)
 
-JA_QUICK = [("\u6700\u8fd1\u904a\u3093\u3060\u30b2\u30fc\u30e0", 10),
-            ("\u304a\u6c17\u306b\u5165\u308a", 7)]
-JA_SYS = [("\u30cb\u30f3\u30c6\u30f3\u30c9\u30fc \u30b2\u30fc\u30e0\u30ad\u30e5\u30fc\u30d6", 24),
-          ("NINTENDO64", 9),
-          ("\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f3", 112),
-          ("\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f32", 2),
-          ("\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f3\u30fb\u30dd\u30fc\u30bf\u30d6\u30eb", 31),
-          ("\u30b9\u30fc\u30d1\u30fc\u30d5\u30a1\u30df\u30b3\u30f3", 204),
-          ("\u30e1\u30ac\u30c9\u30e9\u30a4\u30d6", 88),
-          ("\u30b2\u30fc\u30e0\u30dc\u30fc\u30a4\u30a2\u30c9\u30d0\u30f3\u30b9", 140),
-          ("\u30c9\u30ea\u30fc\u30e0\u30ad\u30e3\u30b9\u30c8", 6),
-          ("\u30a2\u30fc\u30b1\u30fc\u30c9", 47)]
+JA_QUICK = ["\u6700\u8fd1\u904a\u3093\u3060\u30b2\u30fc\u30e0",
+            "\u304a\u6c17\u306b\u5165\u308a"]
+JA_SYS = ["\u30cb\u30f3\u30c6\u30f3\u30c9\u30fc \u30b2\u30fc\u30e0\u30ad\u30e5\u30fc\u30d6",
+          "NINTENDO64",
+          "\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f3",
+          "\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f32",
+          "\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f3\u30fb\u30dd\u30fc\u30bf\u30d6\u30eb",
+          "\u30b9\u30fc\u30d1\u30fc\u30d5\u30a1\u30df\u30b3\u30f3",
+          "\u30e1\u30ac\u30c9\u30e9\u30a4\u30d6",
+          "\u30b2\u30fc\u30e0\u30dc\u30fc\u30a4\u30a2\u30c9\u30d0\u30f3\u30b9",
+          "\u30c9\u30ea\u30fc\u30e0\u30ad\u30e3\u30b9\u30c8",
+          "\u30a2\u30fc\u30b1\u30fc\u30c9"]
 ja_systems = [ja_header("PortareOS"), RULE, "",
               row("  \u30af\u30a4\u30c3\u30af\u30a2\u30af\u30bb\u30b9", "")]
-ja_systems += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(JA_QUICK)]
+ja_systems += [item(i == 0, n) for i, n in enumerate(JA_QUICK)]
 ja_systems += [THIN, row("  \u30b2\u30fc\u30e0\u6a5f", "")]
-ja_systems += [item(False, n, str(c)) for n, c in JA_SYS]
+ja_systems += [item(False, n) for n in JA_SYS]
 ja_systems += [THIN, row(" A \u6c7a\u5b9a   X \u8a2d\u5b9a", "")]
 
 # Japanese filenames sort by code point, without readings. The selected long
@@ -473,8 +475,8 @@ for day, games_of_day in JA_RECENT:
 ja_recent += [""] * (ROWS - 2 - len(ja_recent))
 ja_recent += [THIN, row(" A \u8d77\u52d5   B \u623b\u308b   Y \u89e3\u9664", "")]
 
-# Language & region shares one Settings row and shows the language in its own script.
-JA_SET = [("Wi-Fi", "Hofmann-5G"), ("SSH", "\u30aa\u30f3"), ("Bluetooth", "WH-1000XM4"),
+# Language & time shares one Settings row and shows the language in its own script.
+JA_SET = [("WiFi", "Hofmann-5G"), ("SSH", "\u30aa\u30f3"), ("Bluetooth", "WH-1000XM4"),
           ("USB\u30e2\u30fc\u30c9", "\u30cd\u30c3\u30c8\u30ef\u30fc\u30af"),
           ("\u30dc\u30bf\u30f3\u8868\u8a18", "Retroid"),
           ("\u30b2\u30fc\u30e0\u6a5f", "\u5909\u66f4 2\u4ef6"),
@@ -496,9 +498,9 @@ def lang_screen(ja):
                   item(False, "\u30bf\u30a4\u30e0\u30be\u30fc\u30f3", "Asia/Tokyo")]
         hint = " A \u5909\u66f4   B \u623b\u308b"
     else:
-        lines = [header("Settings  \u203a  Language & region", CLOCK), RULE, ""]
+        lines = [header("Settings  \u203a  Language & time", CLOCK), RULE, ""]
         lines += [item(True, "Language / \u8a00\u8a9e", "English"),
-                  item(False, "Time zone", "Europe/Zurich")]
+                  item(False, "Timezone", "Europe/Zurich")]
         hint = " A CHANGE   B BACK"
     lines += [""] * (ROWS - 2 - len(lines))
     return lines + [THIN, row(hint, "")]
@@ -544,8 +546,8 @@ if __name__ == "__main__":
                  ("PROPOSED - JAPANESE, GAMES, A LONG TITLE SCROLLED", ja_games),
                  ("PROPOSED - JAPANESE, RECENTLY PLAYED", ja_recent),
                  ("PROPOSED - JAPANESE, SETTINGS", ja_settings),
-                 ("PROPOSED - JAPANESE, LANGUAGE & REGION", ja_language),
-                 ("PROPOSED - LANGUAGE & REGION", en_language),
+                 ("PROPOSED - JAPANESE, LANGUAGE & TIME", ja_language),
+                 ("PROPOSED - LANGUAGE & TIME", en_language),
                  ("PROPOSED - ENGLISH, TITLES IN ANY SCRIPT", games_any_script)):
         print(screen(t, s))
         print()
