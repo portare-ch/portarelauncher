@@ -475,7 +475,7 @@ for day, games_of_day in JA_RECENT:
 ja_recent += [""] * (ROWS - 2 - len(ja_recent))
 ja_recent += [THIN, row(" A \u8d77\u52d5   B \u623b\u308b   Y \u89e3\u9664", "")]
 
-# Language & region shares one Settings row and shows the language in its own script.
+# Language & time shares one Settings row and shows the language in its own script.
 JA_SET = [("WiFi", "Hofmann-5G"), ("SSH", "\u30aa\u30f3"), ("Bluetooth", "WH-1000XM4"),
           ("USB\u30e2\u30fc\u30c9", "\u30cd\u30c3\u30c8\u30ef\u30fc\u30af"),
           ("\u30dc\u30bf\u30f3\u8868\u8a18", "Retroid"),
@@ -483,7 +483,7 @@ JA_SET = [("WiFi", "Hofmann-5G"), ("SSH", "\u30aa\u30f3"), ("Bluetooth", "WH-100
           ("\u914d\u8272", "\u30b0\u30ec\u30fc"),
           ("\u30ab\u30e9\u30fc\u30d7\u30ed\u30d5\u30a1\u30a4\u30eb", "\u6a19\u6e96"),
           ("\u5145\u96fbLED", "\u30aa\u30f3"),
-          ("\u8a00\u8a9e\u3068\u5730\u57df", "\u65e5\u672c\u8a9e"),
+          ("\u8a00\u8a9e\u3068\u30bf\u30a4\u30e0\u30be\u30fc\u30f3", "\u65e5\u672c\u8a9e"),
           ("\u8a3a\u65ad", ""), ("\u60c5\u5831", "v0.6.0 2026-10-07"), ("\u96fb\u6e90", "")]
 ja_settings = [ja_header("\u8a2d\u5b9a"), RULE]
 ja_settings += [item(i == 9, n, v) for i, (n, v) in enumerate(JA_SET)]
@@ -493,12 +493,12 @@ ja_settings += [THIN, row(" A \u6c7a\u5b9a   B \u623b\u308b", "")]
 # Name the language row in both languages so an accidental switch can be undone.
 def lang_screen(ja):
     if ja:
-        lines = [header("\u8a2d\u5b9a  \u203a  \u8a00\u8a9e\u3068\u5730\u57df", CLOCK), RULE, ""]
+        lines = [header("\u8a2d\u5b9a  \u203a  \u8a00\u8a9e\u3068\u30bf\u30a4\u30e0\u30be\u30fc\u30f3", CLOCK), RULE, ""]
         lines += [item(True, "\u8a00\u8a9e / Language", "\u65e5\u672c\u8a9e"),
                   item(False, "\u30bf\u30a4\u30e0\u30be\u30fc\u30f3", "Asia/Tokyo")]
         hint = " A \u5909\u66f4   B \u623b\u308b"
     else:
-        lines = [header("Settings  \u203a  Language & region", CLOCK), RULE, ""]
+        lines = [header("Settings  \u203a  Language & time", CLOCK), RULE, ""]
         lines += [item(True, "Language / \u8a00\u8a9e", "English"),
                   item(False, "Timezone", "Europe/Zurich")]
         hint = " A CHANGE   B BACK"
@@ -546,8 +546,8 @@ if __name__ == "__main__":
                  ("PROPOSED - JAPANESE, GAMES, A LONG TITLE SCROLLED", ja_games),
                  ("PROPOSED - JAPANESE, RECENTLY PLAYED", ja_recent),
                  ("PROPOSED - JAPANESE, SETTINGS", ja_settings),
-                 ("PROPOSED - JAPANESE, LANGUAGE & REGION", ja_language),
-                 ("PROPOSED - LANGUAGE & REGION", en_language),
+                 ("PROPOSED - JAPANESE, LANGUAGE & TIME", ja_language),
+                 ("PROPOSED - LANGUAGE & TIME", en_language),
                  ("PROPOSED - ENGLISH, TITLES IN ANY SCRIPT", games_any_script)):
         print(screen(t, s))
         print()

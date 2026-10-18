@@ -10,7 +10,7 @@ The launcher in English or Japanese, and in nothing else.
 
 ![Settings](images/ja-settings.png)
 
-![Settings > Language & region](images/ja-language-region.png)
+![Settings > Language & time](images/ja-language-region.png)
 
 ![The same in English](images/language-region.png)
 
@@ -147,8 +147,8 @@ deleting the game.
 
 ## Settings
 
-Settings stays at thirteen rows. Time zone becomes Language & region,
-言語と地域, a submenu with the language and the time zone. Its value is
+Settings stays at thirteen rows. Timezone becomes Language & time,
+言語とタイムゾーン, a submenu with the language and the timezone. Its value is
 the language, named in its own script.
 
 The language row names itself in both languages, `言語 / Language` and

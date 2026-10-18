@@ -8,7 +8,7 @@ Written in C, it draws directly to the display through KMS using libc and libdrm
 - Launch games through `runemu.sh` and tools such as PortMaster.
 - Manage Wi-Fi, Bluetooth, display settings, power and system updates.
 - Check every button and stick with PortScope, under Settings > Diagnostics.
-- In English or Japanese, under Settings > Language & region. Titles in
+- In English or Japanese, under Settings > Language & time. Titles in
   Japanese or accented file names read correctly in either.
 
 ## Build
