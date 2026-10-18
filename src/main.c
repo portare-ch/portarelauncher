@@ -77,6 +77,7 @@ static const struct { const char *key, *label; } consoles[] = {
 	{ "gbc",     "Game Boy Color"   },
 	{ "gba",     "Game Boy Advance" },
 	{ "genesis", "Genesis"          },
+	{ "neocd",   "Neo Geo CD"       },
 };
 #define N_CONSOLES ((int)(sizeof(consoles) / sizeof(consoles[0])))
 
