@@ -3,16 +3,16 @@
      PortareOS          VOL 50%  BRI 70%  BAT 87%  23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
-      ▸ GameCube                                     24  |
-        Nintendo 64                                   9  |
-        PlayStation                                 112  |
-        PlayStation 2                                 2  |
-        PlayStation Portable                         31  |
-        SNES                                        204  |
-        Mega Drive                                   88  |
-        Game Boy Advance                            140  |
-        Dreamcast                                     6  |
-        Arcade                                       47  |
+      ▸ GameCube                                         |
+        Nintendo 64                                      |
+        PlayStation                                      |
+        PlayStation 2                                    |
+        PlayStation Portable                             |
+        SNES                                             |
+        Mega Drive                                       |
+        Game Boy Advance                                 |
+        Dreamcast                                        |
+        Arcade                                           |
                                                          |
                                                          |
                                                          |
@@ -268,20 +268,20 @@
      ═══════════════════════════════════════════════════ |
                                                          |
       QUICK ACCESS                                       |
-      ▸ Recently played                              10  |
-        Favourites                                    7  |
+      ▸ Recently played                                  |
+        Favourites                                       |
      ─────────────────────────────────────────────────── |
       SYSTEMS                                            |
-        GameCube                                     24  |
-        Nintendo 64                                   9  |
-        PlayStation                                 112  |
-        PlayStation 2                                 2  |
-        PlayStation Portable                         31  |
-        SNES                                        204  |
-        Mega Drive                                   88  |
-        Game Boy Advance                            140  |
-        Dreamcast                                     6  |
-        Arcade                                       47  |
+        GameCube                                         |
+        Nintendo 64                                      |
+        PlayStation                                      |
+        PlayStation 2                                    |
+        PlayStation Portable                             |
+        SNES                                             |
+        Mega Drive                                       |
+        Game Boy Advance                                 |
+        Dreamcast                                        |
+        Arcade                                           |
      ─────────────────────────────────────────────────── |
      A SELECT   X SETTINGS                               |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
@@ -460,20 +460,20 @@
      ═══════════════════════════════════════════════════ |
                                                          |
       クイックアクセス                                   |
-      ▸ 最近遊んだゲーム                             10  |
-        お気に入り                                    7  |
+      ▸ 最近遊んだゲーム                                 |
+        お気に入り                                       |
      ─────────────────────────────────────────────────── |
       ゲーム機                                           |
-        ニンテンドー ゲームキューブ                  24  |
-        NINTENDO64                                    9  |
-        プレイステーション                          112  |
-        プレイステーション2                           2  |
-        プレイステーション・ポータブル               31  |
-        スーパーファミコン                          204  |
-        メガドライブ                                 88  |
-        ゲームボーイアドバンス                      140  |
-        ドリームキャスト                              6  |
-        アーケード                                   47  |
+        ニンテンドー ゲームキューブ                      |
+        NINTENDO64                                       |
+        プレイステーション                               |
+        プレイステーション2                              |
+        プレイステーション・ポータブル                   |
+        スーパーファミコン                               |
+        メガドライブ                                     |
+        ゲームボーイアドバンス                           |
+        ドリームキャスト                                 |
+        アーケード                                       |
      ─────────────────────────────────────────────────── |
      A 決定   X 設定                                     |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows

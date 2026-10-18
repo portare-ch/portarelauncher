@@ -98,13 +98,12 @@ def crumb(name):
     return header("PortareOS  \u203a  " + name, CLOCK)
 THIN = " " + "\u2500" * (COLS - 2)
 
-SYS = [("GameCube", 24), ("Nintendo 64", 9), ("PlayStation", 112),
-       ("PlayStation 2", 2), ("PlayStation Portable", 31), ("SNES", 204),
-       ("Mega Drive", 88), ("Game Boy Advance", 140), ("Dreamcast", 6),
-       ("Arcade", 47)]
+SYS = ["GameCube", "Nintendo 64", "PlayStation",
+       "PlayStation 2", "PlayStation Portable", "SNES",
+       "Mega Drive", "Game Boy Advance", "Dreamcast", "Arcade"]
 
 systems = [header("PortareOS"), RULE, ""]
-systems += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(SYS)]
+systems += [item(i == 0, n) for i, n in enumerate(SYS)]
 systems += [""] * (ROWS - 2 - len(systems))
 systems += [THIN, row(" A SELECT   X SETTINGS", "")]
 
@@ -256,12 +255,12 @@ launching += ["           Tekken 3 (USA)", "",
 launching += [""] * 9
 
 # ---- quick access, recent, favourites, long titles ----------------------
-QUICK = [("Recently played", 10), ("Favourites", 7)]
+QUICK = ["Recently played", "Favourites"]
 systems_quick = [header("PortareOS"), RULE, "",
                  row("  QUICK ACCESS", "")]
-systems_quick += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(QUICK)]
+systems_quick += [item(i == 0, n) for i, n in enumerate(QUICK)]
 systems_quick += [THIN, row("  SYSTEMS", "")]
-systems_quick += [item(False, n, str(c)) for n, c in SYS]
+systems_quick += [item(False, n) for n in SYS]
 systems_quick += [THIN, row(" A SELECT   X SETTINGS", "")]
 
 # Unselected titles use ellipses. Selected titles pause 1 s, scroll a column
@@ -405,23 +404,23 @@ def ja_header(crumb):
 def ja_crumb(name):
     return header("PortareOS  \u203a  " + name, CLOCK)
 
-JA_QUICK = [("\u6700\u8fd1\u904a\u3093\u3060\u30b2\u30fc\u30e0", 10),
-            ("\u304a\u6c17\u306b\u5165\u308a", 7)]
-JA_SYS = [("\u30cb\u30f3\u30c6\u30f3\u30c9\u30fc \u30b2\u30fc\u30e0\u30ad\u30e5\u30fc\u30d6", 24),
-          ("NINTENDO64", 9),
-          ("\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f3", 112),
-          ("\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f32", 2),
-          ("\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f3\u30fb\u30dd\u30fc\u30bf\u30d6\u30eb", 31),
-          ("\u30b9\u30fc\u30d1\u30fc\u30d5\u30a1\u30df\u30b3\u30f3", 204),
-          ("\u30e1\u30ac\u30c9\u30e9\u30a4\u30d6", 88),
-          ("\u30b2\u30fc\u30e0\u30dc\u30fc\u30a4\u30a2\u30c9\u30d0\u30f3\u30b9", 140),
-          ("\u30c9\u30ea\u30fc\u30e0\u30ad\u30e3\u30b9\u30c8", 6),
-          ("\u30a2\u30fc\u30b1\u30fc\u30c9", 47)]
+JA_QUICK = ["\u6700\u8fd1\u904a\u3093\u3060\u30b2\u30fc\u30e0",
+            "\u304a\u6c17\u306b\u5165\u308a"]
+JA_SYS = ["\u30cb\u30f3\u30c6\u30f3\u30c9\u30fc \u30b2\u30fc\u30e0\u30ad\u30e5\u30fc\u30d6",
+          "NINTENDO64",
+          "\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f3",
+          "\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f32",
+          "\u30d7\u30ec\u30a4\u30b9\u30c6\u30fc\u30b7\u30e7\u30f3\u30fb\u30dd\u30fc\u30bf\u30d6\u30eb",
+          "\u30b9\u30fc\u30d1\u30fc\u30d5\u30a1\u30df\u30b3\u30f3",
+          "\u30e1\u30ac\u30c9\u30e9\u30a4\u30d6",
+          "\u30b2\u30fc\u30e0\u30dc\u30fc\u30a4\u30a2\u30c9\u30d0\u30f3\u30b9",
+          "\u30c9\u30ea\u30fc\u30e0\u30ad\u30e3\u30b9\u30c8",
+          "\u30a2\u30fc\u30b1\u30fc\u30c9"]
 ja_systems = [ja_header("PortareOS"), RULE, "",
               row("  \u30af\u30a4\u30c3\u30af\u30a2\u30af\u30bb\u30b9", "")]
-ja_systems += [item(i == 0, n, str(c)) for i, (n, c) in enumerate(JA_QUICK)]
+ja_systems += [item(i == 0, n) for i, n in enumerate(JA_QUICK)]
 ja_systems += [THIN, row("  \u30b2\u30fc\u30e0\u6a5f", "")]
-ja_systems += [item(False, n, str(c)) for n, c in JA_SYS]
+ja_systems += [item(False, n) for n in JA_SYS]
 ja_systems += [THIN, row(" A \u6c7a\u5b9a   X \u8a2d\u5b9a", "")]
 
 # Japanese filenames sort by code point, without readings. The selected long
