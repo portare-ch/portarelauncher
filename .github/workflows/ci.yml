@@ -26,11 +26,11 @@ jobs:
       - name: Tests
         run: make test
 
-      - name: PlayStation helper and title generator fixtures
+      - name: Disc title helper and title generator fixtures
         run: make test-chd
 
       - name: Tests under ASan and UBSan
         run: make test SAN=1
 
-      - name: PlayStation decoder under ASan and UBSan
+      - name: Disc title decoder under ASan and UBSan
         run: make test-chd-san

@@ -1,4 +1,4 @@
-/* Read-only, bounded PS1/PS2/PSP identification. Compression is entirely libchdr's. */
+/* Read-only, bounded PS1/PS2/PSP/Neo Geo CD identification. Compression is libchdr's. */
 #include "ps_iso.h"
 #include <libchdr/chd.h>
 #include <errno.h>

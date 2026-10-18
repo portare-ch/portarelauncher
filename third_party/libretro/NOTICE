@@ -1,4 +1,4 @@
-PortareLauncher offline PlayStation (PS1) and PSP titles
+PortareLauncher offline PlayStation (PS1), PSP and Neo Geo CD titles
 
 Source: Libretro database, Redump Sony - PlayStation DAT
 https://github.com/libretro/libretro-database/blob/12c21cf79f1e20eff6ac68b80875816c717d0a7a/metadat/redump/Sony%20-%20PlayStation.dat
@@ -29,3 +29,23 @@ The menu resolver removes parenthesized language-code groups for display only;
 regions, disc labels, source DATs and exported table contents are preserved.
 The derivative data retains CC-BY-SA-4.0 terms and attribution. No RetroArch
 runtime, .rdb parser, online lookup or provider fallback chain is used.
+
+Neo Geo CD source: Libretro database, Redump SNK - Neo Geo CD DAT
+https://github.com/libretro/libretro-database/blob/12c21cf79f1e20eff6ac68b80875816c717d0a7a/metadat/redump/SNK%20-%20Neo%20Geo%20CD.dat
+Same revision, upstream credits and CC-BY-SA-4.0 license as above.
+Retrieved: 2026-10-18. Unmodified source retained in NeoGeoCD.dat.xz.
+Decompressed SHA-256:
+265756750d6f54ff5ebf8622ad3ad582135e809c196ad6c58a4425e1a85784bb
+Generated table: 96 entries, 4,250 UTF-8 bytes; one ambiguous ID omitted.
+The derivative table uses the 16-bit program-header game ID, not the retail
+catalogue number. Normal commercial NGCD numbers use BCD; publisher-specific
+catalogue numbers and Fatal Fury 3 require explicit hardware-ID mappings.
+These factual mappings were cross-checked against:
+https://github.com/finalburnneo/FBNeo/blob/4033bc427be0538d637eceed40c430c4837d0780/src/burner/neocdlist_games.h
+No FBNeo code or title table is included or linked. Titles come only from
+the pinned Libretro DAT. Region, language and revision labels are removed
+because the program ID does not distinguish those retail variants. Different
+remaining names for an ID are omitted and recorded in neocd-title-collisions.json.
+Unknown homebrew catalogue-to-header mappings are omitted.
+Treasure of the Caribbean reuses Janshin's hardware ID 0x0048; both titles
+are recorded as an ambiguous ID and omitted from the runtime table.

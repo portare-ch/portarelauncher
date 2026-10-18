@@ -16,7 +16,7 @@ struct disc_title_table {
 	size_t ntitles;
 };
 struct disc_titles {
-	struct disc_title_table ps2, psx, psp;
+	struct disc_title_table ps2, psx, psp, neocd;
 	struct disc_identity *entries;
 	int *buckets;
 	size_t nentries, capacity;
@@ -32,7 +32,7 @@ struct disc_titles {
 };
 /* Missing/damaged files are an empty database/cache. init always initializes. */
 void disc_titles_init(struct disc_titles *m, const char *ps2_table, const char *psx_table,
-                      const char *psp_table, const char *cache, const char *helper);
+                      const char *psp_table, const char *neocd_table, const char *cache, const char *helper);
 void disc_titles_free(struct disc_titles *m);
 int disc_titles_supported(const char *system);
 int disc_titles_eligible(const char *system, const char *path, int folder);

@@ -1,5 +1,6 @@
 #include "ps_iso.h"
 #include "ps_sfo.h"
+#include <stdio.h>
 #include <string.h>
 #include <strings.h>
 #define DIRECTORY_MAX (1024U * 1024U)
@@ -82,6 +83,92 @@ static int psp_serial(const struct ps_disc *d, uint32_t volume, const struct met
 	if (rc) return rc;
 	return ps_sfo_serial(data,sfo.size,serial) ? 0 : 1;
 }
+static char *trim(char *s)
+{
+	while (*s == ' ' || *s == '\t') s++;
+	char *end = s+strlen(s);
+	while (end > s && (end[-1] == ' ' || end[-1] == '\t')) *--end = 0;
+	return s;
+}
+static int hex_field(char *s, uint32_t *value)
+{
+	s = trim(s);
+	size_t n = strlen(s);
+	if (!n || n > 8) return 0;
+	*value = 0;
+	for (size_t i = 0; i < n; i++) {
+		unsigned char c = (unsigned char)s[i];
+		unsigned digit = c >= '0' && c <= '9' ? c-'0' :
+		                 c >= 'A' && c <= 'F' ? c-'A'+10 :
+		                 c >= 'a' && c <= 'f' ? c-'a'+10 : 16;
+		if (digit == 16) return 0;
+		*value = (*value << 4) | digit;
+	}
+	return 1;
+}
+/* IPL entries are filename,bank,hexadecimal load address. Only the PRG loaded
+ * at zero contains the boot header; other PRGs can be unrelated overlays. */
+static int neocd_serial(const struct ps_disc *d, uint32_t volume, uint32_t dir, uint32_t bytes,
+                        const struct metadata_entry *ipl, char serial[PS_SERIAL_SIZE])
+{
+	unsigned char data[CONFIG_MAX+1];
+	int rc = read_file(d,ipl,data,CONFIG_MAX);
+	if (rc) return rc;
+	if (memchr(data,0,ipl->size)) return 1;
+	data[ipl->size] = 0;
+	char program[32] = "";
+	unsigned count = 0;
+	for (char *p = (char *)data; *p;) {
+		if (*p == '\r' || *p == '\n' || *p == ' ' || *p == '\t') { p++; continue; }
+		if ((unsigned char)*p == 0x1a) {
+			for (p++; *p; p++) if (*p != '\r' && *p != '\n' && *p != ' ' && *p != '\t') return 1;
+			break;
+		}
+		char *line = p;
+		while (*p && *p != '\r' && *p != '\n' && (unsigned char)*p != 0x1a) p++;
+		/* The DOS EOF marker may follow the last entry without a newline. */
+		int eof = (unsigned char)*p == 0x1a;
+		if (*p) *p++ = 0;
+		if (++count > 32) return 1;
+		char *bank = strchr(line,','), *address;
+		if (!bank) return 1;
+		*bank++ = 0; address = strchr(bank,',');
+		if (!address) return 1;
+		*address++ = 0;
+		uint32_t b, a;
+		if (!hex_field(bank,&b) || !hex_field(address,&a)) return 1;
+		char *name = trim(line);
+		size_t n = strlen(name);
+		if (!n || n >= sizeof(program)) return 1;
+		for (size_t i = 0; i < n; i++) {
+			unsigned char c = (unsigned char)name[i];
+			if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+			      (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.')) return 1;
+		}
+		if (n > 4 && !strcasecmp(name+n-4,".PRG") && !b && !a) {
+			if (program[0]) return 1;
+			memcpy(program,name,n+1);
+		}
+		if (eof) {
+			for (; *p; p++) if (*p != '\r' && *p != '\n' && *p != ' ' && *p != '\t') return 1;
+			break;
+		}
+	}
+	if (!program[0]) return 1;
+	struct metadata_entry prg = {.name=program};
+	rc = directory(d,volume,dir,bytes,&prg,1);
+	if (rc) return rc;
+	if (!prg.found || prg.size < 0x10a) return 1;
+	unsigned char sec[2048];
+	rc = d->read(d->ctx,prg.lba,sec);
+	if (rc) return rc;
+	if (memcmp(sec+0x100,"NEO-GEO",7)) return 1;
+	unsigned id = (unsigned)sec[0x108]<<8 | sec[0x109];
+	if (!id || id == 0xffff) return 1;
+	/* The five hexadecimal digits keep the existing fixed-width cache protocol. */
+	snprintf(serial,PS_SERIAL_SIZE,"NGCD-%05X",id);
+	return 0;
+}
 int ps_iso_serial(const struct ps_disc *d, char serial[PS_SERIAL_SIZE])
 {
 	unsigned char sec[2048], root[34];
@@ -100,11 +187,12 @@ int ps_iso_serial(const struct ps_disc *d, char serial[PS_SERIAL_SIZE])
 		break;
 	}
 	if (!bytes) return 1;
-	struct metadata_entry targets[] = {{.name="SYSTEM.CNF"},{.name="PSP_GAME",.directory=1}};
-	int rc = directory(d,volume,dir,bytes,targets,2);
+	struct metadata_entry targets[] = {{.name="SYSTEM.CNF"},{.name="PSP_GAME",.directory=1},{.name="IPL.TXT"}};
+	int rc = directory(d,volume,dir,bytes,targets,3);
 	if (rc) return rc;
-	/* A mixed console layout is ambiguous. An invalid boot file cannot fall through to PSP. */
-	if (targets[0].found && targets[1].found) return 1;
+	/* A mixed console layout is ambiguous. Invalid metadata cannot fall through. */
+	if (targets[0].found + targets[1].found + targets[2].found > 1) return 1;
+	if (targets[2].found) return neocd_serial(d,volume,dir,bytes,&targets[2],serial);
 	if (targets[1].found) return psp_serial(d,volume,&targets[1],serial);
 	if (!targets[0].found) return 1;
 	unsigned char config[CONFIG_MAX];

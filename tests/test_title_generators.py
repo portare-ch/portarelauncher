@@ -7,6 +7,7 @@ import sys
 import tempfile
 import json
 import lzma
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 spec=importlib.util.spec_from_file_location('generator',Path(__file__).resolve().parents[1]/'tools/gen_ps2_titles.py')
 g=importlib.util.module_from_spec(spec); spec.loader.exec_module(g)
 class GeneratorTests(unittest.TestCase):
@@ -46,6 +47,25 @@ class PS1GeneratorTests(unittest.TestCase):
         for source in ('game ( name "A"', 'game ( name "A" name "B" )', 'game ( name "A" ) )'):
             with self.assertRaises(ValueError): psx.export(source)
 
+neocd_spec=importlib.util.spec_from_file_location('neocd_generator',Path(__file__).resolve().parents[1]/'tools/gen_neocd_titles.py')
+neocd=importlib.util.module_from_spec(neocd_spec); neocd_spec.loader.exec_module(neocd)
+class NeoCDGeneratorTests(unittest.TestCase):
+    def test_program_ids_and_retail_variants(self):
+        source='''game ( name "Metal Slug 2 (World) (En,Ja)" rom ( serial "NGCD-2410" ) )
+game ( name "Metal Slug 2 (World) (En,Ja)" rom ( serial "NGCD-2411" ) )
+game ( name "ADK World (Japan)" rom ( serial "ADCD-103" ) )
+game ( name "Fatal Fury 3 (Export) (Rev 2)" rom ( serial "NGCD-069E" ) )
+game ( name "Fatal Fury 3 (Japan)" rom ( serial "NGCD-069" ) )'''
+        self.assertEqual(neocd.export(source),(b'NGCD-00204\tADK World\nNGCD-00241\tMetal Slug 2\nNGCD-0069C\tFatal Fury 3\n',{}))
+    def test_ambiguity_and_unknown_catalogue_numbers(self):
+        a='game ( name "Game A" rom ( serial "NGCD-2410" ) )'
+        b='game ( name "Game B" rom ( serial "NGCD-2411" ) )'
+        self.assertEqual(neocd.export(a+b),neocd.export(b+a))
+        self.assertEqual(neocd.export(a+b)[0],b'')
+        self.assertEqual(neocd.export('game ( name "Unknown" rom ( serial "NGCD-999" ) )'),(b'',{}))
+        reused='game ( name "Janshin" rom ( serial "AICD-048" ) )game ( name "Treasure" rom ( serial "NGCD-500" ) )'
+        self.assertEqual(neocd.export(reused),(b'',{'NGCD-00048':['Janshin','Treasure']}))
+
 class PinnedGeneratorTests(unittest.TestCase):
     def test_pinned_exports(self):
         root=Path(__file__).resolve().parents[1]
@@ -54,6 +74,7 @@ class PinnedGeneratorTests(unittest.TestCase):
                 ('ps2','pcsx2/GameIndex.yaml.xz'),
                 ('psx','libretro/PlayStation.dat.xz'),
                 ('psp','libretro/PlayStationPortable.dat.xz'),
+                ('neocd','libretro/NeoGeoCD.dat.xz'),
             ):
                 with self.subTest(system=system):
                     out=Path(directory)/f'{system}.tsv'; collisions=Path(directory)/'collisions.json'
