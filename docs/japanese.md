@@ -147,9 +147,10 @@ deleting the game.
 
 ## Settings
 
-Settings stays at thirteen rows. Timezone becomes Language & time,
-言語とタイムゾーン, a submenu with the language and the timezone. Its value is
-the language, named in its own script.
+Settings has thirteen rows. The Language & time submenu, 言語と地域 in
+Japanese, contains language and timezone settings. The regional selection
+also determines the WiFi country code. Its menu row shows the language,
+named in its own script.
 
 The language row names itself in both languages, `言語 / Language` and
 `Language / 言語`, the one place that does. Whoever switched by mistake has

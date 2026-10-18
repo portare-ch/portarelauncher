@@ -483,7 +483,7 @@ JA_SET = [("WiFi", "Hofmann-5G"), ("SSH", "\u30aa\u30f3"), ("Bluetooth", "WH-100
           ("\u914d\u8272", "\u30b0\u30ec\u30fc"),
           ("\u30ab\u30e9\u30fc\u30d7\u30ed\u30d5\u30a1\u30a4\u30eb", "\u6a19\u6e96"),
           ("\u5145\u96fbLED", "\u30aa\u30f3"),
-          ("\u8a00\u8a9e\u3068\u30bf\u30a4\u30e0\u30be\u30fc\u30f3", "\u65e5\u672c\u8a9e"),
+          ("\u8a00\u8a9e\u3068\u5730\u57df", "\u65e5\u672c\u8a9e"),
           ("\u8a3a\u65ad", ""), ("\u60c5\u5831", "v0.6.0 2026-10-07"), ("\u96fb\u6e90", "")]
 ja_settings = [ja_header("\u8a2d\u5b9a"), RULE]
 ja_settings += [item(i == 9, n, v) for i, (n, v) in enumerate(JA_SET)]
@@ -493,7 +493,7 @@ ja_settings += [THIN, row(" A \u6c7a\u5b9a   B \u623b\u308b", "")]
 # Name the language row in both languages so an accidental switch can be undone.
 def lang_screen(ja):
     if ja:
-        lines = [header("\u8a2d\u5b9a  \u203a  \u8a00\u8a9e\u3068\u30bf\u30a4\u30e0\u30be\u30fc\u30f3", CLOCK), RULE, ""]
+        lines = [header("\u8a2d\u5b9a  \u203a  \u8a00\u8a9e\u3068\u5730\u57df", CLOCK), RULE, ""]
         lines += [item(True, "\u8a00\u8a9e / Language", "\u65e5\u672c\u8a9e"),
                   item(False, "\u30bf\u30a4\u30e0\u30be\u30fc\u30f3", "Asia/Tokyo")]
         hint = " A \u5909\u66f4   B \u623b\u308b"

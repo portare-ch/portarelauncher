@@ -56,7 +56,7 @@ static const struct {
 	[S_SET_COLOR]    = { { "Color", "配色" }, 24 },
 	[S_SET_PROFILE]  = { { "Color profile", "カラープロファイル" }, 24 },
 	[S_SET_CHARGING] = { { "Charging LED", "充電LED" }, 24 },
-	[S_SET_REGION]   = { { "Language & time", "言語とタイムゾーン" }, 24 },
+	[S_SET_REGION]   = { { "Language & time", "言語と地域" }, 24 },
 	[S_SET_DIAG]     = { { "Diagnostics", "診断" }, 24 },
 	[S_SET_ABOUT]    = { { "About", "情報" }, 24 },
 	[S_SET_POWER]    = { { "Power", "電源" }, 24 },
