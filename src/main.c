@@ -119,6 +119,7 @@ enum { QUICK_RECENT = 0, QUICK_FAVS = 1 };
 #define PS2_TITLES "/usr/share/portarelauncher/ps2-titles.tsv"
 #define PSX_TITLES "/usr/share/portarelauncher/psx-titles.tsv"
 #define PSP_TITLES "/usr/share/portarelauncher/psp-titles.tsv"
+#define NEOCD_TITLES "/usr/share/portarelauncher/neocd-titles.tsv"
 #define DISC_CACHE  "/storage/.cache/portarelauncher/disc-identities"
 #define DISC_HELPER "/usr/bin/ps-chd-id"
 
@@ -2374,7 +2375,7 @@ int main(void)
 	signal(SIGUSR1, on_signal);
 	signal(SIGUSR2, on_signal);
 
-	disc_titles_init(&u.discs, PS2_TITLES, PSX_TITLES, PSP_TITLES, DISC_CACHE, DISC_HELPER);
+	disc_titles_init(&u.discs, PS2_TITLES, PSX_TITLES, PSP_TITLES, NEOCD_TITLES, DISC_CACHE, DISC_HELPER);
 	if (catalog_load_titles(&u.cat, ES_SYSTEMS, SETTINGS, &u.discs) < 0) {
 		disc_titles_free(&u.discs);
 		return 1;

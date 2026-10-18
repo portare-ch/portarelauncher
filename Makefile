@@ -138,7 +138,7 @@ ps-chd-id: src/ps_sfo.c src/ps_sfo.h tools/ps-chd-id.c src/ps_iso.c src/ps_iso.h
 	+$(CMAKE) --build $(PS_BUILD) --target ps-chd-id
 	cp $(PS_BUILD)/ps-chd-id $@
 
-disc-title-tables: data/ps2-titles.tsv data/psx-titles.tsv data/psp-titles.tsv
+disc-title-tables: data/ps2-titles.tsv data/psx-titles.tsv data/psp-titles.tsv data/neocd-titles.tsv
 
 # Normal builds use the checked-in tables. Only explicit regeneration needs
 # Python/PyYAML and the losslessly compressed upstream catalogues.
@@ -146,6 +146,7 @@ regen-disc-title-tables:
 	python3 tools/gen_ps2_titles.py third_party/pcsx2/GameIndex.yaml.xz data/ps2-titles.tsv
 	python3 tools/gen_psx_titles.py third_party/libretro/PlayStation.dat.xz data/psx-titles.tsv --collisions data/psx-title-collisions.json
 	python3 tools/gen_psp_titles.py third_party/libretro/PlayStationPortable.dat.xz data/psp-titles.tsv --collisions data/psp-title-collisions.json
+	python3 tools/gen_neocd_titles.py third_party/libretro/NeoGeoCD.dat.xz data/neocd-titles.tsv --collisions data/neocd-title-collisions.json
 
 test-chd: ps-chd-id disc-title-tables
 	python3 tests/test_ps_chd.py ./ps-chd-id
@@ -166,6 +167,7 @@ install-disc-titles: ps-chd-id disc-title-tables
 	install -Dm644 data/ps2-titles.tsv $(DESTDIR)$(PREFIX)/share/portarelauncher/ps2-titles.tsv
 	install -Dm644 data/psx-titles.tsv $(DESTDIR)$(PREFIX)/share/portarelauncher/psx-titles.tsv
 	install -Dm644 data/psp-titles.tsv $(DESTDIR)$(PREFIX)/share/portarelauncher/psp-titles.tsv
+	install -Dm644 data/neocd-titles.tsv $(DESTDIR)$(PREFIX)/share/portarelauncher/neocd-titles.tsv
 	install -Dm644 third_party/libretro/NOTICE $(DESTDIR)$(PREFIX)/share/portarelauncher/notices/LIBRETRO-NOTICE.txt
 	install -Dm644 third_party/libretro/LICENSE $(DESTDIR)$(PREFIX)/share/portarelauncher/notices/LIBRETRO-LICENSE.txt
 	install -Dm644 third_party/CHD-NOTICES.txt $(DESTDIR)$(PREFIX)/share/portarelauncher/notices/CHD-NOTICES.txt

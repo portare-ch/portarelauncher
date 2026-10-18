@@ -72,6 +72,17 @@ def psp_iso(param=None, game_name='PSP_GAME', sfo_name='PARAM.SFO;1'):
     data[28*2048:28*2048+len(param)] = param
     return data
 
+def neocd_iso(ipl=b'GAME.FIX,0,0\r\nGAME.PRG,0,0\r\nHIGH.PRG,0,130000\r\n',
+              game_id=0x0241, program='GAME.PRG;1'):
+    data = iso(ipl, 'IPL.TXT;1')
+    # A program larger than the config bound is valid: read only its header.
+    r = entry(program, 28, 65536)
+    at = 21*2048 + data[21*2048]
+    data[at:at+len(r)] = r
+    data[28*2048+0x100:28*2048+0x107] = b'NEO-GEO'
+    struct.pack_into('>H', data, 28*2048+0x108, game_id)
+    return data
+
 def cdframes(data, mode):
     frames = bytearray()
     for at in range(0, len(data), 2048):
@@ -210,6 +221,60 @@ class HelperTests(unittest.TestCase):
         data=psp_iso(); first=data[21*2048]
         r=entry('SYSTEM.CNF;1',30,30); data[21*2048+first:21*2048+first+len(r)]=r
         self.run_image(chd(data),1)  # Mixed PS1/PS2 and PSP layouts are ambiguous.
+    def test_neocd(self):
+        self.run_image(chd(neocd_iso()), serial=b'NGCD-00241\n')
+        self.run_image(chd(neocd_iso(game_id=0x069c)), serial=b'NGCD-0069C\n')
+        for ipl in (b'OTHER.PRG,0,130000\r\nGAME.PRG,0,0\r\n\x1a',
+                    b'game.prg,00,00000000\x1a\r\n',
+                    b' \tGAME.PRG , 0 , 0 \n', b'GAME.PRG,0,0'):
+            self.run_image(chd(neocd_iso(ipl)), serial=b'NGCD-00241\n')
+        for mode in ('MODE1', 'MODE1_RAW', 'MODE2_RAW'):
+            data = neocd_iso()
+            data[16*2048+80:16*2048+88] = both32(128)
+            frames = cdframes(data,mode)+bytes(64*2448)
+            self.run_image(chd(frames,2448,[track(1,mode,64),track(2,'AUDIO',64)]),
+                           serial=b'NGCD-00241\n')
+        frames = bytes((8+150)*2448)+cdframes(neocd_iso(),'MODE1_RAW')+bytes(2*2448)
+        self.run_image(chd(frames,2448,[track(1,'AUDIO',7),track(2,'MODE1_RAW',214,150,True)]),
+                       serial=b'NGCD-00241\n')
+    def test_neocd_invalid(self):
+        for ipl in (b'', b'GAME.FIX,0,0\n', b'GAME.PRG,1,0', b'GAME.PRG,0,1',
+                    b'GAME.PRG,0,0\nOTHER.PRG,0,0', b'GAME.PRG,0,0\nGAME.PRG,0,0',
+                    b'GAME.PRG,0,0,0', b'GAME.PRG,0,100000000', b'GAME.PRG,x,0',
+                    b'../GAME.PRG,0,0', b'GAME.PRG,0,0\0', b'GAME.PRG,0,0\x1ajunk',
+                    b'GAME.FIX,0,0\n'*32+b'GAME.PRG,0,0', b'GAME.PRG,0,0\n'+b'x'*32768):
+            with self.subTest(ipl=ipl[:60]): self.run_image(chd(neocd_iso(ipl)),1)
+        for game_id in (0,0xffff):
+            self.run_image(chd(neocd_iso(game_id=game_id)),1)
+        self.run_image(chd(neocd_iso(program='OTHER.PRG;1')),1)
+        data=neocd_iso(); data[28*2048+0x100]=0
+        self.run_image(chd(data),1)
+        for target, flags in (('SYSTEM.CNF;1',0),('PSP_GAME',2)):
+            data=neocd_iso(); at=21*2048
+            at+=data[at]; at+=data[at]
+            r=entry(target,30,30,flags); data[at:at+len(r)]=r
+            self.run_image(chd(data),1)
+        # The header cannot be borrowed from an audio track or a short PRG.
+        for lba,size,flags in ((80,2048,0),(28,0x109,0),(28,65536,2)):
+            data=neocd_iso(); at=21*2048+data[21*2048]
+            r=entry('GAME.PRG;1',lba,size,flags); data[at:at+len(r)]=r
+            self.run_image(chd(data),1)
+        data=neocd_iso(); data[16*2048+80:16*2048+88]=both32(128)
+        at=21*2048+data[21*2048]; r=entry('GAME.PRG;1',80,2048)
+        data[at:at+len(r)]=r
+        frames=cdframes(data,'MODE1_RAW')+bytes(64*2448)
+        self.run_image(chd(frames,2448,[track(1,'MODE1_RAW',64),track(2,'AUDIO',64)]),1)
+    @unittest.skipUnless(shutil.which('chdman'), 'optional chdman compression integration')
+    def test_compressed_neocd_chdman(self):
+        raw=Path(self.tmp.name)/'neocd.bin'
+        frames=cdframes(neocd_iso(),'MODE1_RAW')
+        raw.write_bytes(b''.join(frames[at:at+2352] for at in range(0,len(frames),2448))+bytes(2352*200))
+        cue=Path(self.tmp.name)/'neocd.cue'
+        cue.write_text('FILE "neocd.bin" BINARY\n TRACK 01 MODE1/2352\n INDEX 01 00:00:00\n'
+                       ' TRACK 02 AUDIO\n INDEX 00 00:00:64\n INDEX 01 00:02:64\n')
+        subprocess.run(['chdman','createcd','-i',str(cue),'-o',str(self.path)],check=True,capture_output=True)
+        r=subprocess.run([HELPER,str(self.path)],capture_output=True,timeout=5)
+        self.assertEqual((r.returncode,r.stdout),(0,b'NGCD-00241\n'),r.stderr)
     def test_invalid(self):
         for cnf in (b'BOOTX=SLUS_209.46;1', b'BOOT2=homebrew.elf;1', b'BOOT2=SLUS_20.946;1',
                     b'BOOT2=SLUS_209.46;A', b'random SLUS_209.46', b'BOOT2=SLUS_209.46\0'):

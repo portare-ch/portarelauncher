@@ -15,7 +15,7 @@
 #define ENTRY_MAX 32768U
 #define TABLE_MAX (2U*1024U*1024U)
 #define BUCKETS 65536U
-#define CACHE_HEADER "PSDISC\t3\n" /* cache and resolver format version */
+#define CACHE_HEADER "PSDISC\t4\n" /* retry older no-ID results after adding Neo Geo CD */
 #define HELPER_MS 10000
 struct disc_title { char *serial, *title; };
 struct disc_identity {
@@ -165,11 +165,13 @@ static const struct disc_title_table *table_for(const struct disc_titles *m, con
 	if (!strcmp(system,"ps2")) return &m->ps2;
 	if (!strcmp(system,"psx")) return &m->psx;
 	if (!strcmp(system,"psp")) return &m->psp;
+	if (!strcmp(system,"neogeocd") || !strcmp(system,"neocd")) return &m->neocd;
 	return NULL;
 }
 int disc_titles_supported(const char *system)
 {
-	return !strcmp(system,"ps2") || !strcmp(system,"psx") || !strcmp(system,"psp");
+	return !strcmp(system,"ps2") || !strcmp(system,"psx") || !strcmp(system,"psp") ||
+	       !strcmp(system,"neogeocd") || !strcmp(system,"neocd");
 }
 const char *disc_titles_lookup(const struct disc_titles *db, const char *system, const char *serial)
 {
@@ -268,13 +270,14 @@ static void load_cache(struct disc_titles *m)
 	fclose(f);
 }
 void disc_titles_init(struct disc_titles *m, const char *ps2_table, const char *psx_table,
-                      const char *psp_table, const char *cache, const char *helper)
+                      const char *psp_table, const char *neocd_table, const char *cache, const char *helper)
 {
 	memset(m,0,sizeof(*m)); proc_job_init(&m->job);
 	str_copy(m->cache,sizeof(m->cache),cache); str_copy(m->helper,sizeof(m->helper),helper);
 	m->buckets = malloc(BUCKETS*sizeof(*m->buckets));
 	clear_cache(m); load_table(&m->ps2,ps2_table); load_table(&m->psx,psx_table);
 	load_table(&m->psp,psp_table);
+	load_table(&m->neocd,neocd_table);
 	if (m->buckets) load_cache(m);
 }
 int disc_titles_save(struct disc_titles *m)
@@ -402,5 +405,6 @@ void disc_titles_free(struct disc_titles *m)
 	disc_titles_stop(m); free(m->ps2.table); free(m->ps2.titles);
 	free(m->psx.table); free(m->psx.titles); free(m->entries); free(m->buckets);
 	free(m->psp.table); free(m->psp.titles);
+	free(m->neocd.table); free(m->neocd.titles);
 	memset(m,0,sizeof(*m)); proc_job_init(&m->job);
 }

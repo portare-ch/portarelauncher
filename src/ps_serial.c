@@ -7,7 +7,9 @@ int ps_serial_valid(const char *s)
 {
 	if (strlen(s) != 10 || s[4] != '-') return 0;
 	for (int i = 0; i < 4; i++) if (s[i] < 'A' || s[i] > 'Z') return 0;
-	for (int i = 5; i < 10; i++) if (s[i] < '0' || s[i] > '9') return 0;
+	int neocd = !memcmp(s,"NGCD-0",6);
+	for (int i = 5; i < 10; i++)
+		if (!((s[i] >= '0' && s[i] <= '9') || (neocd && s[i] >= 'A' && s[i] <= 'F'))) return 0;
 	return 1;
 }
 

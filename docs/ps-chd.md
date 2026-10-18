@@ -1,7 +1,7 @@
-# PS1, PS2 and PSP CHD titles
+# PS1, PS2, PSP and Neo Geo CD CHD titles
 
-The launcher identifies PS1 (`psx`), PS2 (`ps2`) and PSP (`psp`) `.chd` files offline,
-regardless of filename.
+The launcher identifies PS1 (`psx`), PS2 (`ps2`), PSP (`psp`) and Neo Geo CD
+(`neogeocd` or `neocd`) `.chd` files offline, regardless of filename.
 Only display labels change. Launch arguments, paths, favourites, recents,
 folders, playlists and other systems retain their existing identities.
 Identical titles remain separate files. Source names preserve available disc
@@ -12,12 +12,11 @@ revision, translation or modification.
 
 Install CMake alongside the existing build dependencies. `make` builds
 `ps-chd-id` and uses the checked-in `data/ps2-titles.tsv`,
-`data/psx-titles.tsv` and `data/psp-titles.tsv`. Normal builds and runtime need
+`data/psx-titles.tsv`, `data/psp-titles.tsv` and `data/neocd-titles.tsv`. Normal builds and runtime need
 neither Python nor YAML. No build or runtime download is performed.
 
-The checksum-pinned PCSX2 GameIndex and Libretro/Redump PS1/PSP DATs are retained
-losslessly as `.xz` files for offline regeneration. They occupy 1,258,588 bytes
-combined, versus 7,743,561 bytes uncompressed. With Python 3 and PyYAML installed,
+The checksum-pinned PCSX2 GameIndex and Libretro/Redump DATs are retained
+losslessly as `.xz` files for offline regeneration. With Python 3 and PyYAML installed,
 run `make regen-disc-title-tables` to recreate the tables and collision reports.
 Checksums are verified against the original, decompressed source bytes.
 The PS1 and PSP DATs share the same pinned Libretro revision and collision policy.
@@ -33,17 +32,18 @@ make install-disc-titles DESTDIR=/path/to/package/root PREFIX=/usr
 This adds `/usr/bin/ps-chd-id`,
 `/usr/share/portarelauncher/ps2-titles.tsv`,
 `/usr/share/portarelauncher/psx-titles.tsv`,
-`/usr/share/portarelauncher/psp-titles.tsv`, and dependency notices under
+`/usr/share/portarelauncher/psp-titles.tsv`,
+`/usr/share/portarelauncher/neocd-titles.tsv`, and dependency notices under
 `/usr/share/portarelauncher/notices/`. Use it alongside the existing launcher
 and font packaging. Source archives retain the decoder sources, compressed
 catalogue inputs and licenses. The YAML, DATs and upstream build files are not
 installed on the device.
 The PS2 table has 12,830 entries and is 599,092 bytes in UTF-8. The PS1 table
 has 10,293 entries and is 505,263 bytes. The PSP table has 3,726 entries and is
-192,947 bytes. See
+192,947 bytes. The Neo Geo CD table has 96 entries and is 4,250 bytes. See
 [PCSX2 provenance](../third_party/pcsx2/NOTICE) and
 [codec notices](../third_party/CHD-NOTICES.txt). PS2 data carries PCSX2's
-GPL-3.0-or-later terms. PS1/PSP data retain Libretro's CC-BY-SA-4.0 terms and
+GPL-3.0-or-later terms. PS1/PSP/Neo Geo CD data retain Libretro's CC-BY-SA-4.0 terms and
 [provenance](../third_party/libretro/NOTICE), separately from the launcher code
 license. Each system has one fixed title source, with no runtime provider chain.
 
@@ -56,7 +56,7 @@ Lookup of those serials keeps the filename. Input order never selects a title.
 
 Menu labels omit parenthesized groups made entirely of recognized language
 codes, such as `(En,Fr,De,Es,It,Nl,Pl,Ru)`, before UTF-8-safe truncation. Region,
-disc, edition and subtitle labels remain. This applies to all three title tables,
+disc, edition and subtitle labels remain. This applies to the PlayStation title tables,
 including favourites and recents, and does not modify source data, file paths or
 the identifier cache. For example, Killzone displays as **Killzone - Liberation
 (USA)**. Filename fallbacks retain their existing behavior.
@@ -69,7 +69,7 @@ exports follow the identifier/table design without adding an RDB parser.
 See the [PortareOS recipe](https://github.com/portare-ch/portareos/blob/main/packages/emulators/libretro/libretro-database/package.mk).
 
 `make` uses CMake's `MinSizeRel` configuration and enables interprocedural
-optimization when the toolchain supports it. Measured on Linux arm64, GCC 12.2:
+optimization when the toolchain supports it. Before Neo Geo CD support, measured on Linux arm64, GCC 12.2:
 the helper is 217,152 bytes, or 199,064 bytes after `strip`, versus 358,584 and
 330,168 bytes for the previous Release build (40% smaller when stripped).
 It statically includes libchdr, miniz 3.1.2
@@ -99,7 +99,8 @@ stderr. The launcher passes the path directly in argv.
 
 The helper uses pinned libchdr `47d794151b2b64f6aba60304e6480f4f5a2bc24b`.
 It decodes only hunks needed for ISO9660 descriptors, the root directory and
-`SYSTEM.CNF` or `PSP_GAME/PARAM.SFO`. There is no full-disc hash, extraction,
+`SYSTEM.CNF`, `PSP_GAME/PARAM.SFO`, or Neo Geo CD's `IPL.TXT` and boot program header.
+There is no full-disc hash, extraction,
 temporary ISO or byte scan
 for serial-like strings. Compressed hunk maps are still read and validated at
 open, but only sparse checkpoints are retained; uncompressed map entries are
@@ -115,8 +116,8 @@ are supported as demonstrated by the real-image check below. PS1 primary volume
 sizes may include audio tracks; actual directory/config reads stay inside the
 selected data track. Form 2 sectors, GD-ROM, old binary `CHCD` metadata, multi-extent/interleaved files, and
 parent-dependent CHDs without a parent fall back to filenames. The filesystem must expose an ISO9660
-primary volume. The only searched paths are root `SYSTEM.CNF` for PS1/PS2 and
-`PSP_GAME/PARAM.SFO` for PSP.
+primary volume. Searched paths are root `SYSTEM.CNF` for PS1/PS2,
+`PSP_GAME/PARAM.SFO` for PSP, and root `IPL.TXT` plus its named boot program for Neo Geo CD.
 
 The ISO reader finds `SYSTEM.CNF` through its directory entry, accepts numeric
 `;version` suffixes, and parses PS2 `BOOT2` or PS1 `BOOT` case-insensitively, accepting whitespace and
@@ -132,11 +133,29 @@ entry types and offsets, then normalizes the `DISC_ID` string, for example
 `UCUS98646` to `UCUS-98646`. Duplicate, malformed or missing DISC_ID values produce
 no identification. SFO title text is not emitted by the helper; the fixed PSP
 table supplies titles through the same cached serial resolver. A disc containing
-both console metadata layouts is treated as ambiguous. The SFO format reference
+multiple console metadata layouts is treated as ambiguous. The SFO format reference
 is [PPSSPP ParamSFO.cpp](https://github.com/hrydgard/ppsspp/blob/master/Core/ELF/ParamSFO.cpp).
 
+For Neo Geo CD, `IPL.TXT` supplies up to 32 `filename,bank,hex-address` entries.
+The reader selects the single root `.PRG` loaded at bank/address zero, validates
+`NEO-GEO` at offset `0x100`, and reads the big-endian game ID at `0x108`.
+Only the first program sector is decoded, even for large executables. Case,
+whitespace, CR/LF and optional DOS EOF markers are accepted. Missing/malformed
+headers, multiple boot programs, unsupported filenames and mixed console layouts
+keep the filename. No arbitrary PRG scan or inference from filenames is used.
+The fixed-width helper/cache ID is `NGCD-` plus five uppercase hexadecimal digits,
+for example `NGCD-00241` or Fatal Fury 3's `NGCD-0069C`; this is a program identity,
+not the retail catalogue serial. The table uses the pinned Libretro/Redump DAT,
+with explicit mappings for publisher catalogue numbers. Region, language and
+revision labels are removed because the header cannot distinguish those editions.
+The shared Janshin/Treasure of the Caribbean ID is omitted and recorded in
+`data/neocd-title-collisions.json`. Unknown IDs and homebrew mappings retain
+filenames. This identifies the underlying game, not modifications that reuse its ID.
+Format references: [IPL file](https://wiki.neogeodev.org/index.php?title=IPL_file)
+and [FBNeo hardware IDs](https://github.com/finalburnneo/FBNeo/blob/4033bc427be0538d637eceed40c430c4837d0780/src/burner/neocdlist_games.h).
+
 Bounds: 32 volume descriptors, 1 MiB per searched directory, 32 KiB configuration,
-64 KiB SFO with at most 256 entries,
+32 KiB IPL with at most 32 entries, 64 KiB SFO with at most 256 entries,
 99 tracks, 1 MiB hunks, 4,194,304 hunks, and 16 GiB logical images. Linux helper
 processes have a 256 MiB address-space cap and a 15-second CPU cap. The launcher
 also enforces a 10-second wall-clock deadline. Bounds are checked before
@@ -146,12 +165,14 @@ address cap, since ASan reserves a much larger address range.
 ## Cache and scheduling
 
 One persistent file lives at
-`/storage/.cache/portarelauncher/disc-identities`. Its version-3 format stores
+`/storage/.cache/portarelauncher/disc-identities`. Its version-4 format stores
 paths (hex encoded for literal tabs/newlines), size, nanosecond mtime, device,
 inode, nanosecond ctime, status and normalized serial. A checksum and end marker
 reject damaged/truncated snapshots. Both successful and stable no-ID results are
 cached; operational failures, deadlines and cancellations are not persisted.
 The stat signature is checked again before accepting a completed result.
+Older cache versions are discarded so previous stable no-ID results are retried
+with the Neo Geo CD reader.
 
 Cached serials are looked up in the current title table before catalog sorting.
 Lookups use the file's system, so identical serial strings in different systems cannot leak
@@ -159,11 +180,10 @@ titles across systems. A table-only update changes titles after launcher
 restart without reopening unchanged CHDs. Missing/corrupt caches or missing tables/helpers preserve the
 filename fallback. Limits are 32,768 cache records, 32,768 records and 2 MiB
 per title table, a 48 MiB cache file and 32,768 queued files per list opening.
-Title indexes allocate only the actual row count. On a 64-bit target the three
-current indexes reserve 429,584 bytes combined, down from 1,572,864 bytes;
-the title text and on-disk tables are unchanged.
+Title indexes allocate only the actual row count. On a 64-bit target the four
+current indexes reserve 431,120 bytes combined.
 
-Opening PS1, PS2 or PSP queues that system's CHDs; Quick Access queues all three systems. One asynchronous
+Opening a supported system queues that system's CHDs; Quick Access queues all four systems. One asynchronous
 helper runs at a time; an immutable path queue survives catalog resorting. The existing input
 poll waits on helper stdout and Linux pidfd completion, plus a single deadline.
 There is no metadata polling timer or daemon. Kernels without usable pidfds
@@ -188,6 +208,7 @@ helper timeout and input/completion
 wakeups. The existing favourites/recents suite remains in those runs.
 
 `make test-chd` checks PS1 BOOT/PS2 BOOT2, bounded PSP PARAM.SFO parsing,
+Neo Geo CD IPL/program headers, retail-to-hardware ID mappings and ambiguous IDs,
 PSP metadata in flat/CD-wrapped images, mixed audio/data volume sizing,
 source-specific collision handling, and synthetic ISO9660 in actual CHDv5
 containers, including
@@ -224,6 +245,17 @@ original paths. PSP was also checked with the sanitized decoder.
 A separate user-owned DVD-style CHD, a conventional CD-sized PS2 disc, and
 interactive navigation/emulator handoff on physical device hardware remain to
 be checked. Synthetic DVD and CD fixtures cover those framing paths.
+
+A fourth user-owned CHD, **Metal Slug 2**, was mounted read-only. This
+476,241,496-byte CHDv5 image has 2448-byte units, a 20,437-frame raw Mode 1
+data track and 19 audio tracks, with CD LZMA/Deflate/FLAC codecs. `IPL.TXT`
+selects `MS2CD.PRG` at address zero; its header identifies `NGCD-00241`,
+resolving to **Metal Slug 2**. The existing CD framing/decoder needed no changes;
+the missing pieces were Neo Geo CD identification, a title table and launcher
+system scheduling. The normal and sanitized helpers were checked against this
+file under an arbitrary filename, through the launcher resolver and persisted
+cache reload with the helper unavailable. The source file was not modified.
+Unsupported IPL layouts and unverified game IDs still retain filenames.
 
 CD layout reference: [MAME cdrom.cpp](https://github.com/mamedev/mame/blob/master/src/lib/util/cdrom.cpp).
 The bounded ISO reader is local because the launcher had no filesystem reader;
