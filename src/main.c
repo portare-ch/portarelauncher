@@ -2,6 +2,7 @@
 #include "bt.h"
 #include "catalog.h"
 #include "disc_titles.h"
+#include "fit.h"
 #include "lists.h"
 #include "color.h"
 #include "input.h"
@@ -20,6 +21,7 @@
 #include "term.h"
 #include "tools.h"
 #include "tz.h"
+#include "uevent.h"
 #include "update.h"
 #include "idle.h"
 #include "timeutil.h"
@@ -107,6 +109,8 @@ static void console_set_latency(int i, int latency)
 #define PL_VERSION "dev"   /* set by the Makefile, from VERSION or git */
 #endif
 #define SCALE       3          /* 8x16 glyphs at 3x is 53x20 on this panel */
+#define PANEL_W     1280       /* the screen a display shows zoomed, boxed */
+#define PANEL_H     960
 
 #define LIST_TOP    5
 #define LIST_MARGIN 3          /* rows kept below the list for the footer */
@@ -153,6 +157,7 @@ struct ui {
 	int blanked;         /* CRTC disabled by idle or SIGUSR1 */
 	struct status st;
 	struct notify notify;
+	int display_fd;      /* display hotplug uevents, or -1 */
 
 	struct net_list nets;
 	int wifi_on;         /* last queried radio state */
@@ -1652,6 +1657,38 @@ static int wait_or_quit(struct ui *u, pid_t pid)
 	return status;
 }
 
+/* The panel's screen on whatever is driven: the whole panel, or a
+ * whole-number zoom of it boxed in a display's mode. */
+static int screen_init(struct ui *u)
+{
+	struct kms *k = &u->kms;
+	struct fit f = fit_box(k->mode.hdisplay, k->mode.vdisplay, PANEL_W, PANEL_H);
+	return term_init(&u->term, k->map + (size_t)f.y * k->pitch_px + f.x,
+	                 k->pitch_px, f.w, f.h, SCALE * (f.zoom ? f.zoom : 1));
+}
+
+/* Moves the menu to the output that is connected now. Returns 1 when it
+ * moved; the screen is then blank and needs a redraw. */
+static int follow_display(struct ui *u)
+{
+	int r = kms_follow(&u->kms);
+	if (r < 0)
+		fprintf(stderr, "display: nothing driven after a hotplug\n");
+	if (r <= 0)
+		return 0;
+	term_free(&u->term);
+	if (screen_init(u) < 0) {
+		/* Restart=always opens the new output from scratch. */
+		fprintf(stderr, "display: no screen fits %ux%u\n",
+		        u->kms.mode.hdisplay, u->kms.mode.vdisplay);
+		u->running = 0;
+		return 0;
+	}
+	fprintf(stderr, "display: %ux%u, %ux%u grid\n", u->kms.mode.hdisplay,
+	        u->kms.mode.vdisplay, u->term.cols, u->term.rows);
+	return 1;
+}
+
 /* Reapply after reclaiming the panel: a modeset or another DRM master
  * may have cleared the CRTC color properties. */
 static void reapply_profile(struct ui *u)
@@ -1680,7 +1717,9 @@ static int reclaim_panel(struct ui *u, int patience_ms)
 	if (u->panel_lost)
 		fprintf(stderr, "set master: back\n");
 	u->panel_lost = 0;
-	kms_present(&u->kms);
+	/* A display may have come or gone while the game had the screen. */
+	if (!follow_display(u))
+		kms_present(&u->kms);
 	reapply_profile(u);
 	term_invalidate(&u->term);
 	/* Restart idle timing so a long game does not immediately blank the menu. */
@@ -2393,8 +2432,7 @@ int main(void)
 	if (kms_vrr(&u.kms, 1) < 0)
 		fprintf(stderr, "variable refresh is off\n");
 
-	if (term_init(&u.term, u.kms.map, u.kms.pitch_px,
-	              u.kms.mode.hdisplay, u.kms.mode.vdisplay, SCALE) < 0) {
+	if (screen_init(&u) < 0) {
 		fprintf(stderr, "term init failed\n");
 		disc_titles_free(&u.discs);
 		kms_close(&u.kms);
@@ -2413,6 +2451,11 @@ int main(void)
 	/* Register the FIFO after input_open, which clears aux_fd. */
 	if (notify_open(&u.notify) == 0)
 		input_set_aux(&u.in, u.notify.fd);
+	u.display_fd = uevent_open();
+	if (u.display_fd >= 0)
+		input_set_display(&u.in, u.display_fd);
+	else
+		fprintf(stderr, "display: no hotplug events, staying on this output\n");
 
 	fprintf(stderr, "portarelauncher: %ux%u, %ux%u grid, %d systems\n",
 	        u.kms.mode.hdisplay, u.kms.mode.vdisplay,
@@ -2563,6 +2606,18 @@ int main(void)
 		if (metadata_left >= 0 && (idle < 0 || metadata_left < idle)) idle = metadata_left;
 		enum action a = input_wait_job(&u.in, idle, u.discs.job.fd, u.discs.job.done_fd);
 		if (a == ACT_METADATA) continue;
+		/* Without master the follow waits for reclaim_panel. A plug wakes
+		 * a blanked menu, on whichever output it lands. */
+		if (a == ACT_DISPLAY) {
+			if (uevent_read_hotplug(u.display_fd) && !u.panel_lost &&
+			    follow_display(&u)) {
+				reapply_profile(&u);
+				u.blanked = 0;
+				u.last_act = now_ms();
+				redraw(&u);
+			}
+			continue;
+		}
 		net_poll(&u);
 
 		if (blank_requested) {
@@ -2617,6 +2672,8 @@ int main(void)
 	}
 
 	notify_close(&u.notify);
+	if (u.display_fd >= 0)
+		close(u.display_fd);
 	disc_titles_free(&u.discs);
 	input_close(&u.in);
 	term_free(&u.term);

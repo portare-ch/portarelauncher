@@ -5,6 +5,7 @@
  * Raw mode stops InputPlumber to release its EVIOCGRAB on the MCU and
  * gpio-keys devices. Restore it on layer exit and shutdown; the launcher
  * also restores it after SIGKILL. */
+#include "fit.h"
 #include "kms.h"
 #include "pix.h"
 #include "quit.h"
@@ -48,6 +49,8 @@ extern char **environ;
 #define SETTINGS    "/storage/.config/system/configs/system.cfg"
 #define INPUTPLUMBER "inputplumber.service"
 #define SCALE       3
+#define PANEL_W     1280       /* boxed on a display as the launcher is */
+#define PANEL_H     960
 #define MAX_DEV     16
 #define HOLD_MS     1000     /* SELECT held this long switches the layer */
 #define FRAME_MS    8        /* the panel's 120 Hz, near enough */
@@ -387,10 +390,12 @@ int main(int argc, char **argv)
 	struct kms kms;
 	if (kms_open(&kms, CARD) < 0)
 		return 1;
+	struct fit f = fit_box(kms.mode.hdisplay, kms.mode.vdisplay, PANEL_W, PANEL_H);
+	uint32_t *box = kms.map + (size_t)f.y * kms.pitch_px + f.x;
 	struct term term;
 	memset(&term, 0, sizeof(term));
-	if (term_init(&term, kms.map, kms.pitch_px, kms.mode.hdisplay,
-	              kms.mode.vdisplay, SCALE) < 0) {
+	if (term_init(&term, box, kms.pitch_px, f.w, f.h,
+	              SCALE * (f.zoom ? f.zoom : 1)) < 0) {
 		kms_close(&kms);
 		return 1;
 	}
@@ -399,7 +404,7 @@ int main(int argc, char **argv)
 	struct view v;
 	memset(&v, 0, sizeof(v));
 	v.t = &term;
-	v.px = (struct pix){ kms.map, kms.pitch_px, kms.mode.hdisplay, kms.mode.vdisplay };
+	v.px = (struct pix){ box, kms.pitch_px, f.w, f.h };
 	v.shapes = use_shapes();
 
 	static struct scope s;

@@ -185,11 +185,13 @@ static uint32_t mix(uint32_t bg, uint32_t fg, unsigned a)   /* a: 0..255 */
 	return out;
 }
 
-/* Bilinearly scale a 26 x 26, 16-level glyph to two cells and blend
- * between the cell color and black. */
+/* Bilinearly scale a 26 x 26, 16-level glyph to two cells at scale 3 and
+ * blend between the cell color and black. At scale 3k each of those
+ * pixels is a k x k block, as the bitmap glyphs are. */
 static void draw_ja26(struct term *t, unsigned px0, unsigned py0,
                       const unsigned char *g, uint32_t fg, uint32_t bg)
 {
+	const unsigned k = t->scale / 3;
 	enum { OUT = 48 };
 	static int i0[OUT], w1[OUT], ready;
 	if (!ready) {
@@ -205,14 +207,19 @@ static void draw_ja26(struct term *t, unsigned px0, unsigned py0,
 	((x) & 1 ? g[(y) * 13 + (x) / 2] & 0x0F : g[(y) * 13 + (x) / 2] >> 4))
 	for (int oy = 0; oy < OUT; oy++) {
 		int y = i0[oy], wy = w1[oy];
-		uint32_t *out = t->fb + (size_t)(py0 + (unsigned)oy) * t->pitch_px + px0;
+		uint32_t *out = t->fb + (size_t)(py0 + (unsigned)oy * k) * t->pitch_px + px0;
 		for (int ox = 0; ox < OUT; ox++) {
 			int x = i0[ox], wx = w1[ox];
 			int top = L(y, x) * (256 - wx) + L(y, x + 1) * wx;
 			int bot = L(y + 1, x) * (256 - wx) + L(y + 1, x + 1) * wx;
 			int a = top * (256 - wy) + bot * wy;    /* 0 .. 15 * 65536 */
-			*out++ = a ? mix(bg, fg, (unsigned)(a / 3855)) : bg;
+			uint32_t v = a ? mix(bg, fg, (unsigned)(a / 3855)) : bg;
+			for (unsigned sx = 0; sx < k; sx++)
+				*out++ = v;
 		}
+		for (unsigned sy = 1; sy < k; sy++)
+			memcpy(out - OUT * k + (size_t)sy * t->pitch_px, out - OUT * k,
+			       OUT * k * sizeof(*out));
 	}
 #undef L
 }
@@ -224,7 +231,7 @@ static void draw_unifont(struct term *t, unsigned px0, unsigned py0,
 	int wide;
 	const unsigned char *bits = glyph_bits(c->g, &wide);
 	const unsigned s = t->scale;
-	if (wide && s == 3) {
+	if (wide && s % 3 == 0) {
 		const unsigned char *g = ja26_find(glyph_cp(c->g));
 		if (g) {
 			draw_ja26(t, px0, py0, g, fg, bg);

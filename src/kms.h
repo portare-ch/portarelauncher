@@ -16,7 +16,8 @@ struct kms {
 	uint32_t crtc_id;
 	uint32_t fb_id;
 	uint32_t handle;
-	drmModeModeInfo mode;  /* the fastest of the panel's size */
+	drmModeModeInfo mode;  /* the panel's fastest, a display's preferred */
+	int internal;          /* the built-in panel rather than a display */
 	int vrr;               /* variable refresh asked for */
 	drmModeCrtc *saved;   /* whatever was on the CRTC when we arrived */
 	uint32_t *map;
@@ -24,10 +25,15 @@ struct kms {
 	unsigned pitch_px;
 };
 
-/* Opens the card, picks the connected connector and the fastest mode of
- * its preferred size, allocates a dumb buffer and scans it out. */
+/* Opens the card, picks the connected connector and its mode, allocates
+ * a dumb buffer and scans it out. Every other CRTC is switched off. */
 int  kms_open(struct kms *k, const char *card);
 void kms_close(struct kms *k);
+
+/* After a hotplug, moves to the connector that is now connected, with a
+ * new buffer the size of its mode. Returns 1 when it moved, 0 when the
+ * output stays, -1 when nothing is driven any more. Needs DRM master. */
+int  kms_follow(struct kms *k);
 
 /* Restores our buffer after another DRM master changed the scanout. */
 int  kms_present(struct kms *k);
@@ -43,7 +49,8 @@ int  kms_drop_master(struct kms *k);
 int  kms_set_master(struct kms *k);
 
 /* Applies a color profile, or clears it with NULL. Requires DRM master.
- * CRTC properties persist across modesets and master handoffs. */
+ * CRTC properties persist across modesets and master handoffs. A display
+ * is always cleared: the profiles are the panel's calibration. */
 struct color_profile;
 int  kms_color_apply(struct kms *k, const struct color_profile *p);
 

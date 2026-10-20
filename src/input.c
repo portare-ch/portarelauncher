@@ -74,6 +74,7 @@ int input_open(struct input *in)
 {
 	memset(in, 0, sizeof(*in));
 	in->aux_fd = -1;
+	in->display_fd = -1;
 
 	in->notify_fd = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
 	if (in->notify_fd >= 0 &&
@@ -127,6 +128,11 @@ int input_refresh(struct input *in, const struct pollfd *pfd, int n)
 void input_set_aux(struct input *in, int fd)
 {
 	in->aux_fd = fd;
+}
+
+void input_set_display(struct input *in, int fd)
+{
+	in->display_fd = fd;
 }
 
 void input_drain(struct input *in)
@@ -226,16 +232,20 @@ enum action input_wait(struct input *in, int idle_ms)
 
 enum action input_wait_job(struct input *in, int idle_ms, int output_fd, int done_fd)
 {
-	struct pollfd pfd[INPUT_MAX_DEV + 4];
+	struct pollfd pfd[INPUT_MAX_DEV + 5];
 	int ndev = input_fill_poll(in, pfd);
 	int nfd = ndev;
-	int aux = -1, output = -1, done = -1;
+	int aux = -1, display = -1, output = -1, done = -1;
 	if (in->aux_fd >= 0) {
 		aux = nfd;
 		pfd[nfd].fd = in->aux_fd;
 		pfd[nfd].events = POLLIN;
 		pfd[nfd].revents = 0;
 		nfd++;
+	}
+	if (in->display_fd >= 0) {
+		display = nfd;
+		pfd[nfd++] = (struct pollfd){.fd = in->display_fd, .events = POLLIN};
 	}
 	if (output_fd >= 0) {
 		output = nfd;
@@ -267,6 +277,8 @@ enum action input_wait_job(struct input *in, int idle_ms, int output_fd, int don
 
 	if (aux >= 0 && (pfd[aux].revents & POLLIN))
 		return ACT_AUX;
+	if (display >= 0 && (pfd[display].revents & POLLIN))
+		return ACT_DISPLAY;
 	if ((output >= 0 && pfd[output].revents) || (done >= 0 && pfd[done].revents))
 		return ACT_METADATA;
 

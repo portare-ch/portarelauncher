@@ -229,6 +229,28 @@ static void test_ja26(void)
 	CHECK_INT(other, 0);
 	CHECK(ink > 0);
 
+	/* At scale 6, as on a 4K display, each scale-3 pixel is a 2 x 2 block. */
+	static uint32_t small[48 * 48], big[96 * 96];
+	memset(tfb, 0, sizeof(tfb));
+	term_clear(&t);
+	term_invalidate(&t);
+	term_puts(&t, 0, 0, KIN, ATTR_TEXT);
+	term_flush(&t);
+	for (int y = 0; y < 48; y++)
+		memcpy(&small[y * 48], &tfb[y * TW], 48 * sizeof(*small));
+	struct term t6;
+	memset(&t6, 0, sizeof(t6));
+	CHECK_INT(term_init(&t6, big, 96, 96, 96, 6), 0);
+	CHECK_INT(t6.cols, 2);
+	term_puts(&t6, 0, 0, KIN, ATTR_TEXT);
+	term_flush(&t6);
+	int differ = 0;
+	for (int y = 0; y < 96; y++)
+		for (int x = 0; x < 96; x++)
+			differ += big[y * 96 + x] != small[(y / 2) * 48 + x / 2];
+	CHECK_INT(differ, 0);
+	term_free(&t6);
+
 	term_free(&t);
 	fixture_cleanup(dir);
 }
