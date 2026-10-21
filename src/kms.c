@@ -1,9 +1,11 @@
 #include "kms.h"
 #include "color.h"
+#include "modes.h"
 
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -33,23 +35,22 @@ static int is_internal(uint32_t type)
 
 static const drmModeModeInfo *pick_mode(const drmModeConnector *c)
 {
-	const drmModeModeInfo *pref = &c->modes[0], *best;
-	for (int i = 0; i < c->count_modes; i++)
-		if (c->modes[i].type & DRM_MODE_TYPE_PREFERRED)
-			pref = &c->modes[i];
-	/* A display gets its preferred mode: a faster one at the same size may
-	 * fit the link only at 6 bpc, as 4K at 95 Hz does on HBR2 x4. */
-	if (!is_internal(c->connector_type))
-		return pref;
-	/* The panel: the fastest mode at its preferred resolution for VRR scan
-	 * timing, avoiding a second modeset when VRR is enabled. */
-	best = pref;
-	for (int i = 0; i < c->count_modes; i++)
-		if (c->modes[i].hdisplay == pref->hdisplay &&
-		    c->modes[i].vdisplay == pref->vdisplay &&
-		    c->modes[i].clock > best->clock)
-			best = &c->modes[i];
-	return best;
+	struct mode_info *m = calloc((size_t)c->count_modes, sizeof(*m));
+	if (!m)
+		return &c->modes[0];
+	for (int i = 0; i < c->count_modes; i++) {
+		const drmModeModeInfo *d = &c->modes[i];
+		m[i] = (struct mode_info){
+			.w = d->hdisplay, .h = d->vdisplay,
+			.htotal = d->htotal, .vtotal = d->vtotal,
+			.clock_khz = d->clock,
+			.preferred = !!(d->type & DRM_MODE_TYPE_PREFERRED),
+			.interlaced = !!(d->flags & DRM_MODE_FLAG_INTERLACE),
+		};
+	}
+	int i = modes_pick(m, c->count_modes, is_internal(c->connector_type));
+	free(m);
+	return &c->modes[i < 0 ? 0 : i];
 }
 
 static uint32_t pick_crtc(int fd, drmModeRes *res, drmModeConnector *conn)

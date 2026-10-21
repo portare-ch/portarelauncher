@@ -16,7 +16,7 @@ struct kms {
 	uint32_t crtc_id;
 	uint32_t fb_id;
 	uint32_t handle;
-	drmModeModeInfo mode;  /* the panel's fastest, a display's preferred */
+	drmModeModeInfo mode;  /* see modes.h */
 	int internal;          /* the built-in panel rather than a display */
 	int vrr;               /* variable refresh asked for */
 	drmModeCrtc *saved;   /* whatever was on the CRTC when we arrived */
