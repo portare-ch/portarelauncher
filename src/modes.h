@@ -1,8 +1,8 @@
 /* Which of a connector's modes to drive. The panel runs the fastest mode
- * at its own size. A display runs the largest mode of its own aspect that
- * is 120 Hz class, so VRR can show every frame of a 60 Hz game twice and
- * the mode never changes between games; 4K stays below that on this SoC.
- * Without one, its preferred mode. */
+ * at its own size. A display runs 1080p class: the largest mode of its own
+ * aspect up to 1080 lines, at 144 Hz, else 120 Hz, else another rate of
+ * 120 Hz or more, so VRR can show every frame of a 60 Hz game twice and the
+ * mode never changes between games. Without one, its preferred mode. */
 #ifndef PL_MODES_H
 #define PL_MODES_H
 
@@ -14,9 +14,9 @@ struct mode_info {
 	int interlaced;
 };
 
-/* The fastest refresh a 120 Hz class mode may round down to: 119.88 Hz
- * modes count, 100 Hz ones do not. */
-#define MODES_MIN_MHZ 119500u
+#define MODES_MAX_LINES 1080u
+/* The slowest a 120 Hz class mode may run: 119.88 Hz counts. */
+#define MODES_MIN_MHZ   119500u
 
 /* Refresh in mHz, 0 for a mode without totals. */
 unsigned modes_refresh_mhz(const struct mode_info *m);

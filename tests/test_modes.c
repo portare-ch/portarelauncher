@@ -25,8 +25,37 @@ static const struct mode_info lg[] = {
 
 static void test_lg(void)
 {
-	CHECK_INT(modes_pick(lg, N(lg), 0), 2);
+	/* 1080p at 143.98 Hz, not 4K or 1440p. */
+	CHECK_INT(modes_pick(lg, N(lg), 0), 3);
+	CHECK_INT((int)modes_refresh_mhz(&lg[3]), 143981);
 	CHECK_INT((int)modes_refresh_mhz(&lg[2]), 143973);
+}
+
+/* 1920x1080 at r Hz with CVT-RB-like totals. */
+#define FHD(r, pref) { 1920, 1080, 2080, 1111, 2080u * 1111u * (r) / 1000u, pref, 0 }
+
+static void test_rates(void)
+{
+	/* 144 first, then 120, then the other rate nearest 120. */
+	static const struct mode_info all[] = {
+		FHD(60, 1), FHD(240, 0), FHD(120, 0), FHD(165, 0), FHD(144, 0),
+	};
+	CHECK_INT(modes_pick(all, N(all), 0), 4);
+	static const struct mode_info no144[] = {
+		FHD(60, 1), FHD(165, 0), FHD(120, 0),
+	};
+	CHECK_INT(modes_pick(no144, N(no144), 0), 2);
+	static const struct mode_info fast[] = {
+		FHD(60, 1), FHD(240, 0), FHD(165, 0),
+	};
+	CHECK_INT(modes_pick(fast, N(fast), 0), 2);
+	/* A native 1440p monitor runs 1080p too. */
+	static const struct mode_info qhd[] = {
+		{ 2560, 1440, 2720, 1481, 241704, 1, 0 },
+		{ 2560, 1440, 2720, 1543, 604250, 0, 0 },
+		FHD(144, 0),
+	};
+	CHECK_INT(modes_pick(qhd, N(qhd), 0), 2);
 }
 
 static void test_panel(void)
@@ -86,6 +115,7 @@ static void test_fallbacks(void)
 int main(void)
 {
 	test_lg();
+	test_rates();
 	test_panel();
 	test_aspects();
 	test_fallbacks();
