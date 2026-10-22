@@ -50,6 +50,8 @@ struct term {
 	struct cell *cur;
 	struct cell *prev;
 	int pal;
+	int dim;             /* every colour at half, until term_set_dim(t, 0) */
+	uint32_t dimmed[ATTR_COUNT];
 };
 
 int  term_init(struct term *t, uint32_t *fb, unsigned pitch_px,
@@ -72,6 +74,10 @@ int term_palette_count(void);
 int term_palette(const struct term *t);
 /* Current palette color for pixel drawing beside the grid. */
 uint32_t term_color(const struct term *t, int attr);
+/* Draws every colour at half its value, a fifth of the light: the menu
+ * dims before the screen goes off. Returns 1 when that changed, and the
+ * next flush repaints everything. */
+int term_set_dim(struct term *t, int on);
 
 /* Moves the grid dx, dy pixels from its centred place, so static text does
  * not light the same OLED pixels for hours. Clears what the grid leaves and

@@ -25,14 +25,37 @@ static const struct palette palettes[] = {
 int term_palette_count(void) { return N_PALETTES; }
 int term_palette(const struct term *t) { return t->pal; }
 
+/* The palette's colours, or each channel halved while dimmed. */
+static const uint32_t *colours(const struct term *t)
+{
+	return t->dim ? t->dimmed : palettes[t->pal].c;
+}
+
+static void halve(struct term *t)
+{
+	for (int i = 0; i < ATTR_COUNT; i++)
+		t->dimmed[i] = palettes[t->pal].c[i] >> 1 & 0x007F7F7F;
+}
+
 uint32_t term_color(const struct term *t, int attr)
 {
-	return palettes[t->pal].c[attr >= 0 && attr < ATTR_COUNT ? attr : ATTR_TEXT];
+	return colours(t)[attr >= 0 && attr < ATTR_COUNT ? attr : ATTR_TEXT];
+}
+
+int term_set_dim(struct term *t, int on)
+{
+	if (!on == !t->dim)
+		return 0;
+	t->dim = on != 0;
+	halve(t);
+	term_invalidate(t);
+	return 1;
 }
 
 const char *term_set_palette(struct term *t, int idx)
 {
 	t->pal = ((idx % N_PALETTES) + N_PALETTES) % N_PALETTES;
+	halve(t);
 	term_invalidate(t);
 	return palettes[t->pal].name;
 }
@@ -45,6 +68,7 @@ int term_init(struct term *t, uint32_t *fb, unsigned pitch_px,
 
 	t->fb = fb;
 	t->pitch_px = pitch_px;
+	t->dim = 0;
 	t->fb_w = w;
 	t->fb_h = h;
 	t->scale = scale;
@@ -259,7 +283,7 @@ static void draw_unifont(struct term *t, uint32_t *dst, unsigned pitch,
 static void render_cell(struct term *t, uint32_t *dst, unsigned pitch, const struct cell *c)
 {
 	const unsigned char *glyph = &font8x16[(size_t)(c->g & 0xFF) * FONT_H];
-	const uint32_t *pal = palettes[t->pal].c;
+	const uint32_t *pal = colours(t);
 	const uint32_t fg = pal[c->attr < ATTR_COUNT ? c->attr : ATTR_TEXT];
 	const uint32_t bg = pal[ATTR_BG];
 	const unsigned s = t->scale;

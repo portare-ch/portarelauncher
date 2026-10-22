@@ -9,6 +9,11 @@ long long idle_sleep_at(long long last_act, int blank_min, int sleep_min,
 	return retry_at > at ? retry_at : at;
 }
 
+long long idle_dim_at(long long last_act, int blank_min)
+{
+	return last_act + blank_min * 30000LL;
+}
+
 int idle_wait_ms(long long now, long long last_act, int blanked,
                  int blank_min, int sleep_min, long long retry_at)
 {

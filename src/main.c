@@ -1736,6 +1736,7 @@ static int reclaim_panel(struct ui *u, int patience_ms)
 	if (!follow_display(u))
 		kms_present(&u->kms);
 	reapply_profile(u);
+	term_set_dim(&u->term, 0);
 	term_invalidate(&u->term);
 	/* Restart idle timing so a long game does not immediately blank the menu. */
 	u->last_act = now_ms();
@@ -2394,6 +2395,7 @@ static void on_action(struct ui *u, enum action a)
 
 static void wake_panel(struct ui *u)
 {
+	term_set_dim(&u->term, 0);
 	kms_present(&u->kms);
 	reapply_profile(u);
 	term_invalidate(&u->term);
@@ -2616,6 +2618,9 @@ int main(void)
 			                              blank_minutes[u.blank_idx], 0, 0);
 			if (blank_left < idle)
 				idle = blank_left;
+			long long dim_left = idle_dim_at(u.last_act, blank_minutes[u.blank_idx]) - now_ms();
+			if (!u.term.dim && dim_left < idle)
+				idle = dim_left > 0 ? (int)dim_left : 0;
 		}
 
 		int metadata_left = proc_job_left(&u.discs.job);
@@ -2679,6 +2684,15 @@ int main(void)
 		    now_ms() - u.last_act >= blank_minutes[u.blank_idx] * 60000LL) {
 			kms_blank(&u.kms);
 			u.blanked = 1;
+			continue;
+		}
+
+		/* Halfway there the whole menu dims, for the OLED panel. A press
+		 * brings it back and acts as usual: the menu is still readable. */
+		if (term_set_dim(&u.term, now_ms() >= idle_dim_at(u.last_act,
+		                                                   blank_minutes[u.blank_idx])) &&
+		    a == ACT_NONE) {
+			redraw(&u);
 			continue;
 		}
 
