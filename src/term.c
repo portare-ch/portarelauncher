@@ -54,13 +54,14 @@ int term_init(struct term *t, uint32_t *fb, unsigned pitch_px,
 		return -1;
 
 	/* Center the grid within the unused black border. */
-	t->ox = (w - t->cols * FONT_W * scale) / 2;
-	t->oy = (h - t->rows * FONT_H * scale) / 2;
+	t->base_x = t->ox = (int)(w - t->cols * FONT_W * scale) / 2;
+	t->base_y = t->oy = (int)(h - t->rows * FONT_H * scale) / 2;
 
 	size_t n = (size_t)t->cols * t->rows;
 	t->cur = calloc(n, sizeof(*t->cur));
 	t->prev = calloc(n, sizeof(*t->prev));
-	if (!t->cur || !t->prev) {
+	t->scratch = calloc((size_t)2 * FONT_W * scale * FONT_H * scale, sizeof(*t->scratch));
+	if (!t->cur || !t->prev || !t->scratch) {
 		term_free(t);
 		return -1;
 	}
@@ -73,7 +74,9 @@ void term_free(struct term *t)
 {
 	free(t->cur);
 	free(t->prev);
+	free(t->scratch);
 	t->cur = t->prev = NULL;
+	t->scratch = NULL;
 }
 
 void term_clear(struct term *t)
@@ -150,18 +153,17 @@ void term_hline(struct term *t, unsigned y, unsigned char glyph, int attr)
 
 /* Clear the cell, then outline a mark centered on capital rows 2..11.
  * At scale 3 the half-size is 11 pixels and strokes are 2 pixels wide. */
-static void draw_mark(struct term *t, unsigned px0, unsigned py0,
+static void draw_mark(struct term *t, uint32_t *dst, unsigned pitch,
                       unsigned char ch, uint32_t fg, uint32_t bg)
 {
-	struct pix p = { t->fb, t->pitch_px, t->fb_w, t->fb_h };
 	const int s = (int)t->scale;
-	const int x = (int)px0, y = (int)py0;
+	struct pix p = { dst, pitch, FONT_W * (unsigned)s, FONT_H * (unsigned)s };
 	int size = 11 * s / 3, thick = (2 * s + 2) / 3;
 	if (size < 3)
 		size = 3;
 
-	pix_fill(&p, x, y, FONT_W * s, FONT_H * s, bg);
-	const int cx = x + FONT_W * s / 2, cy = y + 7 * s;
+	pix_fill(&p, 0, 0, FONT_W * s, FONT_H * s, bg);
+	const int cx = FONT_W * s / 2, cy = 7 * s;
 	switch (ch) {
 	case G_MARK_CROSS:    pix_cross(&p, cx, cy, size, thick, fg);    break;
 	case G_MARK_SQUARE:   pix_square(&p, cx, cy, size, thick, fg);   break;
@@ -188,7 +190,7 @@ static uint32_t mix(uint32_t bg, uint32_t fg, unsigned a)   /* a: 0..255 */
 /* Bilinearly scale a 26 x 26, 16-level glyph to two cells at scale 3 and
  * blend between the cell color and black. At scale 3k each of those
  * pixels is a k x k block, as the bitmap glyphs are. */
-static void draw_ja26(struct term *t, unsigned px0, unsigned py0,
+static void draw_ja26(struct term *t, uint32_t *dst, unsigned pitch,
                       const unsigned char *g, uint32_t fg, uint32_t bg)
 {
 	const unsigned k = t->scale / 3;
@@ -207,7 +209,7 @@ static void draw_ja26(struct term *t, unsigned px0, unsigned py0,
 	((x) & 1 ? g[(y) * 13 + (x) / 2] & 0x0F : g[(y) * 13 + (x) / 2] >> 4))
 	for (int oy = 0; oy < OUT; oy++) {
 		int y = i0[oy], wy = w1[oy];
-		uint32_t *out = t->fb + (size_t)(py0 + (unsigned)oy * k) * t->pitch_px + px0;
+		uint32_t *out = dst + (size_t)oy * k * pitch;
 		for (int ox = 0; ox < OUT; ox++) {
 			int x = i0[ox], wx = w1[ox];
 			int top = L(y, x) * (256 - wx) + L(y, x + 1) * wx;
@@ -218,14 +220,14 @@ static void draw_ja26(struct term *t, unsigned px0, unsigned py0,
 				*out++ = v;
 		}
 		for (unsigned sy = 1; sy < k; sy++)
-			memcpy(out - OUT * k + (size_t)sy * t->pitch_px, out - OUT * k,
+			memcpy(out - OUT * k + (size_t)sy * pitch, out - OUT * k,
 			       OUT * k * sizeof(*out));
 	}
 #undef L
 }
 
 /* A Unifont glyph from its left cell: 8 or 16 pixels by 16, at scale. */
-static void draw_unifont(struct term *t, unsigned px0, unsigned py0,
+static void draw_unifont(struct term *t, uint32_t *dst, unsigned pitch,
                          const struct cell *c, uint32_t fg, uint32_t bg)
 {
 	int wide;
@@ -234,7 +236,7 @@ static void draw_unifont(struct term *t, unsigned px0, unsigned py0,
 	if (wide && s % 3 == 0) {
 		const unsigned char *g = ja26_find(glyph_cp(c->g));
 		if (g) {
-			draw_ja26(t, px0, py0, g, fg, bg);
+			draw_ja26(t, dst, pitch, g, fg, bg);
 			return;
 		}
 	}
@@ -243,7 +245,7 @@ static void draw_unifont(struct term *t, unsigned px0, unsigned py0,
 		unsigned row = wide ? (unsigned)(bits[gy * 2] << 8 | bits[gy * 2 + 1])
 		                    : bits[gy];
 		for (unsigned sy = 0; sy < s; sy++) {
-			uint32_t *out = t->fb + (size_t)(py0 + gy * s + sy) * t->pitch_px + px0;
+			uint32_t *out = dst + (size_t)(gy * s + sy) * pitch;
 			for (unsigned gx = 0; gx < w; gx++) {
 				uint32_t v = (row & (1u << (w - 1 - gx))) ? fg : bg;
 				for (unsigned sx = 0; sx < s; sx++)
@@ -253,7 +255,8 @@ static void draw_unifont(struct term *t, unsigned px0, unsigned py0,
 	}
 }
 
-static void draw_cell(struct term *t, unsigned cx, unsigned cy, const struct cell *c)
+/* One cell, or a two-cell glyph from its left cell, with its top left at dst. */
+static void render_cell(struct term *t, uint32_t *dst, unsigned pitch, const struct cell *c)
 {
 	const unsigned char *glyph = &font8x16[(size_t)(c->g & 0xFF) * FONT_H];
 	const uint32_t *pal = palettes[t->pal].c;
@@ -261,22 +264,19 @@ static void draw_cell(struct term *t, unsigned cx, unsigned cy, const struct cel
 	const uint32_t bg = pal[ATTR_BG];
 	const unsigned s = t->scale;
 
-	unsigned px0 = t->ox + cx * FONT_W * s;
-	unsigned py0 = t->oy + cy * FONT_H * s;
-
 	if (is_mark(c->g)) {
-		draw_mark(t, px0, py0, (unsigned char)c->g, fg, bg);
+		draw_mark(t, dst, pitch, (unsigned char)c->g, fg, bg);
 		return;
 	}
 	if (c->g >= GLYPH_UNI) {
-		draw_unifont(t, px0, py0, c, fg, bg);
+		draw_unifont(t, dst, pitch, c, fg, bg);
 		return;
 	}
 
 	for (unsigned gy = 0; gy < FONT_H; gy++) {
 		unsigned char bits = glyph[gy];
 		for (unsigned sy = 0; sy < s; sy++) {
-			uint32_t *row = t->fb + (size_t)(py0 + gy * s + sy) * t->pitch_px + px0;
+			uint32_t *row = dst + (size_t)(gy * s + sy) * pitch;
 			for (unsigned gx = 0; gx < FONT_W; gx++) {
 				uint32_t v = (bits & (0x80u >> gx)) ? fg : bg;
 				for (unsigned sx = 0; sx < s; sx++)
@@ -284,6 +284,47 @@ static void draw_cell(struct term *t, unsigned cx, unsigned cy, const struct cel
 			}
 		}
 	}
+}
+
+/* A shifted grid puts the outer cells partly past the box: those are drawn
+ * aside and copied in clipped, the rest straight into the framebuffer. */
+static void draw_cell(struct term *t, unsigned cx, unsigned cy, const struct cell *c)
+{
+	const int cw = (int)(FONT_W * t->scale), h = (int)(FONT_H * t->scale);
+	const int w = c->half == HALF_LEFT ? 2 * cw : cw;
+	const int px0 = t->ox + (int)cx * cw, py0 = t->oy + (int)cy * h;
+
+	if (px0 >= 0 && py0 >= 0 && px0 + w <= (int)t->fb_w && py0 + h <= (int)t->fb_h) {
+		render_cell(t, t->fb + (size_t)py0 * t->pitch_px + (size_t)px0, t->pitch_px, c);
+		return;
+	}
+	const unsigned sp = 2 * (unsigned)cw;
+	render_cell(t, t->scratch, sp, c);
+	int x0 = px0 < 0 ? -px0 : 0, x1 = px0 + w > (int)t->fb_w ? (int)t->fb_w - px0 : w;
+	int y0 = py0 < 0 ? -py0 : 0, y1 = py0 + h > (int)t->fb_h ? (int)t->fb_h - py0 : h;
+	for (int y = y0; y < y1 && x0 < x1; y++)
+		memcpy(t->fb + (size_t)(py0 + y) * t->pitch_px + (size_t)(px0 + x0),
+		       t->scratch + (size_t)y * sp + (size_t)x0, (size_t)(x1 - x0) * sizeof(*t->fb));
+}
+
+void term_shift(struct term *t, int dx, int dy)
+{
+	const int ox = t->base_x + dx, oy = t->base_y + dy;
+	if (ox == t->ox && oy == t->oy)
+		return;
+	t->ox = ox;
+	t->oy = oy;
+
+	/* Black out what the grid no longer covers; the flush redraws the rest. */
+	struct pix p = { t->fb, t->pitch_px, t->fb_w, t->fb_h };
+	const uint32_t bg = palettes[t->pal].c[ATTR_BG];
+	const int gw = (int)(t->cols * FONT_W * t->scale), gh = (int)(t->rows * FONT_H * t->scale);
+	const int W = (int)t->fb_w, H = (int)t->fb_h;
+	pix_fill(&p, 0, 0, W, oy, bg);
+	pix_fill(&p, 0, oy + gh, W, H - oy - gh, bg);
+	pix_fill(&p, 0, oy, ox, gh, bg);
+	pix_fill(&p, ox + gw, oy, W - ox - gw, gh, bg);
+	term_invalidate(t);
 }
 
 static int same(const struct cell *a, const struct cell *b)

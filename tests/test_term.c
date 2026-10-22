@@ -174,6 +174,134 @@ static void test_text(void)
 	term_free(&t);
 }
 
+/* The three-by-two box of test_marks inside a larger buffer: what a shift
+ * moves past the box's edge must not reach the buffer around it. */
+#define G  30
+#define BW (W + 2 * G)
+#define BH (H + 2 * G)
+#define GUARD 0x00123456u
+static uint32_t gfb[BW * BH];
+
+static uint32_t *boxpx(int x, int y)
+{
+	return &gfb[(y + G) * BW + x + G];
+}
+
+static void fill_box(uint32_t v)
+{
+	for (int y = 0; y < H; y++)
+		for (int x = 0; x < W; x++)
+			*boxpx(x, y) = v;
+}
+
+static int guard_intact(void)
+{
+	for (int y = 0; y < BH; y++)
+		for (int x = 0; x < BW; x++)
+			if ((x < G || x >= G + W || y < G || y >= G + H) && gfb[y * BW + x] != GUARD)
+				return 0;
+	return 1;
+}
+
+static void guarded_init(struct term *t)
+{
+	for (int i = 0; i < BW * BH; i++)
+		gfb[i] = GUARD;
+	memset(t, 0, sizeof(*t));
+	CHECK_INT(term_init(t, boxpx(0, 0), BW, W, H, 3), 0);
+}
+
+/* A two-cell glyph shifted past the right and bottom edges: clipped, with
+ * its visible part drawn. */
+static void check_wide_clipped(void)
+{
+	struct term t;
+	guarded_init(&t);
+	const uint32_t bg = term_color(&t, ATTR_BG);
+	fill_box(bg);
+	term_puts(&t, 1, 1, KIN, ATTR_TEXT);
+	term_shift(&t, 7, 3);
+	term_flush(&t);
+	int ink = 0;
+	for (int y = 0; y < H; y++)
+		for (int x = 0; x < W; x++)
+			ink += *boxpx(x, y) != bg;
+	CHECK(ink > 0);
+	CHECK(guard_intact());
+	term_free(&t);
+}
+
+static void test_shift(void)
+{
+	struct term t;
+	guarded_init(&t);
+	const uint32_t text = term_color(&t, ATTR_TEXT), bg = term_color(&t, ATTR_BG);
+
+	/* An A in the middle cell, where the grid is centred. */
+	static unsigned char ref[H][W];
+	fill_box(bg);
+	term_putc(&t, 1, 0, 'A', ATTR_TEXT);
+	term_flush(&t);
+	for (int y = 0; y < H; y++)
+		for (int x = 0; x < W; x++)
+			ref[y][x] = *boxpx(x, y) == text;
+
+	/* Two right and one down: the same pixels moved, what the grid left
+	 * black, and nothing stale anywhere in the box. */
+	fill_box(0x00777777);
+	term_shift(&t, 2, 1);
+	term_flush(&t);
+	int moved = 1, stale = 0;
+	for (int y = 0; y < H; y++)
+		for (int x = 0; x < W; x++) {
+			int want = x >= 2 && y >= 1 && ref[y - 1][x - 2];
+			if ((*boxpx(x, y) == text) != want)
+				moved = 0;
+			stale += *boxpx(x, y) != text && *boxpx(x, y) != bg;
+		}
+	CHECK(moved);
+	CHECK_INT(stale, 0);
+	CHECK(guard_intact());
+
+	/* The same offset again repaints nothing. */
+	*boxpx(70, 94) = 0x00777777;
+	term_shift(&t, 2, 1);
+	term_flush(&t);
+	CHECK(*boxpx(70, 94) == 0x00777777);
+
+	/* Past the top left: the left cell's A clipped, the part still in the box
+	 * where it belongs, and a mark at the bottom right stays inside too. */
+	fill_box(bg);
+	term_putc(&t, 0, 0, 'A', ATTR_TEXT);
+	term_putc(&t, 2, 1, G_MARK_CIRCLE, ATTR_TEXT);
+	term_shift(&t, -5, -2);
+	term_flush(&t);
+	int clipped = 1;
+	for (int y = 0; y < 46; y++)
+		for (int x = 0; x < 19; x++)
+			if ((*boxpx(x, y) == text) != ref[y + 2][x + 5 + 24])
+				clipped = 0;
+	CHECK(clipped);
+	CHECK(guard_intact());
+
+	/* Back in the centre, the middle cell is the reference again. */
+	term_clear(&t);
+	term_putc(&t, 1, 0, 'A', ATTR_TEXT);
+	term_shift(&t, 0, 0);
+	term_flush(&t);
+	int same_as_ref = 1;
+	for (int y = 0; y < H; y++)
+		for (int x = 0; x < W; x++)
+			if ((*boxpx(x, y) == text) != ref[y][x])
+				same_as_ref = 0;
+	CHECK(same_as_ref);
+	CHECK(guard_intact());
+	term_free(&t);
+
+	/* Unifont's two-cell glyphs, before ja26 is loaded. */
+	check_wide_clipped();
+}
+
 /* Scale 26-pixel glyphs to two cells with blended edges, staying within
  * their bounds. Missing glyphs fall back to two-color Unifont. */
 static void test_ja26(void)
@@ -251,6 +379,9 @@ static void test_ja26(void)
 	CHECK_INT(differ, 0);
 	term_free(&t6);
 
+	/* The blended glyph shifted past the edges stays in the box. */
+	check_wide_clipped();
+
 	term_free(&t);
 	fixture_cleanup(dir);
 }
@@ -259,6 +390,7 @@ int main(void)
 {
 	test_marks();
 	test_text();
+	test_shift();
 	test_ja26();
 	return check_report("term");
 }

@@ -44,7 +44,9 @@ struct term {
 	unsigned fb_w, fb_h;
 	unsigned scale;      /* integer glyph scale */
 	unsigned cols, rows;
-	unsigned ox, oy;     /* pixel origin, centring the grid */
+	int base_x, base_y;  /* pixel origin centring the grid */
+	int ox, oy;          /* pixel origin now: base plus the term_shift offset */
+	uint32_t *scratch;   /* a two-cell glyph, for cells the box clips */
 	struct cell *cur;
 	struct cell *prev;
 	int pal;
@@ -70,6 +72,11 @@ int term_palette_count(void);
 int term_palette(const struct term *t);
 /* Current palette color for pixel drawing beside the grid. */
 uint32_t term_color(const struct term *t, int attr);
+
+/* Moves the grid dx, dy pixels from its centred place, so static text does
+ * not light the same OLED pixels for hours. Clears what the grid leaves and
+ * repaints it on the next flush; cells past the box's edge are clipped. */
+void term_shift(struct term *t, int dx, int dy);
 
 /* Writes the cells that changed since the last flush. */
 void term_flush(struct term *t);

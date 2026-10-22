@@ -24,6 +24,7 @@
 #include "uevent.h"
 #include "update.h"
 #include "idle.h"
+#include "orbit.h"
 #include "timeutil.h"
 
 #include <errno.h>
@@ -1499,6 +1500,14 @@ static void restart(struct ui *u)
 
 static void redraw(struct ui *u)
 {
+	/* The grid walks four glyph pixels across and one down. Japanese glyphs
+	 * fill their rows, so a third of that there. The clock redraw each
+	 * minute moves it a pixel. */
+	const int s = (int)u->term.scale;
+	int dx, dy;
+	orbit_offset((long long)time(NULL) / 60, 4 * s, lang_get() == LANG_JA ? s / 3 : s, &dx, &dy);
+	term_shift(&u->term, dx, dy);
+
 	switch (u->screen) {
 	case SCR_SYSTEMS:  draw_systems(u);  break;
 	case SCR_GAMES:    draw_games(u);    break;
