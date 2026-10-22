@@ -51,10 +51,12 @@
 #define KEY_PROFILE "display.colorprofile"
 /* Charging thumbstick LEDs, read by the system daemon. */
 #define KEY_CHARGING "led.charging"
-/* Menu idle timeout in minutes; only applies while the launcher owns the panel. */
+/* Menu idle timeout in minutes; only applies while the launcher owns the panel.
+ * Short by default: the panel is OLED, and a menu left up wears in. */
 #define KEY_BLANK "display.blankminutes"
-static const int blank_minutes[] = { 5, 10, 15 };
+static const int blank_minutes[] = { 1, 2, 5, 10, 15 };
 #define N_BLANK ((int)(sizeof(blank_minutes) / sizeof(blank_minutes[0])))
+#define BLANK_DEFAULT 1          /* index: 2 minutes */
 /* Minutes after blanking before power-handler is asked to sleep.
  * It applies the power key rules, including declining while SSH is active. */
 #define KEY_SLEEP "system.sleepminutes"
@@ -2502,7 +2504,9 @@ int main(void)
 		char chg[8] = "";
 		settings_get(SETTINGS, KEY_CHARGING, chg, sizeof(chg));
 		u.charging_led = strcmp(chg, "0") != 0;
-		/* Missing or invalid timeouts default to the shortest offered value. */
+		/* A missing or invalid screen-off time is the default, a missing or
+		 * invalid sleep time the shortest offered. */
+		u.blank_idx = BLANK_DEFAULT;
 		char blk[8] = "";
 		settings_get(SETTINGS, KEY_BLANK, blk, sizeof(blk));
 		for (int i = 0; i < N_BLANK; i++) {
