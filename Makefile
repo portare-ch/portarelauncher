@@ -35,12 +35,12 @@ PL_VERSION := dev
 endif
 
 SRC  := src/disc_titles.c src/ps_serial.c src/text.c src/proc.c src/update.c src/osinfo.c src/tz.c src/quit.c src/idle.c src/sheets.c src/color.c src/net.c src/bt.c src/osk.c src/tools.c src/settings.c src/status.c src/notify.c src/term.c src/pix.c src/glyph.c src/unifont.c src/ja26.c src/lang.c src/kms.c \
-        src/input.c src/catalog.c src/lists.c src/main.c
+        src/fit.c src/modes.c src/uevent.c src/input.c src/catalog.c src/lists.c src/main.c
 OBJ  := $(SRC:.c=.o)
 BIN  := portarelauncher
 
 # PortScope shares the launcher's display code and has its own input model.
-SCOPE_SRC := src/portscope.c src/scope.c src/pix.c src/term.c src/kms.c \
+SCOPE_SRC := src/portscope.c src/scope.c src/pix.c src/term.c src/kms.c src/fit.c src/modes.c \
              src/color.c src/quit.c src/settings.c src/glyph.c src/unifont.c src/ja26.c
 SCOPE_OBJ := $(SCOPE_SRC:.c=.o)
 SCOPE_BIN := portscope
@@ -91,7 +91,7 @@ TESTS := tests/test_text tests/test_settings tests/test_proc \
          tests/test_catalog tests/test_metadata_input tests/test_disc_titles tests/test_tools tests/test_net tests/test_bt \
          tests/test_osk tests/test_update tests/test_osinfo tests/test_tz tests/test_quit tests/test_sheets tests/test_color tests/test_lists \
          tests/test_scope tests/test_pix tests/test_term tests/test_glyph tests/test_lang tests/test_ja26 \
-         tests/test_idle
+         tests/test_idle tests/test_fit tests/test_uevent tests/test_modes
 
 tests/test_text:     src/text.c
 tests/test_settings: src/settings.c
@@ -110,6 +110,9 @@ tests/test_osinfo:   src/osinfo.c src/text.c
 tests/test_tz:       src/tz.c src/text.c src/settings.c tests/fake_proc.c
 tests/test_quit:     src/quit.c
 tests/test_idle:     src/idle.c
+tests/test_fit:      src/fit.c
+tests/test_uevent:   src/uevent.c
+tests/test_modes:    src/modes.c
 tests/test_sheets:   src/sheets.c
 tests/test_color:   src/color.c
 tests/test_lists:    src/lists.c src/text.c

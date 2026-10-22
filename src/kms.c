@@ -1,9 +1,11 @@
 #include "kms.h"
 #include "color.h"
+#include "modes.h"
 
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -25,21 +27,30 @@ static drmModeConnector *pick_connector(int fd, drmModeRes *res)
 	return NULL;
 }
 
+static int is_internal(uint32_t type)
+{
+	return type == DRM_MODE_CONNECTOR_DSI || type == DRM_MODE_CONNECTOR_eDP ||
+	       type == DRM_MODE_CONNECTOR_LVDS;
+}
+
 static const drmModeModeInfo *pick_mode(const drmModeConnector *c)
 {
-	/* Use the fastest mode at the preferred resolution for VRR scan timing,
-	 * avoiding a second modeset when VRR is enabled. */
-	const drmModeModeInfo *pref = &c->modes[0], *best;
-	for (int i = 0; i < c->count_modes; i++)
-		if (c->modes[i].type & DRM_MODE_TYPE_PREFERRED)
-			pref = &c->modes[i];
-	best = pref;
-	for (int i = 0; i < c->count_modes; i++)
-		if (c->modes[i].hdisplay == pref->hdisplay &&
-		    c->modes[i].vdisplay == pref->vdisplay &&
-		    c->modes[i].clock > best->clock)
-			best = &c->modes[i];
-	return best;
+	struct mode_info *m = calloc((size_t)c->count_modes, sizeof(*m));
+	if (!m)
+		return &c->modes[0];
+	for (int i = 0; i < c->count_modes; i++) {
+		const drmModeModeInfo *d = &c->modes[i];
+		m[i] = (struct mode_info){
+			.w = d->hdisplay, .h = d->vdisplay,
+			.htotal = d->htotal, .vtotal = d->vtotal,
+			.clock_khz = d->clock,
+			.preferred = !!(d->type & DRM_MODE_TYPE_PREFERRED),
+			.interlaced = !!(d->flags & DRM_MODE_FLAG_INTERLACE),
+		};
+	}
+	int i = modes_pick(m, c->count_modes, is_internal(c->connector_type));
+	free(m);
+	return &c->modes[i < 0 ? 0 : i];
 }
 
 static uint32_t pick_crtc(int fd, drmModeRes *res, drmModeConnector *conn)
@@ -69,6 +80,104 @@ static uint32_t pick_crtc(int fd, drmModeRes *res, drmModeConnector *conn)
 	return 0;
 }
 
+static int fb_create(struct kms *k)
+{
+	struct drm_mode_create_dumb creq = {
+		.width = k->mode.hdisplay,
+		.height = k->mode.vdisplay,
+		.bpp = 32,
+	};
+	if (drmIoctl(k->fd, DRM_IOCTL_MODE_CREATE_DUMB, &creq) < 0) {
+		fprintf(stderr, "create dumb: %s\n", strerror(errno));
+		return -1;
+	}
+	k->handle = creq.handle;
+	k->size = creq.size;
+	k->pitch_px = creq.pitch / 4;
+
+	if (drmModeAddFB(k->fd, k->mode.hdisplay, k->mode.vdisplay,
+	                 24, 32, creq.pitch, k->handle, &k->fb_id) < 0) {
+		fprintf(stderr, "addfb: %s\n", strerror(errno));
+		k->fb_id = 0;
+		return -1;
+	}
+
+	struct drm_mode_map_dumb mreq = { .handle = k->handle };
+	if (drmIoctl(k->fd, DRM_IOCTL_MODE_MAP_DUMB, &mreq) < 0) {
+		fprintf(stderr, "map dumb: %s\n", strerror(errno));
+		return -1;
+	}
+
+	k->map = mmap(NULL, k->size, PROT_READ | PROT_WRITE, MAP_SHARED,
+	              k->fd, (off_t)mreq.offset);
+	if (k->map == MAP_FAILED) {
+		k->map = NULL;
+		fprintf(stderr, "mmap: %s\n", strerror(errno));
+		return -1;
+	}
+	memset(k->map, 0, k->size);
+	return 0;
+}
+
+/* Removing a framebuffer that is on screen also switches its CRTC off. */
+static void fb_destroy(struct kms *k)
+{
+	if (k->map)
+		munmap(k->map, k->size);
+	k->map = NULL;
+	if (k->fb_id)
+		drmModeRmFB(k->fd, k->fb_id);
+	k->fb_id = 0;
+	if (k->handle) {
+		struct drm_mode_destroy_dumb d = { .handle = k->handle };
+		drmIoctl(k->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &d);
+	}
+	k->handle = 0;
+}
+
+/* Makes conn the output: its mode, a CRTC for it, a buffer of its size. */
+static int use(struct kms *k, drmModeRes *res, drmModeConnector *conn)
+{
+	k->conn_id = conn->connector_id;
+	k->internal = is_internal(conn->connector_type);
+	k->mode = *pick_mode(conn);
+	k->crtc_id = pick_crtc(k->fd, res, conn);
+	if (!k->crtc_id) {
+		fprintf(stderr, "no usable crtc for connector %u\n", k->conn_id);
+		return -1;
+	}
+	if (fb_create(k) < 0) {
+		fb_destroy(k);
+		return -1;
+	}
+	return 0;
+}
+
+/* Only one output is lit: the panel goes dark when a display takes over,
+ * and a console left on the other output goes with it. */
+static void disable_others(struct kms *k, drmModeRes *res)
+{
+	for (int i = 0; i < res->count_crtcs; i++) {
+		if (res->crtcs[i] == k->crtc_id)
+			continue;
+		drmModeCrtc *c = drmModeGetCrtc(k->fd, res->crtcs[i]);
+		if (!c)
+			continue;
+		if (c->mode_valid)
+			drmModeSetCrtc(k->fd, c->crtc_id, 0, 0, 0, NULL, 0, NULL);
+		drmModeFreeCrtc(c);
+	}
+}
+
+/* The colour profiles are the panel's calibration. A display gets none,
+ * including the LUTs the panel left on a CRTC the display now uses. */
+static void lit(struct kms *k, drmModeRes *res)
+{
+	disable_others(k, res);
+	if (!k->internal)
+		kms_color_apply(k, NULL);
+}
+
 int kms_open(struct kms *k, const char *card)
 {
 	memset(k, 0, sizeof(*k));
@@ -92,67 +201,20 @@ int kms_open(struct kms *k, const char *card)
 		fprintf(stderr, "no connected connector with modes\n");
 		goto fail_res;
 	}
-
-	k->conn_id = conn->connector_id;
-	k->mode = *pick_mode(conn);
-	k->crtc_id = pick_crtc(k->fd, res, conn);
-	if (!k->crtc_id) {
-		fprintf(stderr, "no usable crtc for connector %u\n", k->conn_id);
+	if (use(k, res, conn) < 0)
 		goto fail_conn;
-	}
-
-	struct drm_mode_create_dumb creq = {
-		.width = k->mode.hdisplay,
-		.height = k->mode.vdisplay,
-		.bpp = 32,
-	};
-	if (drmIoctl(k->fd, DRM_IOCTL_MODE_CREATE_DUMB, &creq) < 0) {
-		fprintf(stderr, "create dumb: %s\n", strerror(errno));
-		goto fail_conn;
-	}
-	k->handle = creq.handle;
-	k->size = creq.size;
-	k->pitch_px = creq.pitch / 4;
-
-	if (drmModeAddFB(k->fd, k->mode.hdisplay, k->mode.vdisplay,
-	                 24, 32, creq.pitch, k->handle, &k->fb_id) < 0) {
-		fprintf(stderr, "addfb: %s\n", strerror(errno));
-		goto fail_dumb;
-	}
-
-	struct drm_mode_map_dumb mreq = { .handle = k->handle };
-	if (drmIoctl(k->fd, DRM_IOCTL_MODE_MAP_DUMB, &mreq) < 0) {
-		fprintf(stderr, "map dumb: %s\n", strerror(errno));
-		goto fail_fb;
-	}
-
-	k->map = mmap(NULL, k->size, PROT_READ | PROT_WRITE, MAP_SHARED,
-	              k->fd, (off_t)mreq.offset);
-	if (k->map == MAP_FAILED) {
-		k->map = NULL;
-		fprintf(stderr, "mmap: %s\n", strerror(errno));
-		goto fail_fb;
-	}
-	memset(k->map, 0, k->size);
+	drmModeFreeConnector(conn);
 
 	k->saved = drmModeGetCrtc(k->fd, k->crtc_id);
 
-	drmModeFreeConnector(conn);
-	drmModeFreeResources(res);
-
-	if (kms_present(k) < 0)
+	if (kms_present(k) < 0) {
+		drmModeFreeResources(res);
 		return -1;
+	}
+	lit(k, res);
+	drmModeFreeResources(res);
 	return 0;
 
-fail_fb:
-	drmModeRmFB(k->fd, k->fb_id);
-	k->fb_id = 0;
-fail_dumb:
-	{
-		struct drm_mode_destroy_dumb d = { .handle = k->handle };
-		drmIoctl(k->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &d);
-		k->handle = 0;
-	}
 fail_conn:
 	drmModeFreeConnector(conn);
 fail_res:
@@ -161,6 +223,41 @@ fail_fd:
 	close(k->fd);
 	k->fd = -1;
 	return -1;
+}
+
+int kms_follow(struct kms *k)
+{
+	drmModeRes *res = drmModeGetResources(k->fd);
+	if (!res)
+		return -1;
+	int ret = 0;
+	/* Between a display leaving and the panel coming back nothing is
+	 * connected; the panel's own event follows. */
+	drmModeConnector *conn = pick_connector(k->fd, res);
+	if (!conn)
+		goto out;
+	if (conn->connector_id == k->conn_id &&
+	    !memcmp(pick_mode(conn), &k->mode, sizeof(k->mode)))
+		goto out;
+
+	ret = -1;
+	fb_destroy(k);
+	if (use(k, res, conn) < 0)
+		goto out;
+	/* What was on the CRTC when we arrived belongs to the old output. */
+	if (k->saved) {
+		drmModeFreeCrtc(k->saved);
+		k->saved = NULL;
+	}
+	if (kms_present(k) < 0)
+		goto out;
+	lit(k, res);
+	ret = 1;
+out:
+	if (conn)
+		drmModeFreeConnector(conn);
+	drmModeFreeResources(res);
+	return ret;
 }
 
 /* Disable other planes on our CRTC. Legacy cursor framebuffers can survive
@@ -242,14 +339,7 @@ void kms_close(struct kms *k)
 		drmModeFreeCrtc(k->saved);
 		k->saved = NULL;
 	}
-	if (k->map)
-		munmap(k->map, k->size);
-	if (k->fb_id)
-		drmModeRmFB(k->fd, k->fb_id);
-	if (k->handle) {
-		struct drm_mode_destroy_dumb d = { .handle = k->handle };
-		drmIoctl(k->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &d);
-	}
+	fb_destroy(k);
 	close(k->fd);
 	k->fd = -1;
 }
@@ -331,6 +421,9 @@ int kms_has_degamma(struct kms *k)
 int kms_color_apply(struct kms *k, const struct color_profile *p)
 {
 	int ret = 0;
+
+	if (!k->internal)
+		p = NULL;
 
 	/* Apply degamma first; only clear it if the CRTC exposes the property. */
 	if (p && p->has_degamma) {

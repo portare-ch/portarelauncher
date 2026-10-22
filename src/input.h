@@ -19,6 +19,7 @@ enum action {
 	ACT_FAV,      /* the left face button: favourite on and off, in any list of games */
 	ACT_TICK,     /* the idle timeout expired; nothing was pressed */
 	ACT_AUX,      /* the auxiliary fd has something to read */
+	ACT_DISPLAY,  /* the display fd has something to read: a hotplug */
 	ACT_METADATA, /* metadata stdout or child completion; no user activity */
 	ACT_QUIT,     /* only bound to a keyboard escape hatch */
 };
@@ -30,6 +31,8 @@ struct input {
 	int n;
 	/* Status notification pipe, polled separately from evdev events. */
 	int aux_fd;
+	/* Display hotplug uevents. */
+	int display_fd;
 	/* Watches /dev/input for hotplug and InputPlumber device recreation. */
 	int notify_fd;
 	int quit_only;         /* the mask input_quit_only set, reapplied */
@@ -37,7 +40,8 @@ struct input {
 	int repeats;           /* how many repeats have fired */
 };
 
-/* Clears *in before opening anything, so input_set_aux comes after it. */
+/* Clears *in before opening anything, so input_set_aux and
+ * input_set_display come after it. */
 int  input_open(struct input *in);
 
 /* Adds devices and the hotplug watch to pfd (INPUT_MAX_DEV + 1 slots),
@@ -47,6 +51,7 @@ struct pollfd;
 int  input_fill_poll(struct input *in, struct pollfd *pfd);
 int  input_refresh(struct input *in, const struct pollfd *pfd, int n);
 void input_set_aux(struct input *in, int fd);
+void input_set_display(struct input *in, int fd);
 void input_close(struct input *in);
 
 /* Retroid: right confirms, bottom goes back. Shapes: bottom confirms,
