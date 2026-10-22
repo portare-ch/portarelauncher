@@ -301,12 +301,14 @@ static void draw_frame_right(struct ui *u, const char *crumb, int status)
 		str_copy(right, sizeof(right), u->st.clock);
 	term_puts_right(t, t->cols - 1, 0, right, ATTR_MID);
 
-	/* Leave two columns between the breadcrumb and the variable-width status. */
+	/* Leave two columns between the breadcrumb and the variable-width status.
+	 * MID like the status: the header stays put on every screen, and on an
+	 * OLED panel what stays put and bright wears in first. */
 	int room = (int)t->cols - 1 - text_width(right) - 2 - 1;
 	char c[192];
 	if (room > 0) {
 		snprintf(c, sizeof(c), "%.*s", (int)text_fit(crumb, room), crumb);
-		term_puts(t, 1, 0, c, ATTR_TEXT);
+		term_puts(t, 1, 0, c, ATTR_MID);
 	}
 
 	term_hline(t, 1, G_HLINE_D, ATTR_DIM);
@@ -590,8 +592,10 @@ static void draw_row(struct ui *u, unsigned y, int selected,
 	struct term *t = &u->term;
 	int attr = selected ? ATTR_BRIGHT : ATTR_TEXT;
 
+	/* The caret is a solid block of pixels where the selection rests; the
+	 * bright label already marks the row. */
 	if (selected)
-		term_putc(t, 2, y, G_CARET, ATTR_BRIGHT);
+		term_putc(t, 2, y, G_CARET, ATTR_TEXT);
 	term_puts(t, 4, y, label, attr);
 	if (right && *right)
 		term_puts_right(t, t->cols - 2, y, right, selected ? ATTR_BRIGHT : ATTR_MID);
