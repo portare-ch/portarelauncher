@@ -30,9 +30,21 @@ static void test_wait(void)
 	CHECK(idle_wait_ms(0, 1LL << 40, 1, 5, 10, 0) > 0);
 }
 
+static void test_dim_at(void)
+{
+	/* Halfway to the screen going off, for every offered time. */
+	CHECK(idle_dim_at(1000, 2) == 1000 + MIN);
+	CHECK(idle_dim_at(1000, 1) == 1000 + MIN / 2);
+	CHECK(idle_dim_at(0, 15) == 7 * MIN + MIN / 2);
+	/* Before the screen goes off, always. */
+	for (int m = 1; m <= 15; m++)
+		CHECK(idle_dim_at(0, m) < idle_wait_ms(0, 0, 0, m, 0, 0));
+}
+
 int main(void)
 {
 	test_sleep_at();
+	test_dim_at();
 	test_wait();
 	return check_report("idle");
 }

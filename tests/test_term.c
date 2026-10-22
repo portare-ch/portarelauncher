@@ -77,6 +77,41 @@ static void test_marks(void)
 	term_free(&t);
 }
 
+static void test_dim(void)
+{
+	struct term t;
+	memset(&t, 0, sizeof(t));
+	CHECK_INT(term_init(&t, fb, W, W, H, 3), 0);
+	term_set_palette(&t, 0);
+	const uint32_t text = term_color(&t, ATTR_TEXT);
+
+	/* Dimmed, every colour at half and the next flush repaints with it. */
+	memset(fb, 0, sizeof(fb));
+	term_putc(&t, 1, 0, 'A', ATTR_TEXT);
+	term_flush(&t);
+	int lit = lit_in(24, 0, 24, 48, text);
+	CHECK(lit > 0);
+	CHECK_INT(term_set_dim(&t, 1), 1);
+	CHECK_INT(term_set_dim(&t, 1), 0);
+	CHECK(term_color(&t, ATTR_TEXT) == 0x00606060);
+	CHECK(term_color(&t, ATTR_BRIGHT) == 0x007F7F7F);
+	CHECK(term_color(&t, ATTR_BG) == 0);
+	term_flush(&t);
+	CHECK_INT(lit_in(24, 0, 24, 48, text), 0);
+	CHECK_INT(lit_in(24, 0, 24, 48, 0x00606060), lit);
+
+	/* Another palette while dimmed is dimmed too. */
+	term_set_palette(&t, 1);
+	CHECK(term_color(&t, ATTR_TEXT) == 0x007F5800);
+	term_set_palette(&t, 0);
+
+	/* Back, the same pixels in the full colour. */
+	CHECK_INT(term_set_dim(&t, 0), 1);
+	term_flush(&t);
+	CHECK_INT(lit_in(24, 0, 24, 48, text), lit);
+	term_free(&t);
+}
+
 /* Text: ten cells by one row, 240 x 48 at scale 3. */
 #define TW 240
 #define TH 48
@@ -258,6 +293,7 @@ static void test_ja26(void)
 int main(void)
 {
 	test_marks();
+	test_dim();
 	test_text();
 	test_ja26();
 	return check_report("term");
