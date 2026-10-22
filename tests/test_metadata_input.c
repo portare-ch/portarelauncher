@@ -11,7 +11,7 @@ static void input_during_job(void)
 {
 	int p[2]; CHECK_INT(pipe(p),0);
 	fcntl(p[0],F_SETFL,O_NONBLOCK);
-	struct input in={.n=1,.aux_fd=-1,.notify_fd=-1}; in.fd[0]=p[0];
+	struct input in={.n=1,.aux_fd=-1,.display_fd=-1,.notify_fd=-1}; in.fd[0]=p[0];
 	struct proc_job j; proc_job_init(&j);
 	char *args[]={"/bin/sh","-c","exec sleep 10",NULL};
 	CHECK_INT(proc_job_start(&j,args,5000),0);
@@ -25,7 +25,7 @@ static void input_during_job(void)
 }
 static void completion_wakes(void)
 {
-	struct input in={.aux_fd=-1,.notify_fd=-1};
+	struct input in={.aux_fd=-1,.display_fd=-1,.notify_fd=-1};
 	struct proc_job j; proc_job_init(&j);
 	char *args[]={"/bin/sh","-c","printf 'SLUS-20946\\n'",NULL};
 	CHECK_INT(proc_job_start(&j,args,5000),0);
