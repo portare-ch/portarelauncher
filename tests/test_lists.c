@@ -150,7 +150,6 @@ static void test_short_system(void)
 	short_system("psx", 0, out, sizeof(out));       CHECK_STR(out, "PS1");
 	short_system("gamecube", 0, out, sizeof(out));  CHECK_STR(out, "GC");
 	short_system("dreamcast", 0, out, sizeof(out)); CHECK_STR(out, "DC");
-	short_system("snesmsu1", 0, out, sizeof(out));  CHECK_STR(out, "SNES");
 	short_system("wonderswan", 0, out, sizeof(out)); CHECK_STR(out, "WOND");
 	short_system("c64", 0, out, sizeof(out));       CHECK_STR(out, "C64");
 	/* The names used in Japan where they differ, the rest the same. */

@@ -170,7 +170,7 @@ static void supported_systems(void)
 	fixture_write(helper,"#!/bin/sh\ncase \"$1\" in *neocd*|*neogeocd*) printf 'NGCD-0069C\\n';; "
 	                     "*) printf 'SLUS-20946\\n';; esac\n"); chmod(helper,0700);
 	struct game games[6]={0}; struct psystem systems[6]={0};
-	const char *names[]={"psx","ps2","psp","neogeocd","neocd","megadrive"};
+	const char *names[]={"psx","ps2","psp","neogeocd","neocd","genesis"};
 	for (int i=0;i<6;i++) {
 		snprintf(games[i].path,sizeof(games[i].path),"%s/%s.CHd",root,names[i]);
 		fixture_write(games[i].path,""); strcpy(games[i].name,"filename");
@@ -190,7 +190,7 @@ static void supported_systems(void)
 	CHECK(!disc_titles_eligible("psp",games[2].path,1));
 	CHECK(!disc_titles_eligible("psp","/test.iso",0));
 	CHECK(!disc_titles_eligible("psp","/test.m3u",0));
-	CHECK(disc_titles_lookup(&m,"megadrive","SLUS-20946")==NULL);
+	CHECK(disc_titles_lookup(&m,"genesis","SLUS-20946")==NULL);
 	disc_titles_free(&m);
 	/* Same cache, only the PS1 title table changes. */
 	fixture_write(psx_table,"SLUS-20946\tUpdated PS1 title\n");
