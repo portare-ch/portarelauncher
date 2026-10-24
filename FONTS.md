@@ -4,8 +4,9 @@ Three fonts, all drawn from data generated into this repository.
 
 ## VGA 8x16
 
-`src/font8x16.h`, the whole UI today, is the VGA 8x16 text-mode font from
-Linux, `lib/fonts/font_8x16.c`, under the GPL 2.0 like the launcher.
+`src/font8x16.h`, used for Latin text and box drawing, is the VGA 8x16
+text-mode font from Linux, `lib/fonts/font_8x16.c`, under the GPL 2.0 like
+the launcher.
 `tools/mkfont.py` generates it and records where it comes from.
 
 ## Kana and kanji, from Noto Sans CJK JP
@@ -26,7 +27,7 @@ mockups use, under the same notice.
 
 ## Japanese, from Unifont
 
-`src/unifont.c` carries the full set the launcher draws with, generated
+`src/unifont.c` carries the launcher's fallback and one-cell glyphs, generated
 by `tools/mkunifont.py`; `tools/unifont-mockup.hex` carries the glyphs the
 mockups use, cut by `tools/mkjafont.py`. Both come from the Japanese build
 of GNU Unifont, `unifont_jp` 18.0.01:

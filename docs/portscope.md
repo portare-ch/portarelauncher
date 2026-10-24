@@ -1,23 +1,28 @@
 # PortScope
 
-PortScope is input diagnostics of our own. It replaces the SDL
-GamepadTester the image ships today, which needs SDL2_gfx and a controller
-database and looks like nothing else on the device. This one is a second binary in this repository, built from
-the launcher's own pieces: `kms.c` for the panel, the evdev reading of
-`input.c`, the 8x16 font and the palette. No SDL, no database: it shows the
+PortScope is input diagnostics of our own. It replaces the former SDL
+GamepadTester, which needed SDL2_gfx and a controller database and looked
+like nothing else on the device. It is a separate binary in this repository,
+built from the launcher's own pieces: `kms.c` for the panel, the 8x16 font,
+the palette and `quit.c` for the exit combo, with its own evdev reader in
+`portscope.c` and input model in `scope.c`. No SDL, no database: it shows the
 pad as the kernel reports it, and it looks like one more launcher screen.
 
 It lives under Settings > Diagnostics, a submenu for the tools that show
 what the hardware does, and nowhere in Tools: Tools is for scripts a user
-dropped into the modules folder, this is part of the system.
+dropped into the modules folder or the distribution supplies there; this
+is part of the system. Tools reads `/storage/.config/modules`, falling
+back to `/usr/config/modules` if the storage directory is absent.
 
 ![Settings > Diagnostics](images/settings-diagnostics.png)
 
 ![PortScope](images/portscope.png)
 
 The picture is `tools/mockup.py`'s `pad_screen`, at the launcher's 53x20
-grid, rendered by `tools/mockup_png.py` with the launcher's font; a program
-like the other mockups, so the layout cannot drift from what it claims.
+grid, rendered by `tools/mockup_png.py` with the launcher's font. It is a
+separate layout, not a capture of PortScope. The Diagnostics mockup still
+shows an `↑↓ MOVE` hint that the current screen omits; the mockup colours
+also differ from the current UI.
 
 ## The one concession
 
@@ -54,12 +59,16 @@ and the Button style diagram show the same ones.
   `R2`; label and ring go bright while the stick is clicked.
 - **SELECT, HOME, START** and the paddles **M1, M2**.
 - **Last input**: the last events as the kernel names them, code and
-  value, in the rows a footer would have taken.
+  value, in the rows a footer would have taken. The long paddle codes
+  `BTN_TRIGGER_HAPPY3` and `BTN_TRIGGER_HAPPY4` are shortened to `BTN_HAPPY3`
+  and `BTN_HAPPY4` to fit.
 - In the header, `RATE` and the report rate of the device shown, measured
   from its events over the last second: the virtual pad's by default, the
   MCU's in raw mode. Whether the full rate survives the path to a game is
   what someone testing this device most often wants to know; the MCU
   itself reports at 200 Hz.
+
+With several pads connected, the display combines their events and report counts.
 
 ## One layer at a time
 
@@ -82,8 +91,8 @@ hidden nodes back in `/dev/input` when it stops, and PortScope reads them
 there. Leaving the raw layer starts it again, and so does every way out
 of PortScope it controls. The launcher starts it once more after
 PortScope returns, which covers the one way out that runs no code in
-PortScope, a SIGKILL. While the raw layer is shown nothing else gets the
-pad, which is the point of it.
+PortScope, a SIGKILL. While the raw layer is shown, InputPlumber's virtual
+pad is unavailable.
 
 The raw layer is two devices: the MCU, and gpio-keys, which carries the
 paddles, BTN_Z for M1 and BTN_C for M2. The MCU reports the top face
@@ -94,22 +103,21 @@ MCU sent.
 
 ## What it does not do
 
-No calibration, no remapping, no settings. `gamepadcalibration` keeps the
-stick calibration; this only shows.
+No calibration, no remapping, no settings. The distribution no longer
+packages `gamepadcalibration`; PortScope only shows input.
 
 ## Leaving
 
-Home + START, the same combo that leaves every emulator: the launcher
-holds it while a child runs (`quit.h`) and takes the panel back. PortScope
-has no exit combo of its own and nothing says so, neither a footer here
-nor a description on the Diagnostics screen; it is the way out of
-everything on the device.
+Home + START, the same combo the launcher watches while a game or tool
+runs (`quit.h`). PortScope also handles it itself, including in raw mode
+while InputPlumber is stopped. There is no exit hint in its footer or on
+the Diagnostics screen. After PortScope exits, the launcher takes the
+panel back.
 
 ## In the distribution
 
-`packages/apps/gamepadtester` goes, with its two SM8550 patches and the
-Tools script and gamelist entry that ran it; nothing replaces them in
-Tools. The launcher opens `/usr/bin/portscope` from Settings >
+`packages/apps/gamepadtester`, its patches, and the Tools script and
+gamelist entry that ran it are gone; nothing replaces them in Tools.
+The launcher opens `/usr/bin/portscope` from Settings >
 Diagnostics, so the package installs it beside `portarelauncher`.
-`SDL2_gfx` was pulled in for the old tester and may go too once nothing
-else lists it.
+`SDL2_gfx`, pulled in for the old tester, is gone too.

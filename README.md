@@ -8,8 +8,8 @@ Written in C, it draws directly to the display through KMS using libc and libdrm
 - Launch games through `runemu.sh` and tools such as PortMaster.
 - Manage Wi-Fi, Bluetooth, display settings, power and system updates.
 - Check every button and stick with PortScope, under Settings > Diagnostics.
-- In English or Japanese, under Settings > Language & time. Titles in
-  Japanese or accented file names read correctly in either.
+- In English or Japanese, under Settings > Language & time. Japanese titles
+  and supported accented characters display in either language.
 
 ## Build
 
@@ -19,6 +19,8 @@ headers, then run:
 ```sh
 make
 ```
+
+This builds `portarelauncher`, `portscope` and `ps-chd-id`.
 
 To build for the device on an Apple Silicon Mac using Apple's `container`:
 
@@ -35,12 +37,16 @@ display and input devices.
 |---|---|---|
 | Confirm / launch | A | Cross |
 | Back | B | Circle |
-| Settings | X or START | Triangle or START |
+| Settings (from Systems) | X or START | Triangle or START |
 | Toggle favourite | Y | Square |
-| Return to consoles | Home | Home |
+| Return to Systems (in the launcher) | Home | Home |
 | Quit the running game or tool | Home + START | Home + START |
 
-Button style can be changed in Settings.
+Button style can be changed in Settings > Button style.
+
+Settings > Power controls the menu's screen-off timeout and the delay from
+screen off to sleep. A direction or face button wakes a blanked menu; that
+press does not select anything. These timeouts do not apply to games.
 
 ## Development
 
@@ -53,7 +59,8 @@ make test-chd    # Disc title helper; compressed fixtures also use chdman if ins
 make test-chd-san
 ```
 
-CHD tests and title-table regeneration require Python 3 with PyYAML.
+`make test-chd` and title-table regeneration require Python 3 with PyYAML;
+`make test-chd-san` needs only Python 3.
 Normal builds use the checked-in title tables. `make regen-disc-title-tables`
 recreates them offline from the compressed upstream catalogues.
 
@@ -61,7 +68,8 @@ CI builds and runs both test modes on arm64. Version tags (`v*`) publish a
 source archive and SHA-256 checksum through the release workflow.
 
 Layout notes and mockups are in [docs/](docs/). Regenerate mockups with
-`make mockup`.
+`make mockup` (Python 3). These are illustrative layouts, with some differences
+from the current UI noted in the documents.
 
 [Offline CHD titles](docs/ps-chd.md) documents packaging, provenance, binary size,
 cache behavior and validation, including the remaining physical-device checks.
@@ -70,7 +78,7 @@ cache behavior and validation, including the remaining physical-device checks.
 
 [GPL-2.0](LICENSE). The embedded font comes from Linux's
 `lib/fonts/font_8x16.c`; its provenance is recorded in
-[tools/mkfont.py](tools/mkfont.py). The Japanese glyphs come from GNU
-Unifont; [FONTS.md](FONTS.md) has the notice for both fonts.
+[tools/mkfont.py](tools/mkfont.py). Japanese glyphs use Noto Sans CJK JP with
+GNU Unifont as a fallback; [FONTS.md](FONTS.md) has the notices for all three fonts.
 PCSX2/Libretro title data and the helper's decoder dependencies have separate notices
 in [third_party/](third_party/).

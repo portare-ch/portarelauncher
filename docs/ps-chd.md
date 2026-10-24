@@ -48,7 +48,7 @@ GPL-3.0-or-later terms. PS1/PSP/Neo Geo CD data retain Libretro's CC-BY-SA-4.0 t
 license. Each system has one fixed title source, with no runtime provider chain.
 
 The PS1 and PSP generators use `game.name` and `rom.serial`. They remove parenthesized
-revision/version labels, collapses identical resulting names and omits serials
+revision/version labels, collapse identical resulting names and omit serials
 whose remaining names differ. Regions, languages and disc labels are retained.
 The 76 ambiguous PS1 serials are recorded in `data/psx-title-collisions.json`;
 16 ambiguous PSP serials are recorded in `data/psp-title-collisions.json`.
@@ -66,7 +66,7 @@ under `/usr/share/libretro-database` and explicitly omits `.rdb` scanner/title
 databases. Its Libretro revision matches the PS1/PSP data pinned here. There is
 therefore no packaged title catalogue to reuse at runtime. These small build-time
 exports follow the identifier/table design without adding an RDB parser.
-See the [PortareOS recipe](https://github.com/portare-ch/portareos/blob/main/packages/emulators/libretro/libretro-database/package.mk).
+See the [PortareOS recipe](https://github.com/portare-ch/portareos/blob/next/packages/emulators/libretro/libretro-database/package.mk).
 
 `make` uses CMake's `MinSizeRel` configuration and enables interprocedural
 optimization when the toolchain supports it. Before Neo Geo CD support, measured on Linux arm64, GCC 12.2:
@@ -94,7 +94,7 @@ ps-chd-id /absolute/path/game.chd
 
 Success writes one normalized identifier, such as `SLUS-20946`, followed by a
 newline. Exit 0 means identification, 1 means unsupported or no identification,
-and 2 means an operational/I/O failure that can be retried. Diagnostics go to
+and 2 means an operational/I/O failure or invalid arguments. Diagnostics go to
 stderr. The launcher passes the path directly in argv.
 
 The helper uses pinned libchdr `47d794151b2b64f6aba60304e6480f4f5a2bc24b`.
@@ -128,8 +128,8 @@ must match four ASCII letters, a hyphen and five digits. Conflicting boot
 assignments or conflicting identified data tracks produce no identification.
 
 For PSP, the reader finds the `PSP_GAME` directory and `PARAM.SFO` file through
-their ISO directory entries. It validates the SFO header, index/key/data tables,
-entry types and offsets, then normalizes the `DISC_ID` string, for example
+their ISO directory entries. It validates the SFO header, table bounds and entry
+offsets, requires `DISC_ID` to have the expected string type, then normalizes it, for example
 `UCUS98646` to `UCUS-98646`. Duplicate, malformed or missing DISC_ID values produce
 no identification. SFO title text is not emitted by the helper; the fixed PSP
 table supplies titles through the same cached serial resolver. A disc containing
@@ -158,9 +158,9 @@ Bounds: 32 volume descriptors, 1 MiB per searched directory, 32 KiB configuratio
 32 KiB IPL with at most 32 entries, 64 KiB SFO with at most 256 entries,
 99 tracks, 1 MiB hunks, 4,194,304 hunks, and 16 GiB logical images. Linux helper
 processes have a 256 MiB address-space cap and a 15-second CPU cap. The launcher
-also enforces a 10-second wall-clock deadline. Bounds are checked before
-allocating the decoder's hunk map. Only sanitizer builds disable the virtual
-address cap, since ASan reserves a much larger address range.
+also enforces a 10-second wall-clock deadline. CHD size and hunk bounds are checked
+before allocating the decoder's hunk map. Sanitizer builds skip both process
+resource limits; ASan reserves a much larger virtual address range.
 
 ## Cache and scheduling
 
@@ -177,8 +177,9 @@ with the Neo Geo CD reader.
 Cached serials are looked up in the current title table before catalog sorting.
 Lookups use the file's system, so identical serial strings in different systems cannot leak
 titles across systems. A table-only update changes titles after launcher
-restart without reopening unchanged CHDs. Missing/corrupt caches or missing tables/helpers preserve the
-filename fallback. Limits are 32,768 cache records, 32,768 records and 2 MiB
+restart without reopening unchanged CHDs. Files without a usable cached title
+start with the filename fallback; missing tables or helpers do not prevent browsing
+or launching. Limits are 32,768 cache records, 32,768 records and 2 MiB
 per title table, a 48 MiB cache file and 32,768 queued files per list opening.
 Title indexes allocate only the actual row count. On a 64-bit target the four
 current indexes reserve 431,120 bytes combined.
