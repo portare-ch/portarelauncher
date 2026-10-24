@@ -17,19 +17,20 @@ The launcher in English or Japanese, and in nothing else.
 ![English menus, titles in any script](images/games-any-script.png)
 
 The pictures are `tools/mockup.py`'s screens, rendered by
-`tools/mockup_png.py` with the launcher's font and the glyphs below. Both
-follow the rules in this file, so a mockup shows what the rules produce.
+`tools/mockup_png.py` with the launcher's fonts and the glyphs below. They
+illustrate the text rules, but their layouts and colours are separate from
+the UI code, and the versions and dates shown are sample values.
 
 ## The setting
 
-The language is `system.language` in system.cfg, `en_US` or `ja_JP`. It is
+The language is `system.language` in
+`/storage/.config/system/configs/system.cfg`, `en_US` or `ja_JP`. It is
 an existing key, so no second place says which language the device speaks.
 
-Writing `ja_JP` changes nothing else. The only other reader is
-`portareos-scraper` in the distribution, and nothing runs it: no package
-builds the `sselph-scraper` it calls. If it ran, `ja_JP` would fall to its
-default branch and scrape in English. Scraping names in Japanese would be a
-deliberate change to that script, not a side effect of this one.
+Writing `ja_JP` changes the launcher's menus and console names, not game
+titles or the timezone. The distribution no longer includes
+`portareos-scraper` or `sselph-scraper`; this setting does not scrape names
+in Japanese.
 
 ## The font
 
@@ -47,8 +48,8 @@ Earlier tries are why. Unifont's 16 x 16 glyphs tripled showed
 three-pixel stairs, which on this panel read as aliasing. Scale3x
 smoothed them, and that was too smooth.
 
-The file holds 13,636 glyphs, every two-cell character below, in 4.5 MB,
-2 MB compressed; it is installed as
+The file holds 13,636 glyphs, every two-cell character below, in about 4.45 MiB,
+about 1.96 MiB with gzip; it is installed as
 `/usr/share/portarelauncher/ja26.bin` with `ja26.NOTICE` and
 `OFL-1.1.txt`. The program reads it at start. Without it, or for a
 character it lacks, Unifont's glyph is drawn instead, which also covers
@@ -68,9 +69,9 @@ take one.
 
 Unifont's own glyphs are dual-licensed, also under the SIL OFL 1.1; the
 launcher takes the GPL option, which matches its own licence. The 14,300
-glyphs are generated into `src/unifont.c` by `tools/mkunifont.py`, 446 KB
+glyphs are generated into `src/unifont.c` by `tools/mkunifont.py`, about 447 KiB
 of bitmaps. Combining marks are left out, since they are always composed
-or dropped. [FONTS.md](../FONTS.md) is the notice for both fonts.
+or dropped. [FONTS.md](../FONTS.md) has the notices for all three fonts.
 
 The mockups carry only the glyphs they use: `tools/unifont-mockup.hex`,
 cut by `tools/mkjafont.py` with the same rule, its header listing which
@@ -80,13 +81,13 @@ launcher.
 
 ## Text
 
-Strings and titles are UTF-8 and are decoded. Today every byte is drawn as
-a CP437 glyph, so "Pokémon" comes out as "Pok├⌐mon".
+Strings and titles are decoded as UTF-8, so "Pokémon" is drawn correctly
+rather than as the CP437 byte sequence "Pok├⌐mon".
 
-Titles are composed to NFC when the catalog loads them. A file copied from
-a Mac is named in decomposed form, `e` and U+0301, and a Japanese one can
-carry the combining voiced mark U+3099. Composed, they are é and ガ. A
-combining mark left over after composing is dropped.
+Supported base-and-mark pairs are composed when the catalog loads titles.
+A file copied from a Mac can be named in decomposed form, `e` and U+0301,
+and a Japanese one can carry the combining voiced mark U+3099. Composed,
+they are é and ガ. A combining mark left over after composing is dropped.
 
 Each character is drawn by the first of these that has it, and that
 decides its width. There is no Unicode width table.
@@ -116,53 +117,57 @@ text moves a column a tick on average in any script. Scrolling stops at the
 first character boundary at or past the overflow, so the last character is
 in view.
 
-The code today counts bytes. `marquee_overflow` uses `strlen`, and
-`row_label` starts the visible text at `name + off`, so a UTF-8 title would
-be cut inside a character. Both become counts of display columns over
-decoded characters.
+`marquee_overflow` uses `text_scroll_end`, and `row_label` uses
+`text_at_col` and `text_fit`: they count display columns over decoded
+characters, so a UTF-8 title is not cut inside a character.
 
 ## Order
 
-Lists sort by code point: Latin first, then kana in their own order, then
-kanji in no order a reader would expect, as in the games mockup. Readings
-are not in the data: the catalog names a game by its file and does not
-read gamelists.
+Game lists put folders first, then sort by display name, ignoring ASCII
+case. Japanese names follow code-point order: Latin first, then kana in
+their own order, then kanji in no order a reader would expect, as in the
+games mockup. Readings are not in the data: the catalog uses filenames or
+[offline CHD titles](ps-chd.md) and does not read `gamelist.xml` for games.
+Favourites stay in insertion order; Recently played stays newest first.
+Systems sort by their configured full names before translation, so changing
+the language does not reorder them. The Systems mockup uses an illustrative
+order instead.
 
 ## Words
 
-Every launcher-owned UI string lives in one table per language, compiled
-in. Titles, network and device names, time zone IDs, versions and
+Translated UI strings live in a compiled-in table with English and Japanese
+entries. Titles, network and device names, time zone IDs, versions and
 addresses come from outside and are drawn as they are. A test checks that
-each owned string fits where it is drawn, in both languages, by width.
+each table entry fits its allotted width in both languages.
 
 Console names are the ones Nintendo, Sony and Sega use in Japan:
 スーパーファミコン, NINTENDO64, ニンテンドー ゲームキューブ, メガドライブ.
 The short names in the cross-system lists follow, SFC and FC rather than
 SNES and NES.
 
-The hints keep the key letters and translate the verb. A enters with
-決定 where it opens or confirms, and 変更 where it changes a value in place.
-B is 戻る. Y is お気に入り, and 解除 to remove one; 削除 would read as
-deleting the game.
+The hints keep the button labels and translate the verb. With Retroid
+button style, A enters with 決定 where it opens or confirms, and 変更 where
+it changes a value in place. B is 戻る. Y is お気に入り, and 解除 to remove
+one; 削除 would read as deleting the game.
 
 ## Settings
 
 Settings has thirteen rows. The Language & time submenu, 言語と地域 in
-Japanese, contains language and timezone settings. The regional selection
-also determines the WiFi country code. Its menu row shows the language,
-named in its own script.
+Japanese, contains language and timezone settings. The timezone's country
+also determines the WiFi country code; UTC uses world rules. Its menu row
+shows the language, named in its own script.
 
 The language row names itself in both languages, `言語 / Language` and
 `Language / 言語`, the one place that does. Whoever switched by mistake has
 to find the way back without reading the language they switched to. The
-values are each language in its own script, English and 日本語. A, left or
-right switches, as Button style does, and the screen redraws in the new
-language at once.
+values are each language in its own script, English and 日本語. Confirm,
+left or right switches, as Button style does, and the screen redraws in the
+new language at once.
 
 ## Not part of it
 
-- The on-screen keyboard stays Latin: it types Wi-Fi passwords and network
-  names. Its hints are translated.
+- The on-screen keyboard stays Latin: it types Wi-Fi passwords. Its hints
+  are translated.
 - PortScope keeps the kernel's event names and the labels printed on the
   device: L1, SELECT, HOME, START.
 - Japanese input, other languages, RetroArch's own menu language, and
