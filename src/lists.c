@@ -259,8 +259,7 @@ void day_label(long long when, long long now, int ja, char *out, size_t osz)
 void short_system(const char *name, int ja, char *out, size_t osz)
 {
 	static const struct { const char *name, *label; } table_ja[] = {
-		{ "snes", "SFC" }, { "snesh", "SFC" }, { "snesmsu1", "SFC" },
-		{ "satellaview", "SFC" }, { "nes", "FC" }, { "psx", "PS" },
+		{ "snes", "SFC" }, { "nes", "FC" }, { "psx", "PS" },
 	};
 	for (size_t i = 0; ja && i < sizeof(table_ja) / sizeof(table_ja[0]); i++) {
 		if (strcmp(table_ja[i].name, name) == 0) {
@@ -269,15 +268,12 @@ void short_system(const char *name, int ja, char *out, size_t osz)
 		}
 	}
 	static const struct { const char *name, *label; } table[] = {
-		{ "snes", "SNES" }, { "snesh", "SNES" }, { "snesmsu1", "SNES" },
-		{ "sfc", "SFC" }, { "satellaview", "SNES" },
-		{ "nes", "NES" }, { "famicom", "FC" }, { "fds", "FDS" },
-		{ "gb", "GB" }, { "gbh", "GB" }, { "gbc", "GBC" }, { "gbch", "GBC" },
-		{ "gba", "GBA" }, { "gbah", "GBA" }, { "gbav", "GBA" },
+		{ "snes", "SNES" }, { "nes", "NES" },
+		{ "gb", "GB" }, { "gbc", "GBC" }, { "gba", "GBA" },
 		{ "n64", "N64" }, { "gamecube", "GC" }, { "wii", "WII" },
 		{ "nds", "NDS" },
 		{ "psx", "PS1" }, { "ps2", "PS2" }, { "psp", "PSP" },
-		{ "genesis", "MD" }, { "megadrive", "MD" }, { "segacd", "MCD" },
+		{ "genesis", "MD" }, { "segacd", "MCD" },
 		{ "sega32x", "32X" }, { "mastersystem", "SMS" }, { "gamegear", "GG" },
 		{ "saturn", "SAT" }, { "dreamcast", "DC" },
 		{ "arcade", "ARC" }, { "fbneo", "ARC" }, { "neogeo", "NEO" },

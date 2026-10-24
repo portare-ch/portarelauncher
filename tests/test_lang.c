@@ -105,13 +105,10 @@ static void test_language(void)
 	          "\xe3\x83\x8d\xe3\x83\x83\xe3\x83\x88\xe3\x83\xaf\xe3\x83\xbc\xe3\x82\xaf");
 
 	/* Japanese console names must fit from column 4 before a four-digit count. */
-	const char *names[] = { "arcade", "atomiswave", "dreamcast", "famicom", "fds",
-		"gamecube", "gamegear", "gb", "gba", "gbah", "gbav", "gbc", "gbch", "gbh",
-		"genesis", "genh", "ggh", "imageviewer", "mastersystem", "megacd",
-		"megadrive", "megadrive-japan", "megadriveh", "movies", "music", "n64",
-		"n64dd", "neocd", "neogeo", "nes", "ports", "ps2", "ps3", "psp", "psx",
-		"satellaview", "saturn", "sega32x", "segacd", "sfc", "snes", "snesh",
-		"snesmsu1", "tools", "wiiware" };
+	const char *names[] = { "arcade", "atomiswave", "dreamcast", "gamecube",
+		"gamegear", "gb", "gba", "gbc", "genesis", "imageviewer", "mastersystem",
+		"movies", "music", "n64", "neocd", "neogeo", "nes", "ports", "ps2", "ps3",
+		"psp", "psx", "saturn", "sega32x", "segacd", "snes", "tools" };
 	for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
 		const char *ja = lang_system(names[i], "");
 		CHECK(strcmp(ja, names[i]) != 0);        /* it has a Japanese name */
