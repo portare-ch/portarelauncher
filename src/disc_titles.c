@@ -166,12 +166,13 @@ static const struct disc_title_table *table_for(const struct disc_titles *m, con
 	if (!strcmp(system,"psx")) return &m->psx;
 	if (!strcmp(system,"psp")) return &m->psp;
 	if (!strcmp(system,"neogeocd") || !strcmp(system,"neocd")) return &m->neocd;
+	if (!strcmp(system,"xbox")) return &m->xbox;
 	return NULL;
 }
 int disc_titles_supported(const char *system)
 {
 	return !strcmp(system,"ps2") || !strcmp(system,"psx") || !strcmp(system,"psp") ||
-	       !strcmp(system,"neogeocd") || !strcmp(system,"neocd");
+	       !strcmp(system,"neogeocd") || !strcmp(system,"neocd") || !strcmp(system,"xbox");
 }
 const char *disc_titles_lookup(const struct disc_titles *db, const char *system, const char *serial)
 {
@@ -189,8 +190,9 @@ const char *disc_titles_lookup(const struct disc_titles *db, const char *system,
 int disc_titles_eligible(const char *sys, const char *path, int folder)
 {
 	const char *dot = strrchr(path,'.');
-	return !folder && disc_titles_supported(sys) &&
-	       path[0] == '/' && dot && !strcasecmp(dot,".chd");
+	/* hakuX also plays plain Xbox ISOs; PlayStation ISOs are not read. */
+	return !folder && disc_titles_supported(sys) && path[0] == '/' && dot &&
+	       (!strcasecmp(dot,".chd") || (!strcmp(sys,"xbox") && !strcasecmp(dot,".iso")));
 }
 void disc_titles_apply(const struct disc_titles *m, const char *sys, struct game *g)
 {
@@ -270,14 +272,15 @@ static void load_cache(struct disc_titles *m)
 	fclose(f);
 }
 void disc_titles_init(struct disc_titles *m, const char *ps2_table, const char *psx_table,
-                      const char *psp_table, const char *neocd_table, const char *cache, const char *helper)
+                      const char *psp_table, const char *neocd_table, const char *xbox_table,
+                      const char *cache, const char *helper)
 {
 	memset(m,0,sizeof(*m)); proc_job_init(&m->job);
 	str_copy(m->cache,sizeof(m->cache),cache); str_copy(m->helper,sizeof(m->helper),helper);
 	m->buckets = malloc(BUCKETS*sizeof(*m->buckets));
 	clear_cache(m); load_table(&m->ps2,ps2_table); load_table(&m->psx,psx_table);
 	load_table(&m->psp,psp_table);
-	load_table(&m->neocd,neocd_table);
+	load_table(&m->neocd,neocd_table); load_table(&m->xbox,xbox_table);
 	if (m->buckets) load_cache(m);
 }
 int disc_titles_save(struct disc_titles *m)
@@ -406,5 +409,6 @@ void disc_titles_free(struct disc_titles *m)
 	free(m->psx.table); free(m->psx.titles); free(m->entries); free(m->buckets);
 	free(m->psp.table); free(m->psp.titles);
 	free(m->neocd.table); free(m->neocd.titles);
+	free(m->xbox.table); free(m->xbox.titles);
 	memset(m,0,sizeof(*m)); proc_job_init(&m->job);
 }

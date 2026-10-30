@@ -4,7 +4,7 @@ A lightweight, text-only launcher for [PortareOS](https://github.com/portare-ch/
 Written in C, it draws directly to the display through KMS using libc and libdrm.
 
 - Browse consoles and games, favourites and recently played games.
-- Recognize PS1, PS2, PSP and Neo Geo CD CHD titles offline, preserving filenames and launch paths.
+- Recognize PS1, PS2, PSP and Neo Geo CD CHD titles, and Xbox ISO and CHD titles, offline, preserving filenames and launch paths.
 - Launch games through `runemu.sh` and tools such as PortMaster.
 - Manage Wi-Fi, Bluetooth, display settings, power and system updates.
 - Check every button and stick with PortScope, under Settings > Diagnostics.
@@ -71,7 +71,7 @@ Layout notes and mockups are in [docs/](docs/). Regenerate mockups with
 `make mockup` (Python 3). These are illustrative layouts, with some differences
 from the current UI noted in the documents.
 
-[Offline CHD titles](docs/ps-chd.md) documents packaging, provenance, binary size,
+[Offline disc titles](docs/ps-chd.md) documents packaging, provenance, binary size,
 cache behavior and validation, including the remaining physical-device checks.
 
 ## License

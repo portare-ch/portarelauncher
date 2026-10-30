@@ -74,7 +74,7 @@ static void cache(void)
 	str_copy(games[0].path,512,file); str_copy(games[1].path,512,other);
 	str_copy(games[0].name,192,"arbitrary"); str_copy(games[1].name,192,"Alpha");
 	struct psystem s={.games=games,.ngames=2}; strcpy(s.name,"ps2");
-	struct disc_titles m; disc_titles_init(&m,table,table,NULL,NULL,cachefile,helper);
+	struct disc_titles m; disc_titles_init(&m,table,table,NULL,NULL,NULL,cachefile,helper);
 	CHECK(disc_titles_eligible("ps2",file,0)); CHECK(disc_titles_eligible("psx",file,0));
 	CHECK(!disc_titles_eligible("ps2",file,1)); CHECK(!disc_titles_eligible("ps2","/x.m3u",0));
 	disc_titles_apply(&m,"ps2",games); CHECK_STR(games[0].name,"arbitrary");
@@ -106,7 +106,7 @@ static void cache(void)
 	/* Updating only the database resolves the cached serial without a helper. */
 	fixture_write(table,"SLUS-20946\tUpdated title\n");
 	fixture_write(helper,"#!/bin/sh\nexit 2\n");
-	disc_titles_init(&m,table,table,NULL,NULL,cachefile,helper); CHECK_INT(m.nentries,2);
+	disc_titles_init(&m,table,table,NULL,NULL,NULL,cachefile,helper); CHECK_INT(m.nentries,2);
 	disc_titles_apply(&m,"ps2",games); CHECK_STR(games[0].name,"Updated title");
 	disc_titles_begin(&m,&s); disc_titles_step(&m);
 	CHECK(!m.job.pid && !m.queue); CHECK_INT(m.nentries,2);
@@ -116,11 +116,11 @@ static void cache(void)
 	disc_titles_begin(&m,&s); wait_work(&m); /* transient errors never replace identities */
 	disc_titles_free(&m);
 	fixture_write(cachefile,"PSDISC\t4\ninvalid\nEND\t0000000000000000\n");
-	disc_titles_init(&m,table,table,NULL,NULL,cachefile,helper); CHECK_INT(m.nentries,0);
+	disc_titles_init(&m,table,table,NULL,NULL,NULL,cachefile,helper); CHECK_INT(m.nentries,0);
 	/* A stable no-ID is cached, including after reload. */
 	fixture_write(helper,"#!/bin/sh\nexit 1\n"); disc_titles_begin(&m,&s); wait_work(&m);
 	CHECK_INT(m.nentries,2); disc_titles_free(&m);
-	disc_titles_init(&m,table,table,NULL,NULL,cachefile,helper); CHECK_INT(m.nentries,2);
+	disc_titles_init(&m,table,table,NULL,NULL,NULL,cachefile,helper); CHECK_INT(m.nentries,2);
 	fixture_write(helper,"#!/bin/sh\nexit 99\n"); disc_titles_begin(&m,&s); disc_titles_step(&m);
 	CHECK(!m.job.pid && !m.queue);
 	CHECK_INT(m.nentries,2);
@@ -156,56 +156,63 @@ static void supported_systems(void)
 {
 #ifdef __linux__
 	char root[32]; strcpy(root,fixture_dir());
-	char psx_table[128], ps2_table[128], psp_table[128], neocd_table[128], cache[128], helper[128];
+	char psx_table[128], ps2_table[128], psp_table[128], neocd_table[128], xbox_table[128], cache[128], helper[128];
 	snprintf(psx_table,sizeof(psx_table),"%s/psx.tsv",root);
 	snprintf(ps2_table,sizeof(ps2_table),"%s/ps2.tsv",root);
 	snprintf(psp_table,sizeof(psp_table),"%s/psp.tsv",root);
 	snprintf(neocd_table,sizeof(neocd_table),"%s/neocd.tsv",root);
+	snprintf(xbox_table,sizeof(xbox_table),"%s/xbox.tsv",root);
 	snprintf(cache,sizeof(cache),"%s/cache",root);
 	snprintf(helper,sizeof(helper),"%s/helper",root);
 	fixture_write(psx_table,"SLUS-20946\tPS1 scoped title\n");
 	fixture_write(ps2_table,"SLUS-20946\tPS2 scoped title\n");
 	fixture_write(psp_table,"SLUS-20946\tPSP scoped title (USA) (En,Fr,De,Es,It,Nl,Pl,Ru) [Disc 1]\n");
 	fixture_write(neocd_table,"NGCD-0069C\tNeo Geo CD scoped title\n");
+	fixture_write(xbox_table,"XBMS-00004\tXbox scoped title\nXEMS-00004\tOther region\n");
 	fixture_write(helper,"#!/bin/sh\ncase \"$1\" in *neocd*|*neogeocd*) printf 'NGCD-0069C\\n';; "
-	                     "*) printf 'SLUS-20946\\n';; esac\n"); chmod(helper,0700);
-	struct game games[6]={0}; struct psystem systems[6]={0};
-	const char *names[]={"psx","ps2","psp","neogeocd","neocd","genesis"};
-	for (int i=0;i<6;i++) {
-		snprintf(games[i].path,sizeof(games[i].path),"%s/%s.CHd",root,names[i]);
+	                     "*xbox*) printf 'XBMS-00004\\n';; *) printf 'SLUS-20946\\n';; esac\n"); chmod(helper,0700);
+	struct game games[7]={0}; struct psystem systems[7]={0};
+	const char *names[]={"psx","ps2","psp","neogeocd","neocd","genesis","xbox"};
+	for (int i=0;i<7;i++) {
+		/* hakuX plays plain Xbox ISOs as well as CHDs. */
+		snprintf(games[i].path,sizeof(games[i].path),"%s/%s.%s",root,names[i],i == 6 ? "ISO" : "CHd");
 		fixture_write(games[i].path,""); strcpy(games[i].name,"filename");
 		strcpy(systems[i].name,names[i]); systems[i].games=&games[i]; systems[i].ngames=1;
 	}
-	struct catalog catalog={.sys=systems,.n=6};
-	struct disc_titles m; disc_titles_init(&m,ps2_table,psx_table,psp_table,neocd_table,cache,helper);
-	disc_titles_begin_catalog(&m,&catalog); wait_work(&m); CHECK_INT(m.nentries,5);
-	for (int i=0;i<6;i++) disc_titles_apply(&m,names[i],&games[i]);
+	struct catalog catalog={.sys=systems,.n=7};
+	struct disc_titles m; disc_titles_init(&m,ps2_table,psx_table,psp_table,neocd_table,xbox_table,cache,helper);
+	disc_titles_begin_catalog(&m,&catalog); wait_work(&m); CHECK_INT(m.nentries,6);
+	for (int i=0;i<7;i++) disc_titles_apply(&m,names[i],&games[i]);
 	CHECK_STR(games[0].name,"PS1 scoped title"); CHECK_STR(games[1].name,"PS2 scoped title");
 	CHECK_STR(games[2].name,"PSP scoped title (USA) [Disc 1]");
 	CHECK_STR(games[3].name,"Neo Geo CD scoped title");
 	CHECK_STR(games[4].name,"Neo Geo CD scoped title");
 	CHECK_STR(games[5].name,"filename");
+	CHECK_STR(games[6].name,"Xbox scoped title");
 	CHECK(!disc_titles_lookup(&m,"psx","NGCD-0069C"));
+	CHECK(!disc_titles_lookup(&m,"ps2","XBMS-00004"));
 	CHECK(!disc_titles_lookup(&m,"neogeocd","SLUS-20946"));
 	CHECK(!disc_titles_eligible("psp",games[2].path,1));
 	CHECK(!disc_titles_eligible("psp","/test.iso",0));
+	CHECK(disc_titles_eligible("xbox","/test.iso",0)); CHECK(disc_titles_eligible("xbox","/test.chd",0));
+	CHECK(!disc_titles_eligible("xbox","/test.xiso",0)); CHECK(!disc_titles_eligible("xbox","/test.iso",1));
 	CHECK(!disc_titles_eligible("psp","/test.m3u",0));
 	CHECK(disc_titles_lookup(&m,"genesis","SLUS-20946")==NULL);
 	disc_titles_free(&m);
 	/* Same cache, only the PS1 title table changes. */
 	fixture_write(psx_table,"SLUS-20946\tUpdated PS1 title\n");
-	disc_titles_init(&m,ps2_table,psx_table,psp_table,neocd_table,cache,helper);
+	disc_titles_init(&m,ps2_table,psx_table,psp_table,neocd_table,xbox_table,cache,helper);
 	disc_titles_apply(&m,"psx",&games[0]); CHECK_STR(games[0].name,"Updated PS1 title");
 	disc_titles_begin_catalog(&m,&catalog); disc_titles_step(&m); CHECK(!m.job.pid && !m.queue);
 	fixture_write(psp_table,"SLUS-20946\tUpdated PSP title (Europe) (En,Fr)\n");
 	disc_titles_free(&m);
-	disc_titles_init(&m,ps2_table,psx_table,psp_table,neocd_table,cache,helper);
+	disc_titles_init(&m,ps2_table,psx_table,psp_table,neocd_table,xbox_table,cache,helper);
 	disc_titles_apply(&m,"psp",&games[2]); CHECK_STR(games[2].name,"Updated PSP title (Europe)");
 	disc_titles_begin_catalog(&m,&catalog); disc_titles_step(&m); CHECK(!m.job.pid && !m.queue);
 	/* Neo Geo CD IDs survive reload without a helper, including hexadecimal digits. */
 	disc_titles_free(&m);
 	fixture_write(neocd_table,"NGCD-0069C\tUpdated Neo Geo CD title\n");
-	disc_titles_init(&m,ps2_table,psx_table,psp_table,neocd_table,cache,"/nonexistent/helper");
+	disc_titles_init(&m,ps2_table,psx_table,psp_table,neocd_table,xbox_table,cache,"/nonexistent/helper");
 	for (int i=3;i<5;i++) {
 		disc_titles_apply(&m,names[i],&games[i]); CHECK_STR(games[i].name,"Updated Neo Geo CD title");
 	}
@@ -213,7 +220,7 @@ static void supported_systems(void)
 	/* Even an otherwise valid version-3 snapshot must be retried by the new reader. */
 	FILE *old = fopen(cache,"r+"); CHECK(old != NULL);
 	if (old) { CHECK_INT(fseek(old,7,SEEK_SET),0); CHECK_INT(fputc('3',old),'3'); fclose(old); }
-	disc_titles_init(&m,ps2_table,psx_table,psp_table,neocd_table,cache,helper);
+	disc_titles_init(&m,ps2_table,psx_table,psp_table,neocd_table,xbox_table,cache,helper);
 	CHECK_INT(m.nentries,0);
 	disc_titles_free(&m); fixture_cleanup(root);
 #endif
@@ -229,7 +236,7 @@ static void language_labels(void)
 		"UCUS-00004\tGame (Energy) (En,Demo) (USA, Europe) (En,Fr\n"
 		"UCUS-00005\t(En,Fr) Game (Ja,Zh)\n"
 		"UCUS-00006\tGame (En,Fr) - Part 2\n");
-	struct disc_titles m; disc_titles_init(&m,NULL,NULL,table,NULL,"/nonexistent/cache","/nonexistent/helper");
+	struct disc_titles m; disc_titles_init(&m,NULL,NULL,table,NULL,NULL,"/nonexistent/cache","/nonexistent/helper");
 	CHECK_STR(disc_titles_lookup(&m,"psp","UCUS-00001"),"Killzone - Liberation (USA)");
 	CHECK_STR(disc_titles_lookup(&m,"psp","UCUS-00002"),"Game (Europe) (Disc 2) (Ni) [Deluxe Pack]");
 	CHECK_STR(disc_titles_lookup(&m,"psp","UCUS-00003"),"Game (US) (Japan, Asia) (The Beginning)");
@@ -248,7 +255,7 @@ static void table_validation(void)
 	struct disc_titles m;
 	for (unsigned i = 0; i < sizeof(bad)/sizeof(*bad); i++) {
 		fixture_write(table,bad[i]);
-		disc_titles_init(&m,table,NULL,NULL,NULL,"/nonexistent/cache","/nonexistent/helper");
+		disc_titles_init(&m,table,NULL,NULL,NULL,NULL,"/nonexistent/cache","/nonexistent/helper");
 		CHECK_INT(m.ps2.ntitles,0);
 		disc_titles_free(&m);
 	}
@@ -256,13 +263,13 @@ static void table_validation(void)
 	if (f) {
 		for (unsigned i = 0; i < 32768; i++) fprintf(f,"AAAA-%05u\tTitle %u\n",i,i);
 		fclose(f);
-		disc_titles_init(&m,table,NULL,NULL,NULL,"/nonexistent/cache","/nonexistent/helper");
+		disc_titles_init(&m,table,NULL,NULL,NULL,NULL,"/nonexistent/cache","/nonexistent/helper");
 		CHECK_INT(m.ps2.ntitles,32768);
 		CHECK_STR(disc_titles_lookup(&m,"ps2","AAAA-32767"),"Title 32767");
 		disc_titles_free(&m);
 		f = fopen(table,"a"); CHECK(f != NULL);
 		if (f) { fputs("AAAA-32768\tOver limit\n",f); fclose(f); }
-		disc_titles_init(&m,table,NULL,NULL,NULL,"/nonexistent/cache","/nonexistent/helper");
+		disc_titles_init(&m,table,NULL,NULL,NULL,NULL,"/nonexistent/cache","/nonexistent/helper");
 		CHECK_INT(m.ps2.ntitles,0);
 		disc_titles_free(&m);
 	}
