@@ -11,7 +11,7 @@
 
 static const char media[] = "MICROSOFT*XBOX*MEDIA";
 /* Game partition starts: a rebuilt XISO, then full XGD1, XGD2 and XGD3 dumps. */
-static const uint32_t partitions[] = {0, 0x18300000/2048, 0xfd90000/2048, 0x89d80000/2048};
+static const uint32_t partitions[] = {0, 0x18300000/2048, 0xfd90000/2048, 0x2080000/2048};
 
 static uint32_t le32(const unsigned char *p)
 { return (uint32_t)p[0] | (uint32_t)p[1]<<8 | (uint32_t)p[2]<<16 | (uint32_t)p[3]<<24; }

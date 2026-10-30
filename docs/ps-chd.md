@@ -166,7 +166,7 @@ reads any file without the CHD signature as 2048-byte sectors. The volume
 descriptor is the one at sector 32 with `MICROSOFT*XBOX*MEDIA` at both ends.
 Rebuilt XISOs start the game partition at the beginning of the file; full
 Redump dumps of XGD1, XGD2 and XGD3 discs start it at `0x18300000`,
-`0xFD90000` and `0x89D80000`. A descriptor found at more than one start is
+`0xFD90000` and `0x2080000`. A descriptor found at more than one start is
 ambiguous. So is a disc that also has PlayStation metadata.
 
 The root directory is a binary tree of entries. The reader visits every node
