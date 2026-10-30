@@ -137,12 +137,12 @@ test:
 CMAKE ?= cmake
 PS_BUILD ?= build/ps-helper
 PS_CMAKE_ARGS ?=
-ps-chd-id: src/ps_sfo.c src/ps_sfo.h tools/ps-chd-id.c src/ps_iso.c src/ps_iso.h src/ps_serial.c src/ps_serial.h tools/ps-helper/CMakeLists.txt
+ps-chd-id: src/ps_sfo.c src/ps_sfo.h tools/ps-chd-id.c src/ps_iso.c src/ps_iso.h src/ps_serial.c src/ps_serial.h src/xbox_iso.c src/xbox_iso.h tools/ps-helper/CMakeLists.txt
 	$(CMAKE) -S tools/ps-helper -B $(PS_BUILD) -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_C_COMPILER="$(CC)" $(PS_CMAKE_ARGS)
 	+$(CMAKE) --build $(PS_BUILD) --target ps-chd-id
 	cp $(PS_BUILD)/ps-chd-id $@
 
-disc-title-tables: data/ps2-titles.tsv data/psx-titles.tsv data/psp-titles.tsv data/neocd-titles.tsv
+disc-title-tables: data/ps2-titles.tsv data/psx-titles.tsv data/psp-titles.tsv data/neocd-titles.tsv data/xbox-titles.tsv
 
 # Normal builds use the checked-in tables. Only explicit regeneration needs
 # Python/PyYAML and the losslessly compressed upstream catalogues.
@@ -151,6 +151,7 @@ regen-disc-title-tables:
 	python3 tools/gen_psx_titles.py third_party/libretro/PlayStation.dat.xz data/psx-titles.tsv --collisions data/psx-title-collisions.json
 	python3 tools/gen_psp_titles.py third_party/libretro/PlayStationPortable.dat.xz data/psp-titles.tsv --collisions data/psp-title-collisions.json
 	python3 tools/gen_neocd_titles.py third_party/libretro/NeoGeoCD.dat.xz data/neocd-titles.tsv --collisions data/neocd-title-collisions.json
+	python3 tools/gen_xbox_titles.py third_party/libretro/Xbox.dat.xz data/xbox-titles.tsv --collisions data/xbox-title-collisions.json
 
 test-chd: ps-chd-id disc-title-tables
 	python3 tests/test_ps_chd.py ./ps-chd-id
@@ -172,6 +173,7 @@ install-disc-titles: ps-chd-id disc-title-tables
 	install -Dm644 data/psx-titles.tsv $(DESTDIR)$(PREFIX)/share/portarelauncher/psx-titles.tsv
 	install -Dm644 data/psp-titles.tsv $(DESTDIR)$(PREFIX)/share/portarelauncher/psp-titles.tsv
 	install -Dm644 data/neocd-titles.tsv $(DESTDIR)$(PREFIX)/share/portarelauncher/neocd-titles.tsv
+	install -Dm644 data/xbox-titles.tsv $(DESTDIR)$(PREFIX)/share/portarelauncher/xbox-titles.tsv
 	install -Dm644 third_party/libretro/NOTICE $(DESTDIR)$(PREFIX)/share/portarelauncher/notices/LIBRETRO-NOTICE.txt
 	install -Dm644 third_party/libretro/LICENSE $(DESTDIR)$(PREFIX)/share/portarelauncher/notices/LIBRETRO-LICENSE.txt
 	install -Dm644 third_party/CHD-NOTICES.txt $(DESTDIR)$(PREFIX)/share/portarelauncher/notices/CHD-NOTICES.txt

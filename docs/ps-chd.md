@@ -1,7 +1,8 @@
-# PS1, PS2, PSP and Neo Geo CD CHD titles
+# PS1, PS2, PSP, Neo Geo CD and Xbox disc titles
 
 The launcher identifies PS1 (`psx`), PS2 (`ps2`), PSP (`psp`) and Neo Geo CD
-(`neogeocd` or `neocd`) `.chd` files offline, regardless of filename.
+(`neogeocd` or `neocd`) `.chd` files, and Xbox (`xbox`) `.iso` and `.chd` files,
+offline, regardless of filename.
 Only display labels change. Launch arguments, paths, favourites, recents,
 folders, playlists and other systems retain their existing identities.
 Identical titles remain separate files. Source names preserve available disc
@@ -12,7 +13,7 @@ revision, translation or modification.
 
 Install CMake alongside the existing build dependencies. `make` builds
 `ps-chd-id` and uses the checked-in `data/ps2-titles.tsv`,
-`data/psx-titles.tsv`, `data/psp-titles.tsv` and `data/neocd-titles.tsv`. Normal builds and runtime need
+`data/psx-titles.tsv`, `data/psp-titles.tsv`, `data/neocd-titles.tsv` and `data/xbox-titles.tsv`. Normal builds and runtime need
 neither Python nor YAML. No build or runtime download is performed.
 
 The checksum-pinned PCSX2 GameIndex and Libretro/Redump DATs are retained
@@ -33,19 +34,21 @@ This adds `/usr/bin/ps-chd-id`,
 `/usr/share/portarelauncher/ps2-titles.tsv`,
 `/usr/share/portarelauncher/psx-titles.tsv`,
 `/usr/share/portarelauncher/psp-titles.tsv`,
-`/usr/share/portarelauncher/neocd-titles.tsv`, and dependency notices under
+`/usr/share/portarelauncher/neocd-titles.tsv`,
+`/usr/share/portarelauncher/xbox-titles.tsv`, and dependency notices under
 `/usr/share/portarelauncher/notices/`. Use it alongside the existing launcher
 and font packaging. Source archives retain the decoder sources, compressed
 catalogue inputs and licenses. The YAML, DATs and upstream build files are not
 installed on the device.
 The PS2 table has 12,830 entries and is 599,092 bytes in UTF-8. The PS1 table
 has 10,293 entries and is 505,263 bytes. The PSP table has 3,726 entries and is
-192,947 bytes. The Neo Geo CD table has 96 entries and is 4,250 bytes. See
+192,947 bytes. The Neo Geo CD table has 96 entries and is 4,250 bytes. The Xbox
+table has 6,375 entries, up to seven per title ID, and is 223,078 bytes. See
 [PCSX2 provenance](../third_party/pcsx2/NOTICE) and
 [codec notices](../third_party/CHD-NOTICES.txt). PS2 data carries PCSX2's
 GPL-3.0-or-later terms. PS1/PSP/Neo Geo CD data retain Libretro's CC-BY-SA-4.0 terms and
 [provenance](../third_party/libretro/NOTICE), separately from the launcher code
-license. Each system has one fixed title source, with no runtime provider chain.
+license. Xbox data comes from the same Libretro revision and terms. Each system has one fixed title source, with no runtime provider chain.
 
 The PS1 and PSP generators use `game.name` and `rom.serial`. They remove parenthesized
 revision/version labels, collapse identical resulting names and omit serials
@@ -99,7 +102,8 @@ stderr. The launcher passes the path directly in argv.
 
 The helper uses pinned libchdr `47d794151b2b64f6aba60304e6480f4f5a2bc24b`.
 It decodes only hunks needed for ISO9660 descriptors, the root directory and
-`SYSTEM.CNF`, `PSP_GAME/PARAM.SFO`, or Neo Geo CD's `IPL.TXT` and boot program header.
+`SYSTEM.CNF`, `PSP_GAME/PARAM.SFO`, Neo Geo CD's `IPL.TXT` and boot program header, or the
+Xbox `default.xbe` header and certificate.
 There is no full-disc hash, extraction,
 temporary ISO or byte scan
 for serial-like strings. Compressed hunk maps are still read and validated at
@@ -154,9 +158,50 @@ filenames. This identifies the underlying game, not modifications that reuse its
 Format references: [IPL file](https://wiki.neogeodev.org/index.php?title=IPL_file)
 and [FBNeo hardware IDs](https://github.com/finalburnneo/FBNeo/blob/4033bc427be0538d637eceed40c430c4837d0780/src/burner/neocdlist_games.h).
 
+## Xbox
+
+Xbox games are XDVDFS volumes. hakuX plays plain XISOs as well as DVD CHDs
+(`chdman createdvd`), so `.iso` files are eligible for `xbox` only; the helper
+reads any file without the CHD signature as 2048-byte sectors. The volume
+descriptor is the one at sector 32 with `MICROSOFT*XBOX*MEDIA` at both ends.
+Rebuilt XISOs start the game partition at the beginning of the file; full
+Redump dumps of XGD1, XGD2 and XGD3 discs start it at `0x18300000`,
+`0xFD90000` and `0x89D80000`. A descriptor found at more than one start is
+ambiguous. So is a disc that also has PlayStation metadata.
+
+The root directory is a binary tree of entries. The reader visits every node
+once rather than relying on the tree's sort order, finds `default.xbe` without
+regard to case, and rejects cycles, nodes reached twice, entries that cross a
+sector, a second `default.xbe`, or one marked as a directory. From the XBE it
+reads the image header and the certificate. The certificate must lie inside
+the headers, which must fit in the file and in 64 KiB. Format references:
+[XDVDFS](https://xboxdevwiki.net/XDVDFS) and [XBE](https://xboxdevwiki.net/Xbe).
+
+The title ID's high half is the publisher's two letters and the low half the
+game number, which Redump writes in decimal: Halo's `0x4D530004` is `MS-004`.
+Releases in different regions often share a title ID under different names,
+such as FIFA Soccer and FIFA Football, so the identifier also carries the
+certificate's region flags (North America 1, Japan 2, rest of the world 4).
+The fixed-width ID is `X`, then the letter `A` plus those flags, the publisher
+letters, a hyphen and the five-digit number: `XBMS-00004` for Halo in North
+America, `XEEA-00091` for Burnout 3 in Europe. Certificates without one of
+the three flags, or whose publisher letters are not `A` to `Z`, keep the filename.
+
+The table generator maps Redump regions to those flags: USA, Canada and Latin
+America to North America; Japan to Japan; European countries, Scandinavia and
+Australia to the rest of the world; Asian releases, which were sold with
+either, to both; World to all three. For each title ID and each of the seven
+flag combinations it collects the releases sold in any of the disc's regions.
+Their names, without region, language, revision and packaging labels such as
+Collector's Edition, must agree; otherwise that combination is omitted and
+recorded in `data/xbox-title-collisions.json`. 583 combinations are, mostly
+localized releases sharing one region, and magazine discs. Serials with a
+disc suffix, such as `XK-030-0`, are not title IDs and are skipped.
+
 Bounds: 32 volume descriptors, 1 MiB per searched directory, 32 KiB configuration,
 32 KiB IPL with at most 32 entries, 64 KiB SFO with at most 256 entries,
-99 tracks, 1 MiB hunks, 4,194,304 hunks, and 16 GiB logical images. Linux helper
+1 MiB per Xbox directory, 64 KiB of XBE headers,
+99 tracks, 1 MiB hunks, 4,194,304 hunks, and 16 GiB logical images or plain files. Linux helper
 processes have a 256 MiB address-space cap and a 15-second CPU cap. The launcher
 also enforces a 10-second wall-clock deadline. CHD size and hunk bounds are checked
 before allocating the decoder's hunk map. Sanitizer builds skip both process
@@ -181,10 +226,10 @@ restart without reopening unchanged CHDs. Files without a usable cached title
 start with the filename fallback; missing tables or helpers do not prevent browsing
 or launching. Limits are 32,768 cache records, 32,768 records and 2 MiB
 per title table, a 48 MiB cache file and 32,768 queued files per list opening.
-Title indexes allocate only the actual row count. On a 64-bit target the four
-current indexes reserve 431,120 bytes combined.
+Title indexes allocate only the actual row count. On a 64-bit target the five
+current indexes reserve 533,120 bytes combined.
 
-Opening a supported system queues that system's CHDs; Quick Access queues all four systems. One asynchronous
+Opening a supported system queues that system's discs; Quick Access queues all five systems. One asynchronous
 helper runs at a time; an immutable path queue survives catalog resorting. The existing input
 poll waits on helper stdout and Linux pidfd completion, plus a single deadline.
 There is no metadata polling timer or daemon. Kernels without usable pidfds

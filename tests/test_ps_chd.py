@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synthetic ISO9660 in real uncompressed CHDv5 containers. No copyrighted discs."""
+"""Synthetic ISO9660 and Xbox XDVDFS images, plain or in CHDv5 containers. No copyrighted discs."""
 import os
 from pathlib import Path
 import shutil
@@ -81,6 +81,41 @@ def neocd_iso(ipl=b'GAME.FIX,0,0\r\nGAME.PRG,0,0\r\nHIGH.PRG,0,130000\r\n',
     data[at:at+len(r)] = r
     data[28*2048+0x100:28*2048+0x107] = b'NEO-GEO'
     struct.pack_into('>H', data, 28*2048+0x108, game_id)
+    return data
+
+MEDIA = b'MICROSOFT*XBOX*MEDIA'
+
+def xbe(title_id=0x4D530004, regions=1, cert=0x178, headers=0x1000, length=0x1d0):
+    data = bytearray(headers)
+    data[:4] = b'XBEH'
+    struct.pack_into('<II', data, 0x104, 0x10000, headers)
+    struct.pack_into('<I', data, 0x118, 0x10000+cert)
+    if cert+0xa4 <= headers:
+        struct.pack_into('<III', data, cert, length, 0, title_id)
+        struct.pack_into('<I', data, cert+0xa0, regions)
+    return data
+
+def xdvd(name, sector, size, left=0, right=0, attr=0x20):
+    name = name.encode('ascii')
+    return struct.pack('<HHIIBB', left, right, sector, size, attr, len(name)) + name
+
+def xiso(image=None, name='default.xbe', attr=0x20):
+    """A rebuilt XISO: descriptor at 32, a two-sector root at 40, the XBE at 48."""
+    image = xbe() if image is None else image
+    data = bytearray(64*2048)
+    vd = bytearray(2048)
+    vd[:20] = vd[0x7ec:0x800] = MEDIA
+    struct.pack_into('<II', vd, 20, 40, 4096)
+    data[32*2048:33*2048] = vd
+    root = bytearray(b'\xff'*4096)
+    # media sorts after default.xbe: its left child is in the second sector.
+    for at, entry in ((0, xdvd('media', 50, 2048, left=512, right=8, attr=0x10)),
+                      (32, xdvd('update.xbe', 51, 2048)),
+                      (2048, xdvd(name, 48, len(image), left=520, attr=attr)),
+                      (2080, xdvd('AUDIO', 52, 2048, attr=0x10))):
+        root[at:at+len(entry)] = entry
+    data[40*2048:42*2048] = root
+    data[48*2048:48*2048+len(image)] = image
     return data
 
 def cdframes(data, mode):
@@ -264,6 +299,72 @@ class HelperTests(unittest.TestCase):
         data[at:at+len(r)]=r
         frames=cdframes(data,'MODE1_RAW')+bytes(64*2448)
         self.run_image(chd(frames,2448,[track(1,'MODE1_RAW',64),track(2,'AUDIO',64)]),1)
+    def test_xbox(self):
+        self.run_image(chd(xiso()), serial=b'XBMS-00004\n')
+        self.run_image(xiso(), serial=b'XBMS-00004\n')  # A plain XISO is not a CHD.
+        self.run_image(chd(xiso(xbe(regions=4))), serial=b'XEMS-00004\n')
+        # Only the three region bits count; 0x80000000 marks manufacturing discs.
+        self.run_image(xiso(xbe(0x4541005B,0x80000007)), serial=b'XHEA-00091\n')
+        self.run_image(xiso(xbe(cert=0x400,length=0x1ec)), serial=b'XBMS-00004\n')
+        self.run_image(chd(xiso(name='DEFAULT.XBE'),hunk=3072), serial=b'XBMS-00004\n')
+    def test_xbox_full_dump(self):
+        # XGD2 game partition after the video partition, as Redump dumps it.
+        base = 0xfd90000
+        with open(self.path,'wb') as f:
+            f.seek(base); f.write(xiso()); f.truncate(base+0x400000)
+        r = subprocess.run([HELPER, str(self.path)], capture_output=True, timeout=5)
+        self.assertEqual((r.returncode,r.stdout),(0,b'XBMS-00004\n'),r.stderr)
+        # A rebuilt XISO in front would make the disc ambiguous.
+        with open(self.path,'r+b') as f: f.write(xiso())
+        r = subprocess.run([HELPER, str(self.path)], capture_output=True, timeout=5)
+        self.assertEqual((r.returncode,r.stdout),(1,b''),r.stderr)
+    def test_xbox_invalid(self):
+        for image in (xbe(0x00010001), xbe(0x4D300004), xbe(regions=0), xbe(regions=0x80000000),
+                      xbe(length=0x1cf), xbe(cert=0x170), xbe(cert=0x1000-0x40),
+                      xbe(headers=0x340), xbe()[:0x177]):
+            with self.subTest(image=bytes(image[0x118:0x11c])): self.run_image(xiso(image),1)
+        image = xbe(); image[0] = 0
+        self.run_image(xiso(image),1)
+        image = xbe(); struct.pack_into('<I',image,0x118,0xfff0)  # certificate below the base
+        self.run_image(xiso(image),1)
+        image = xbe(); struct.pack_into('<I',image,0x108,0x2000)  # headers longer than the file
+        self.run_image(xiso(image),1)
+        self.run_image(xiso(name='default.xbx'),1)
+        self.run_image(xiso(attr=0x10),1)  # default.xbe must not be a directory.
+        data = xiso(); data[32*2048+0x7ec] = 0
+        self.run_image(data,1)
+        # A root cut before its second sector loses default.xbe's node.
+        for root, size in ((40,0), (40,1024*1024+2048), (63,4096), (40,2048)):
+            data = xiso(); struct.pack_into('<II',data,32*2048+20,root,size)
+            with self.subTest(root=root,size=size): self.run_image(data,1)
+        data = xiso(); struct.pack_into('<H',data,40*2048+2080,512)  # a cycle; offset 0 is no child
+        self.run_image(data,1)
+        data = xiso(); struct.pack_into('<H',data,40*2048+2,512)  # two parents of one node
+        self.run_image(data,1)
+        data = xiso(); data[40*2048+2048+13] = 0  # a nameless entry
+        self.run_image(data,1)
+        data = xiso(); e = xdvd('default.xbe',48,4096)
+        data[40*2048+32:40*2048+32+len(e)] = e  # two default.xbe entries
+        self.run_image(data,1)
+        data = xiso(); e = xdvd('x'*40,48,4096)
+        data[40*2048+2030:40*2048+2030+14] = e[:14]  # an entry crossing a sector
+        struct.pack_into('<H',data,40*2048+2,2030//4+1)
+        self.run_image(data,1)
+        data = xiso(); struct.pack_into('<I',data,40*2048+2048+8,0x1000000)  # beyond the image
+        self.run_image(data,1)
+        # PlayStation and Xbox metadata on one disc are ambiguous.
+        data = iso(); data[32*2048:] = xiso()[32*2048:]
+        self.run_image(data,1)
+        self.run_image(chd(data),1)
+    @unittest.skipUnless(shutil.which('chdman'), 'optional chdman compression integration')
+    def test_compressed_xbox_chdman(self):
+        raw=Path(self.tmp.name)/'xbox.iso'; raw.write_bytes(xiso(xbe(0x4541005B,4)))
+        subprocess.run(['chdman','createraw','-i',str(raw),'-o',str(self.path),
+                        '-hs','8192','-us','2048','-c','lzma,zlib,huff'],check=True,capture_output=True)
+        r=subprocess.run([HELPER,str(self.path)],capture_output=True,timeout=5)
+        self.assertEqual((r.returncode,r.stdout),(0,b'XEEA-00091\n'),r.stderr)
+        r=subprocess.run([HELPER,str(raw)],capture_output=True,timeout=5)
+        self.assertEqual((r.returncode,r.stdout),(0,b'XEEA-00091\n'),r.stderr)
     @unittest.skipUnless(shutil.which('chdman'), 'optional chdman compression integration')
     def test_compressed_neocd_chdman(self):
         raw=Path(self.tmp.name)/'neocd.bin'

@@ -49,3 +49,16 @@ remaining names for an ID are omitted and recorded in neocd-title-collisions.jso
 Unknown homebrew catalogue-to-header mappings are omitted.
 Treasure of the Caribbean reuses Janshin's hardware ID 0x0048; both titles
 are recorded as an ambiguous ID and omitted from the runtime table.
+
+Xbox source: Libretro database, Redump Microsoft - Xbox DAT
+https://github.com/libretro/libretro-database/blob/12c21cf79f1e20eff6ac68b80875816c717d0a7a/metadat/redump/Microsoft%20-%20Xbox.dat
+Same revision, upstream credits and CC-BY-SA-4.0 license as above.
+Retrieved: 2026-10-30. Unmodified source retained in Xbox.dat.xz.
+Decompressed SHA-256:
+2630f780019b6e360a4dad54d22bb7b65a3ebb87483cccc41f2d754a810811bf
+Generated table: 6,375 entries, 223,078 UTF-8 bytes; 583 ambiguous IDs omitted.
+Redump's Xbox serial is the XBE certificate's title ID. Each key adds the
+disc's region flags, so a title ID has up to seven rows: one per combination
+of North America, Japan and the rest of the world. Region, language, revision
+and packaging labels are removed. Different remaining names for a key are
+omitted and recorded in xbox-title-collisions.json.

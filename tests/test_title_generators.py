@@ -66,6 +66,40 @@ game ( name "Fatal Fury 3 (Japan)" rom ( serial "NGCD-069" ) )'''
         reused='game ( name "Janshin" rom ( serial "AICD-048" ) )game ( name "Treasure" rom ( serial "NGCD-500" ) )'
         self.assertEqual(neocd.export(reused),(b'',{'NGCD-00048':['Janshin','Treasure']}))
 
+xbox_spec=importlib.util.spec_from_file_location('xbox_generator',Path(__file__).resolve().parents[1]/'tools/gen_xbox_titles.py')
+xbox=importlib.util.module_from_spec(xbox_spec); xbox_spec.loader.exec_module(xbox)
+class XboxGeneratorTests(unittest.TestCase):
+    def test_region_flags(self):
+        source='''game ( name "Halo - Combat Evolved (USA) (Rev 2)" rom ( serial "MS-004" ) )
+game ( name "Halo - Combat Evolved (Europe) (Fr,De)" rom ( serial "MS-004" ) )
+game ( name "Halo (Japan)" rom ( serial "MS-004" ) )
+game ( name "Halo Movies (Japan)" rom ( serial "MS-004" ) )'''
+        table,collisions=xbox.export(source)
+        # B, E and F: North America, the rest of the world, or both.
+        self.assertEqual(table,b'XBMS-00004\tHalo - Combat Evolved\nXEMS-00004\tHalo - Combat Evolved\n'
+                               b'XFMS-00004\tHalo - Combat Evolved\n')
+        self.assertEqual(sorted(collisions),['XCMS-00004','XDMS-00004','XGMS-00004','XHMS-00004'])
+        self.assertEqual(collisions['XCMS-00004'],['Halo (Japan)','Halo Movies (Japan)'])
+        self.assertEqual(xbox.export('\n'.join(reversed(source.splitlines()))),(table,collisions))
+    def test_labels_and_serials(self):
+        source='''game ( name "Doom 3 (USA) (Limited Collector's Edition)" rom ( serial "AV-032" ) )
+game ( name "Doom 3 (Europe, Australia) (En,Fr,De)" rom ( serial "AV-032" ) )
+game ( name "Game (Korea) (En,Ko)" rom ( serial "XX-1234" ) )
+game ( name "Show (Japan) (Disc 1) (Taikenban)" rom ( serial "XK-030-0" ) )
+game ( name "Show (Japan) (Disc 1) (Taikenban)" rom ( serial "XK-030" ) )
+game ( name "Recovery (Build 5659) (USA)" rom ( serial "MS-999" ) )
+game ( name "Too big (USA)" rom ( serial "MS-65536" ) )'''
+        rows=dict(line.split('\t') for line in xbox.export(source)[0].decode().splitlines())
+        self.assertEqual({rows[k] for k in rows if 'AV-' in k},{'Doom 3'})
+        # Neither release was sold in Japan, so a Japan-only disc finds nothing.
+        self.assertEqual(sorted(k[1] for k in rows if 'AV-' in k),list('BDEFGH'))
+        # Asian releases match either the Japan or the rest-of-world flag.
+        self.assertNotIn('XBXX-01234',rows)
+        self.assertEqual(rows['XCXX-01234'],'Game'); self.assertEqual(rows['XEXX-01234'],'Game')
+        self.assertEqual(rows['XCXK-00030'],'Show (Disc 1) (Taikenban)')
+        self.assertEqual(rows['XBMS-00999'],'Recovery (Build 5659)')
+        self.assertFalse([k for k in rows if k.endswith('65536')])
+
 class PinnedGeneratorTests(unittest.TestCase):
     def test_pinned_exports(self):
         root=Path(__file__).resolve().parents[1]
@@ -75,6 +109,7 @@ class PinnedGeneratorTests(unittest.TestCase):
                 ('psx','libretro/PlayStation.dat.xz'),
                 ('psp','libretro/PlayStationPortable.dat.xz'),
                 ('neocd','libretro/NeoGeoCD.dat.xz'),
+                ('xbox','libretro/Xbox.dat.xz'),
             ):
                 with self.subTest(system=system):
                     out=Path(directory)/f'{system}.tsv'; collisions=Path(directory)/'collisions.json'

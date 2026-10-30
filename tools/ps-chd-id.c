@@ -1,5 +1,6 @@
-/* Read-only, bounded PS1/PS2/PSP/Neo Geo CD identification. Compression is libchdr's. */
+/* Read-only, bounded PS1/PS2/PSP/Neo Geo CD/Xbox identification. Compression is libchdr's. */
 #include "ps_iso.h"
+#include "xbox_iso.h"
 #include <libchdr/chd.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -64,6 +65,26 @@ static int sector(void *ctx, uint32_t lba, unsigned char out[2048])
 	memcpy(out, frame+im->offset, 2048);
 	return 0;
 }
+/* A plain image, such as an Xbox XISO, is read directly as 2048-byte sectors. */
+static int file_sector(void *ctx, uint32_t lba, unsigned char out[2048])
+{
+	struct image *im = ctx;
+	if (lba >= im->sectors) return 1;
+	ssize_t n = pread(fileno(im->fp), out, 2048, (off_t)lba * 2048);
+	return n == 2048 ? 0 : n < 0 ? 2 : 1;
+}
+/* A disc with both PlayStation and Xbox metadata is ambiguous. */
+static int dvd_serial(const struct ps_disc *d, char serial[PS_SERIAL_SIZE])
+{
+	char ps[PS_SERIAL_SIZE], xbox[PS_SERIAL_SIZE];
+	int rc = ps_iso_serial(d, ps);
+	if (rc == 2) return rc;
+	int xrc = xbox_iso_serial(d, xbox);
+	if (xrc == 2) return xrc;
+	if (!rc == !xrc) return 1;
+	memcpy(serial, rc ? xbox : ps, PS_SERIAL_SIZE);
+	return 0;
+}
 static int track_type(struct image *im, const char *s)
 {
 	im->offset = 0; im->raw = im->mode2 = 0;
@@ -86,7 +107,7 @@ static int identify(struct image *im, char serial[PS_SERIAL_SIZE])
 	if (im->stride == 2048) {
 		im->sectors = im->h->logicalbytes / 2048;
 		struct ps_disc d = {im, im->sectors, sector};
-		return ps_iso_serial(&d, serial);
+		return dvd_serial(&d, serial);
 	}
 	if (im->stride != 2448) return 1;
 	uint64_t start = 0;
@@ -137,7 +158,7 @@ static int identify(struct image *im, char serial[PS_SERIAL_SIZE])
 int main(int argc, char **argv)
 {
 	if (argc != 2 || argv[1][0] != '/') {
-		fprintf(stderr, "usage: ps-chd-id /absolute/path/game.chd\n"); return 2;
+		fprintf(stderr, "usage: ps-chd-id /absolute/path/game.chd|game.iso\n"); return 2;
 	}
 #if defined(__linux__) && !defined(PS_ID_SANITIZED)
 	struct rlimit mem = {256U*1024U*1024U,256U*1024U*1024U};
@@ -154,8 +175,19 @@ int main(int argc, char **argv)
 	struct stat st;
 	int rc = 1;
 	chd_header header;
+	char serial[PS_SERIAL_SIZE];
+	unsigned char magic[8];
 	if (fstat(fileno(im.fp), &st)) { rc = 2; goto done; }
 	if (!S_ISREG(st.st_mode)) goto done;
+	ssize_t n = pread(fileno(im.fp), magic, sizeof(magic), 0);
+	if (n < 0) { rc = 2; goto done; }
+	if (n != (ssize_t)sizeof(magic) || memcmp(magic, "MComprHD", sizeof(magic))) {
+		if (st.st_size > 16LL*1024*1024*1024) goto done;
+		im.sectors = (uint64_t)st.st_size / 2048;
+		struct ps_disc d = {&im, im.sectors, file_sector};
+		rc = dvd_serial(&d, serial);
+		goto print;
+	}
 	chd_error err = chd_read_header_file(im.fp, &header);
 	if (err) { rc = failure(&im,err); goto done; }
 	/* Bounds apply BEFORE libchdr allocates the map or codec buffers. */
@@ -168,8 +200,8 @@ int main(int argc, char **argv)
 	im.h = chd_get_header(im.chd);
 	im.hunk = malloc(im.h->hunkbytes);
 	if (!im.hunk) { rc = 2; goto done; }
-	char serial[PS_SERIAL_SIZE];
 	rc = identify(&im, serial);
+print:
 	if (!rc && printf("%s\n",serial) < 0) rc = 2;
 done:
 	free(im.hunk);
