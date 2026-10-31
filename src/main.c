@@ -171,6 +171,7 @@ struct ui {
 	struct bt_list bt;
 	int bt_on, bt_auto;
 	int bt_sel, bt_top;
+	int bt_busy;
 
 	struct osk osk;
 	char join_ssid[80];
@@ -1048,7 +1049,7 @@ static void draw_wifi(struct ui *u)
 
 static int bt_rows(const struct ui *u)
 {
-	return (int)u->term.rows - BT_LIST_TOP - 2;
+	return (int)u->term.rows - BT_LIST_TOP - 2 - (u->note[0] ? 2 : 0);
 }
 
 static void draw_bt(struct ui *u)
@@ -1090,7 +1091,12 @@ static void draw_bt(struct ui *u)
 	const char *verb = tr(S_BT_CHANGE);
 	if (sel >= 0 && sel < u->bt.n)
 		verb = tr(u->bt.d[sel].connected ? S_BT_DISCONNECT : S_BT_CONNECT);
-	snprintf(buf, sizeof(buf), tr(S_HINT_BT), f.confirm, verb, f.back, f.menu);
+	if (u->note[0])
+		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
+	if (u->bt_busy)
+		snprintf(buf, sizeof(buf), tr(S_HINT_BT_WAIT), f.back);
+	else
+		snprintf(buf, sizeof(buf), tr(S_HINT_BT), f.confirm, verb, f.back, f.menu);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -1935,6 +1941,117 @@ static void show_systems(struct ui *u)
 	u->screen = SCR_SYSTEMS;
 }
 
+static void wake_panel(struct ui *u);
+
+struct bt_wait {
+	struct ui *u;
+	enum action leave;
+};
+
+static int bt_run_ui(void *ctx, char *const argv[], void (*cb)(char *, void *),
+                     void *cb_ctx, int ceiling_ms)
+{
+	struct bt_wait *w = ctx;
+	struct ui *u = w->u;
+	if (w->leave || stop_requested) return PROC_CANCELLED;
+	struct proc_job j;
+	proc_job_init(&j);
+	if (proc_job_start_lines(&j, argv, cb, cb_ctx, ceiling_ms)) return PROC_FAILED;
+	while (!proc_job_step(&j)) {
+		if (stop_requested) break;
+		int left = proc_job_left(&j);
+		int minute = status_ms_to_next_minute();
+		if (minute < left) left = minute;
+		enum action a = input_wait_job(&u->in, left, j.fd, j.done_fd);
+		if (blank_requested) {
+			int on = blank_requested > 0;
+			blank_requested = 0;
+			if (on) wake_panel(u);
+			else { kms_blank(&u->kms); u->blanked = 1; }
+		}
+		if (a != ACT_NONE && a != ACT_METADATA && a != ACT_TICK &&
+		    a != ACT_AUX && a != ACT_DISPLAY) {
+			u->last_act = now_ms();
+			if (u->blanked) { wake_panel(u); continue; }
+		}
+		if (a == ACT_BACK || a == ACT_HOME || a == ACT_QUIT) {
+			w->leave = a;
+			break;
+		}
+		if (a == ACT_DISPLAY) {
+			if (uevent_read_hotplug(u->display_fd) && follow_display(u)) {
+				reapply_profile(u);
+				u->blanked = 0;
+			}
+		} else if (a == ACT_AUX) {
+			notify_drain(&u->notify);
+			status_read(&u->st);
+		} else if (a == ACT_TICK) status_read(&u->st);
+		else if (a != ACT_NONE && a != ACT_METADATA) {
+			u->last_act = now_ms();
+			if (u->blanked) wake_panel(u);
+		}
+		if (a != ACT_METADATA && a != ACT_NONE && !u->blanked) redraw(u);
+	}
+	if (w->leave || stop_requested) {
+		/* BlueZ cancels pending pairing when this client's bus connection exits. */
+		proc_job_cancel(&j);
+		return PROC_CANCELLED;
+	}
+	return j.status;
+}
+
+enum bt_op { BT_READ, BT_DISCOVER, BT_POWER, BT_AUTO, BT_JOIN, BT_LEAVE };
+
+static void bluetooth(struct ui *u, enum bt_op op, const char *addr)
+{
+	struct bt_wait wait = { .u = u };
+	struct bt_client client = { .run = bt_run_ui, .ctx = &wait };
+	const enum str busy[] = { S_READING_DEVICES, S_SCANNING_8,
+	                         u->bt_on ? S_TURNING_OFF : S_TURNING_ON,
+	                         S_APPLYING, S_CONNECTING, S_DISCONNECTING };
+	char selected[20] = "";
+	int sel = u->bt_sel - BT_HEAD;
+	if (sel >= 0 && sel < u->bt.n)
+		str_copy(selected, sizeof(selected), u->bt.d[sel].addr);
+	u->screen = SCR_BT;
+	u->bt_busy = 1;
+	str_copy(u->note, sizeof(u->note), tr(busy[op]));
+	redraw(u);
+
+	int rc = 0;
+	switch (op) {
+	case BT_READ: break;
+	case BT_DISCOVER: rc = bt_scan(&client, &u->bt, 8); break;
+	case BT_POWER: rc = bt_power(&client, !u->bt_on); break;
+	case BT_AUTO: rc = bt_set_autoconnect(&client, !u->bt_auto); break;
+	case BT_JOIN: rc = bt_connect(&client, addr); break;
+	case BT_LEAVE: rc = bt_disconnect(&client, addr); break;
+	}
+	if (!rc && op != BT_DISCOVER) {
+		str_copy(u->note, sizeof(u->note), tr(S_READING_DEVICES));
+		redraw(u);
+		int on = bt_powered(&client);
+		if (on < 0) rc = on;
+		else {
+			u->bt_on = on;
+			if (on) rc = bt_list(&client, &u->bt);
+			else memset(&u->bt, 0, sizeof(u->bt));
+		}
+	}
+	u->bt_auto = bt_autoconnect();
+	u->bt_busy = 0;
+	u->note[0] = 0;
+	if (wait.leave == ACT_BACK) u->screen = SCR_SETTINGS;
+	else if (wait.leave == ACT_HOME) show_systems(u);
+	else if (wait.leave == ACT_QUIT) u->running = 0;
+	else if (rc && rc != PROC_CANCELLED)
+		str_copy(u->note, sizeof(u->note), tr(rc == PROC_TIMEOUT ? S_BT_TIMEOUT : S_BT_FAILED));
+	for (int i = 0; selected[0] && i < u->bt.n; i++)
+		if (!strcmp(selected, u->bt.d[i].addr)) u->bt_sel = BT_HEAD + i;
+	if (u->bt_sel >= BT_HEAD + u->bt.n) u->bt_sel = 0;
+}
+
 static void on_action(struct ui *u, enum action a)
 {
 
@@ -2072,13 +2189,8 @@ static void on_action(struct ui *u, enum action a)
 		else if (a == ACT_CONFIRM && u->set_sel == SET_DIAGNOSTICS)
 			u->screen = SCR_DIAG;
 		else if (a == ACT_CONFIRM && u->set_sel == SET_BLUETOOTH) {
-			draw_busy(u, tr(S_READING_DEVICES));
-			u->bt_on = bt_powered();
-			u->bt_auto = bt_autoconnect();
-			if (u->bt_on)
-				bt_list(&u->bt);
 			u->bt_sel = u->bt_top = 0;
-			u->screen = SCR_BT;
+			bluetooth(u, BT_READ, NULL);
 		}
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
 		         u->set_sel == SET_SSH) {
@@ -2347,47 +2459,19 @@ static void on_action(struct ui *u, enum action a)
 	case SCR_BT: {
 		int sel = u->bt_sel - BT_HEAD;
 		int last = BT_HEAD + u->bt.n - 1;
-
 		if (a == ACT_UP && u->bt_sel > 0) u->bt_sel--;
 		else if (a == ACT_DOWN && u->bt_sel < last) u->bt_sel++;
 		else if (a == ACT_MENU) {
-			if (!u->bt_on) {
-				draw_busy(u, tr(S_BT_OFF));
-				break;
-			}
-			/* Show the scan duration while the panel is blocked. */
-			draw_busy(u, tr(S_SCANNING_8));
-			bt_scan(&u->bt, 8);
-			if (u->bt_sel > BT_HEAD + u->bt.n - 1)
-				u->bt_sel = BT_HEAD;
+			if (u->bt_on) bluetooth(u, BT_DISCOVER, NULL);
+			else str_copy(u->note, sizeof(u->note), tr(S_BT_OFF));
 		}
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
-		         u->bt_sel == 0) {
-			draw_busy(u, tr(u->bt_on ? S_TURNING_OFF : S_TURNING_ON));
-			bt_power(!u->bt_on);
-			u->bt_on = bt_powered();
-			memset(&u->bt, 0, sizeof(u->bt));
-			if (u->bt_on)
-				bt_list(&u->bt);
-		}
+		         u->bt_sel == 0) bluetooth(u, BT_POWER, NULL);
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
-		         u->bt_sel == 1) {
-			u->bt_auto = !u->bt_auto;
-			draw_busy(u, tr(S_APPLYING));
-			bt_set_autoconnect(u->bt_auto);
-			if (u->bt_on)
-				bt_list(&u->bt);
-		}
+		         u->bt_sel == 1) bluetooth(u, BT_AUTO, NULL);
 		else if (a == ACT_CONFIRM && sel >= 0 && sel < u->bt.n) {
 			struct bt_device d = u->bt.d[sel];
-			if (d.connected) {
-				draw_busy(u, tr(S_DISCONNECTING));
-				bt_disconnect(d.addr);
-			} else {
-				draw_busy(u, tr(S_CONNECTING));
-				bt_connect(d.addr);
-			}
-			bt_list(&u->bt);
+			bluetooth(u, d.connected ? BT_LEAVE : BT_JOIN, d.addr);
 		}
 		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
 		else if (a == ACT_QUIT) u->running = 0;
@@ -2568,9 +2652,10 @@ int main(void)
 	u.upd_staged = update_staged(STAGE_DIR);
 	net_scan(&u.nets, 0);
 	u.bt_auto = bt_autoconnect();
-	u.bt_on = bt_powered();
+	u.bt_on = bt_powered(NULL);
+	if (u.bt_on < 0) u.bt_on = 0;
 	if (u.bt_on)
-		bt_list(&u.bt);
+		bt_list(NULL, &u.bt);
 
 	u.screen = SCR_SYSTEMS;
 	u.running = 1;

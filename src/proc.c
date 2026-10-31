@@ -107,8 +107,20 @@ int proc_run_for(char *const argv[], void (*cb)(char *line, void *ctx),
 	close(fd[0]);
 
 	int status = 0;
-	while (waitpid(pid, &status, 0) < 0 && errno == EINTR)
-		;
+	for (;;) {
+		pid_t r = waitpid(pid, &status, timed_out ? 0 : WNOHANG);
+		if (r == pid) break;
+		if (r < 0 && errno != EINTR) return PROC_FAILED;
+		if (timed_out) continue;
+		long long left = deadline - now_ms();
+		if (left <= 0) {
+			timed_out = 1;
+			kill(pid, SIGKILL);
+		} else {
+			/* EOF can precede process exit; it must not bypass the deadline. */
+			poll(NULL, 0, left < 10 ? (int)left : 10);
+		}
+	}
 	if (timed_out)
 		return PROC_TIMEOUT;
 	return WIFEXITED(status) ? WEXITSTATUS(status) : PROC_FAILED;
@@ -162,7 +174,8 @@ static void job_close(struct proc_job *j)
 }
 void proc_job_cancel(struct proc_job *j)
 {
-	if (j->pid > 0) {
+	if (j->pid > 0) kill(-j->pid, SIGKILL);
+	if (j->pid > 0 && !j->exited) {
 		kill(j->pid, SIGKILL);
 		while (waitpid(j->pid, NULL, 0) < 0 && errno == EINTR) {}
 	}
@@ -179,6 +192,7 @@ int proc_job_start(struct proc_job *j, char *const argv[], int ceiling_ms)
 	fcntl(p[1], F_SETFD, FD_CLOEXEC);
 	pid_t pid = fork();
 	if (!pid) {
+		setpgid(0, 0);
 		close(p[0]);
 		dup2(p[1], STDOUT_FILENO);
 		close(p[1]);
@@ -192,6 +206,7 @@ int proc_job_start(struct proc_job *j, char *const argv[], int ceiling_ms)
 	}
 	close(p[1]);
 	if (pid < 0) { close(p[0]); return -1; }
+	setpgid(pid, pid);
 	j->pid = pid; j->fd = p[0];
 	fcntl(j->fd, F_SETFL, O_NONBLOCK);
 #if defined(__linux__) && defined(SYS_pidfd_open)
@@ -203,6 +218,22 @@ int proc_job_start(struct proc_job *j, char *const argv[], int ceiling_ms)
 	j->deadline = now_ms() + ceiling_ms;
 	return 0;
 }
+int proc_job_start_lines(struct proc_job *j, char *const argv[],
+                         void (*cb)(char *line, void *ctx), void *ctx,
+                         int ceiling_ms)
+{
+	int r = proc_job_start(j, argv, ceiling_ms);
+	if (!r) { j->line_cb = cb; j->line_ctx = ctx; }
+	return r;
+}
+static void job_line(struct proc_job *j)
+{
+	if (j->line_length && j->line_cb) {
+		j->line[j->line_length] = 0;
+		j->line_cb(j->line, j->line_ctx);
+	}
+	j->line_length = 0;
+}
 static void job_read(struct proc_job *j)
 {
 	char b[512];
@@ -211,12 +242,18 @@ static void job_read(struct proc_job *j)
 		ssize_t n = read(j->fd, b, sizeof(b));
 		if (n <= 0) {
 			if (!n || (errno != EAGAIN && errno != EINTR)) {
+				job_line(j);
 				close(j->fd); j->fd = -1;
 			}
 			break;
 		}
 		for (ssize_t k = 0; k < n; k++) {
-			if (j->length < sizeof(j->output)-1) j->output[j->length++] = b[k];
+			if (j->line_cb) {
+				if (b[k] == '\n' || j->line_length + 1 >= sizeof(j->line)) {
+					job_line(j);
+					if (b[k] != '\n') j->line[j->line_length++] = b[k];
+				} else j->line[j->line_length++] = b[k];
+			} else if (j->length < sizeof(j->output)-1) j->output[j->length++] = b[k];
 			else j->overflow = 1;
 		}
 	}
@@ -226,11 +263,17 @@ int proc_job_step(struct proc_job *j)
 {
 	if (!j->pid) return 0;
 	job_read(j);
-	int st;
-	pid_t r = waitpid(j->pid, &st, WNOHANG);
-	if (r == j->pid || (r < 0 && errno != EINTR)) {
-		job_read(j);
-		j->status = r > 0 && WIFEXITED(st) ? WEXITSTATUS(st) : PROC_FAILED;
+	if (!j->exited) {
+		int st;
+		pid_t r = waitpid(j->pid, &st, WNOHANG);
+		if (r == j->pid || (r < 0 && errno != EINTR)) {
+			j->exited = 1;
+			j->status = r > 0 && WIFEXITED(st) ? WEXITSTATUS(st) : PROC_FAILED;
+			if (j->done_fd >= 0) close(j->done_fd);
+			j->done_fd = -1;
+		}
+	}
+	if (j->exited && j->fd < 0) {
 		job_close(j);
 		return 1;
 	}

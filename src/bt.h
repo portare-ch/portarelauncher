@@ -23,25 +23,27 @@ struct bt_list {
 	int n;
 };
 
-/* Connected first, then paired, then whatever else a scan turned up. */
-void bt_list(struct bt_list *l);
+/* NULL uses synchronous deadlines. The UI supplies an input-aware runner;
+ * a nonzero command result stops the operation, including cancellation. */
+struct bt_client {
+	int (*run)(void *ctx, char *const argv[], void (*cb)(char *, void *),
+	           void *cb_ctx, int ceiling_ms);
+	void *ctx;
+};
 
-/* Discovers for `seconds`, then lists. Blocks for that long. */
-void bt_scan(struct bt_list *l, int seconds);
+/* Failed/cancelled queries retain the previous list. */
+int bt_list(const struct bt_client *c, struct bt_list *l);
+int bt_scan(const struct bt_client *c, struct bt_list *l, int seconds);
 
-/* Queries the adapter; the saved setting may differ if service startup failed. */
-int  bt_powered(void);
+/* 0/1 on success, negative on query failure. */
+int bt_powered(const struct bt_client *c);
+int bt_power(const struct bt_client *c, int on);
 
-/* Runs portareos-bluetooth to manage power, the pairing agent and the saved
- * setting. Blocks for seconds. */
-void bt_power(int on);
+/* Reuses existing pairing/trust; stops at the first failed step. */
+int bt_connect(const struct bt_client *c, const char *addr);
+int bt_disconnect(const struct bt_client *c, const char *addr);
 
-/* Pairs, trusts and connects. Returns 0 on success. An unavailable device
- * may consume the full connection timeout. */
-int  bt_connect(const char *addr);
-int  bt_disconnect(const char *addr);
-
-int  bt_autoconnect(void);
-void bt_set_autoconnect(int on);
+int bt_autoconnect(void);
+int bt_set_autoconnect(const struct bt_client *c, int on);
 
 #endif

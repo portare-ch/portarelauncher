@@ -118,6 +118,9 @@ static const struct {
 	[S_HINT_BT]       = { { "%c %s   %c BACK   %c SCAN", "%c %s   %c 戻る   %c 検索" }, 40 },
 	[S_BT_CHANGE]     = { { "CHANGE", "変更" }, 10 },
 	[S_BT_DISCONNECT] = { { "DISCONNECT", "切断" }, 10 },
+	[S_HINT_BT_WAIT] = { { "%c BACK", "%c 戻る" }, 51 },
+	[S_BT_FAILED]    = { { "Bluetooth failed. Please retry.", "Bluetoothに失敗しました。再試行してください。" }, 47 },
+	[S_BT_TIMEOUT]   = { { "Bluetooth timed out. Please retry.", "Bluetoothの応答なし。再試行してください。" }, 47 },
 	[S_BT_CONNECT]    = { { "CONNECT", "接続" }, 10 },
 
 	[S_TOOLS_HEAD] = { { "TOOLS", "ツール" }, 24 },

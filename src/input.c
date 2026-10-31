@@ -279,9 +279,6 @@ enum action input_wait_job(struct input *in, int idle_ms, int output_fd, int don
 		return ACT_AUX;
 	if (display >= 0 && (pfd[display].revents & POLLIN))
 		return ACT_DISPLAY;
-	if ((output >= 0 && pfd[output].revents) || (done >= 0 && pfd[done].revents))
-		return ACT_METADATA;
-
 	if (input_refresh(in, pfd, ndev))
 		return ACT_NONE;
 
@@ -327,7 +324,10 @@ enum action input_wait_job(struct input *in, int idle_ms, int output_fd, int don
 			out = a;
 		}
 	}
-	return out;
+	if (out != ACT_NONE) return out;
+	if ((output >= 0 && pfd[output].revents) || (done >= 0 && pfd[done].revents))
+		return ACT_METADATA;
+	return ACT_NONE;
 }
 
 _Static_assert(QUIT_BTN_MODE == BTN_MODE && QUIT_BTN_START == BTN_START &&

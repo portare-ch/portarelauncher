@@ -9,6 +9,7 @@
 
 #define PROC_FAILED  (-1)
 #define PROC_TIMEOUT (-2)
+#define PROC_CANCELLED (-3)
 
 /* Default deadline; bluetoothctl can hang even with its own --timeout. */
 #define PROC_CEILING_MS 15000
@@ -33,9 +34,18 @@ struct proc_job {
 	char output[64];
 	size_t length;
 	int overflow;
+	int exited;
+	void (*line_cb)(char *line, void *ctx);
+	void *line_ctx;
+	char line[1024];
+	size_t line_length;
 };
 void proc_job_init(struct proc_job *j);
 int proc_job_start(struct proc_job *j, char *const argv[], int ceiling_ms);
+/* Streams nonempty lines instead of retaining output in the 64-byte buffer. */
+int proc_job_start_lines(struct proc_job *j, char *const argv[],
+                         void (*cb)(char *line, void *ctx), void *ctx,
+                         int ceiling_ms);
 /* Returns 1 once collected, 0 while running. Never waits for a live child. */
 int proc_job_step(struct proc_job *j);
 void proc_job_cancel(struct proc_job *j);
