@@ -1540,6 +1540,8 @@ static void redraw(struct ui *u)
 static void draw_busy(struct ui *u, const char *what)
 {
 	struct term *t = &u->term;
+	for (unsigned x = 4; x < t->cols; x++)
+		term_putc(t, x, t->rows - 4, ' ', ATTR_TEXT);
 	term_puts(t, 4, t->rows - 4, what, ATTR_BRIGHT);
 	term_flush(t);
 }
