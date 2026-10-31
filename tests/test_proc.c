@@ -90,8 +90,17 @@ static void test_ceiling(void)
 	CHECK_STR(L.l[0], "started");
 }
 
+static void test_closed_stdout_ceiling(void)
+{
+	struct lines L;
+	long long start = now_ms();
+	CHECK_INT(sh("exec 1>&-; exec sleep 2", &L, 100), PROC_TIMEOUT);
+	CHECK(now_ms() - start < 1000);
+}
+
 int main(void)
 {
+	test_closed_stdout_ceiling();
 	test_lines();
 	test_long_line();
 	test_status();

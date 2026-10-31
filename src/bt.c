@@ -120,14 +120,21 @@ static void cb_device(char *line, void *ctx)
 	d->connected |= a->connected;
 }
 
-static void list_kind(struct bt_list *l, const char *kind,
+static int run(const struct bt_client *c, char *const argv[],
+               void (*cb)(char *, void *), void *ctx, int ceiling_ms)
+{
+	return c && c->run ? c->run(c->ctx, argv, cb, ctx, ceiling_ms)
+	                   : proc_run_for(argv, cb, ctx, ceiling_ms);
+}
+
+static int list_kind(const struct bt_client *c, struct bt_list *l, const char *kind,
                       int paired, int trusted, int connected)
 {
 	struct add_ctx ctx = { l, paired, trusted, connected };
 	char *const argv[] = { (char *)BTCTL, (char *)"devices",
 	                       (char *)kind, NULL };
 	char *const argv_all[] = { (char *)BTCTL, (char *)"devices", NULL };
-	proc_run_for(kind ? argv : argv_all, cb_device, &ctx, BT_QUERY_MS);
+	return run(c, kind ? argv : argv_all, cb_device, &ctx, BT_QUERY_MS);
 }
 
 static int by_rank(const void *a, const void *b)
@@ -138,33 +145,32 @@ static int by_rank(const void *a, const void *b)
 	return strcasecmp(x->name, y->name);
 }
 
-void bt_list(struct bt_list *l)
+int bt_list(const struct bt_client *c, struct bt_list *l)
 {
-	memset(l, 0, sizeof(*l));
-
-	/* Four bulk queries avoid an info process per device. */
-	list_kind(l, "Connected", 0, 0, 1);
-	list_kind(l, "Paired",    1, 0, 0);
-	list_kind(l, "Trusted",   0, 1, 0);
-	list_kind(l, NULL,        0, 0, 0);
-
-	qsort(l->d, (size_t)l->n, sizeof(l->d[0]), by_rank);
+	struct bt_list next = {0};
+	int rc;
+	if ((rc = list_kind(c, &next, "Connected", 0, 0, 1)) ||
+	    (rc = list_kind(c, &next, "Paired",    1, 0, 0)) ||
+	    (rc = list_kind(c, &next, "Trusted",   0, 1, 0)) ||
+	    (rc = list_kind(c, &next, NULL,        0, 0, 0)))
+		return rc;
+	qsort(next.d, (size_t)next.n, sizeof(next.d[0]), by_rank);
+	*l = next;
+	return 0;
 }
 
-void bt_scan(struct bt_list *l, int seconds)
+int bt_scan(const struct bt_client *c, struct bt_list *l, int seconds)
 {
 	char secs[8];
 	if (seconds < 1 || seconds > 60)
 		seconds = 8;
 	snprintf(secs, sizeof(secs), "%d", seconds);
 
-	/* Keep bluetoothctl alive during discovery; BlueZ stops scanning when
-	 * the requesting client exits. */
+	/* BlueZ stops discovery when the requesting client exits. */
 	char *const argv[] = { (char *)BTCTL, (char *)"--timeout", secs,
 	                       (char *)"scan", (char *)"on", NULL };
-	proc_run_for(argv, NULL, NULL, seconds * 1000 + BT_QUERY_MS);
-
-	bt_list(l);
+	int rc = run(c, argv, NULL, NULL, seconds * 1000 + BT_QUERY_MS);
+	return rc ? rc : bt_list(c, l);
 }
 
 /* ---- adapter ---------------------------------------------------------- */
@@ -173,9 +179,14 @@ static void cb_powered(char *line, void *ctx)
 {
 	int *on = ctx;
 	strip_ansi(line);
-	const char *p = strstr(line, "Powered:");
-	if (p && strstr(p, "yes"))
-		*on = 1;
+	while (isspace((unsigned char)*line)) line++;
+	const char *p = line;
+	if (!strncmp(p, "Powered:", strlen("Powered:"))) {
+		p += strlen("Powered:");
+		while (isspace((unsigned char)*p)) p++;
+		if (!strcmp(p, "yes")) *on = 1;
+		else if (!strcmp(p, "no")) *on = 0;
+	}
 }
 
 /* Check the saved setting first: with BlueZ stopped, bluetoothctl hangs
@@ -187,44 +198,70 @@ static int bt_enabled(void)
 	                    v, sizeof(v)) && strcmp(v, "1") == 0;
 }
 
-int bt_powered(void)
+int bt_powered(const struct bt_client *c)
 {
-	int on = 0;
+	int on = -1;
 
 	if (!bt_enabled())
 		return 0;
 	char *const argv[] = { (char *)BTCTL, (char *)"show", NULL };
-	proc_run_for(argv, cb_powered, &on, BT_QUERY_MS);
+	int rc = run(c, argv, cb_powered, &on, BT_QUERY_MS);
+	if (rc) return rc < 0 ? rc : PROC_FAILED;
 	return on;
 }
 
-void bt_power(int on)
+int bt_power(const struct bt_client *c, int on)
 {
 	char *const argv[] = { (char *)BTSCRIPT,
 	                       (char *)(on ? "enable" : "disable"), NULL };
-	proc_run(argv, NULL, NULL);
+	return run(c, argv, NULL, NULL, PROC_CEILING_MS);
 }
 
 /* ---- connecting ------------------------------------------------------- */
 
-static int btctl(const char *cmd, const char *addr, int ceiling_ms)
+static int btctl(const struct bt_client *c, const char *cmd, const char *addr,
+                 int ceiling_ms)
 {
 	char *const argv[] = { (char *)BTCTL, (char *)cmd, (char *)addr, NULL };
-	return proc_run_for(argv, NULL, NULL, ceiling_ms);
+	return run(c, argv, NULL, NULL, ceiling_ms);
 }
 
-int bt_connect(const char *addr)
+struct connection { int paired, trusted, connected; };
+
+static void cb_info(char *line, void *ctx)
 {
-	/* Pair and trust are idempotent. Trust before connecting so this device
-	 * can reconnect even if auto-connect is disabled for other paired devices. */
-	btctl("pair", addr, BT_RADIO_MS);
-	btctl("trust", addr, BT_QUERY_MS);
-	return btctl("connect", addr, BT_RADIO_MS);
+	struct connection *d = ctx;
+	strip_ansi(line);
+	while (isspace((unsigned char)*line)) line++;
+	const char *keys[] = { "Paired:", "Trusted:", "Connected:" };
+	int *values[] = { &d->paired, &d->trusted, &d->connected };
+	for (int i = 0; i < 3; i++) {
+		size_t n = strlen(keys[i]);
+		if (strncmp(line, keys[i], n)) continue;
+		const char *v = line + n;
+		while (isspace((unsigned char)*v)) v++;
+		if (!strcmp(v, "yes")) *values[i] = 1;
+		else if (!strcmp(v, "no")) *values[i] = 0;
+	}
 }
 
-int bt_disconnect(const char *addr)
+int bt_connect(const struct bt_client *c, const char *addr)
 {
-	return btctl("disconnect", addr, BT_QUERY_MS);
+	/* Recheck the device: a headset may reconnect while the menu is open. */
+	struct connection d = { -1, -1, -1 };
+	char *const argv[] = { (char *)BTCTL, (char *)"info", (char *)addr, NULL };
+	int rc = run(c, argv, cb_info, &d, BT_QUERY_MS);
+	if (rc) return rc;
+	if (d.paired < 0 || d.trusted < 0 || d.connected < 0) return PROC_FAILED;
+	if (d.connected) return 0;
+	if (!d.paired && (rc = btctl(c, "pair", addr, BT_RADIO_MS))) return rc;
+	if (!d.trusted && (rc = btctl(c, "trust", addr, BT_QUERY_MS))) return rc;
+	return btctl(c, "connect", addr, BT_RADIO_MS);
+}
+
+int bt_disconnect(const struct bt_client *c, const char *addr)
+{
+	return btctl(c, "disconnect", addr, BT_QUERY_MS);
 }
 
 /* ---- auto-connect ----------------------------------------------------- */
@@ -237,19 +274,22 @@ int bt_autoconnect(void)
 	return strcmp(v, "0") != 0 && strcasecmp(v, "no") != 0;
 }
 
-void bt_set_autoconnect(int on)
+int bt_set_autoconnect(const struct bt_client *c, int on)
 {
-	settings_set(SETTINGS_PATH, KEY_AUTOCONNECT, on ? "1" : "0");
+	if (settings_set(SETTINGS_PATH, KEY_AUTOCONNECT, on ? "1" : "0"))
+		return PROC_FAILED;
 
 	struct bt_list l;
 	memset(&l, 0, sizeof(l));
-	list_kind(&l, "Paired", 1, 0, 0);
-	list_kind(&l, "Connected", 0, 0, 1);
+	int rc = list_kind(c, &l, "Paired", 1, 0, 0);
+	if (!rc) rc = list_kind(c, &l, "Connected", 0, 0, 1);
+	if (rc) return rc;
 
 	for (int i = 0; i < l.n; i++) {
 		if (!l.d[i].paired)
 			continue;
-		btctl(on ? "trust" : "untrust", l.d[i].addr, BT_QUERY_MS);
+		rc = btctl(c, on ? "trust" : "untrust", l.d[i].addr, BT_QUERY_MS);
+		if (rc) return rc;
 
 		/* One detached attempt for a device already switched on; an unavailable
 		 * device can block for the connection timeout. */
@@ -259,4 +299,5 @@ void bt_set_autoconnect(int on)
 			proc_spawn(argv);
 		}
 	}
+	return 0;
 }
