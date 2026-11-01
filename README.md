@@ -48,6 +48,9 @@ Settings > Power controls the menu's screen-off timeout and the delay from
 screen off to sleep. A direction or face button wakes a blanked menu; that
 press does not select anything. These timeouts do not apply to games.
 
+The timezone selected under Settings > Language & time determines daylight
+saving changes automatically, using the system's timezone database.
+
 ## Development
 
 Run the host tests without libdrm or device hardware:

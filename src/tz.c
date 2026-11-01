@@ -111,6 +111,21 @@ void tz_clock(const char *zone, char *out, size_t osz)
 	tzset();
 }
 
+void tz_refresh(const char *settings)
+{
+	/* Use the selected zone's full rules, even if TZ was inherited as a fixed
+	 * offset or libc cached /etc/localtime before tz-data.service ran. */
+	char zone[48], tz[64];
+	if (settings_get(settings, TZ_KEY, zone, sizeof(zone))) {
+		snprintf(tz, sizeof(tz), ":%s", zone);
+		setenv("TZ", tz, 1);
+	} else {
+		/* No saved selection: follow the system timezone. */
+		unsetenv("TZ");
+	}
+	tzset();
+}
+
 static int write_file(const char *path, const char *text)
 {
 	FILE *f = fopen(path, "w");
@@ -139,6 +154,6 @@ int tz_apply(const char *zone, const char *settings, const char *cache)
 	char *const argv[] = { (char *)"/usr/bin/systemctl", (char *)"restart",
 	                       (char *)"tz-data.service", NULL };
 	proc_run_for(argv, NULL, NULL, 10000);
-	tzset();
+	tz_refresh(settings);
 	return 0;
 }
