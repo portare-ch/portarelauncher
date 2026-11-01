@@ -108,6 +108,79 @@ static void test_clock(void)
 	CHECK(getenv("TZ") == NULL);
 }
 
+static void check_local(time_t when, const char *want, int dst)
+{
+	struct tm tm;
+	CHECK(localtime_r(&when, &tm) != NULL);
+	char got[32];
+	strftime(got, sizeof(got), "%Y-%m-%d %H:%M:%S", &tm);
+	CHECK_STR(got, want);
+	CHECK_INT(tm.tm_isdst, dst);
+}
+
+static void test_refresh(void)
+{
+	/* Historical instants just before/after each transition. Keep one zone
+	 * loaded across the boundary, as a launcher left running would. */
+	static const struct {
+		const char *zone;
+		time_t at;
+		const char *before, *after;
+		int dst;
+	} transitions[] = {
+		{ "Europe/Zurich", 1711846800,
+		  "2024-03-31 01:59:59", "2024-03-31 03:00:00", 0 },
+		{ "Europe/Zurich", 1729990800,
+		  "2024-10-27 02:59:59", "2024-10-27 02:00:00", 1 },
+		{ "America/New_York", 1710054000,
+		  "2024-03-10 01:59:59", "2024-03-10 03:00:00", 0 },
+		{ "America/New_York", 1730613600,
+		  "2024-11-03 01:59:59", "2024-11-03 01:00:00", 1 },
+		{ "Australia/Sydney", 1712419200,
+		  "2024-04-07 02:59:59", "2024-04-07 02:00:00", 1 },
+		{ "Australia/Sydney", 1728144000,
+		  "2024-10-06 01:59:59", "2024-10-06 03:00:00", 0 },
+		/* Not every region changes by a whole hour. */
+		{ "Australia/Lord_Howe", 1712415600,
+		  "2024-04-07 01:59:59", "2024-04-07 01:30:00", 1 },
+		{ "Australia/Lord_Howe", 1728142200,
+		  "2024-10-06 01:59:59", "2024-10-06 02:30:00", 0 },
+	};
+	char cfg[64], text[96], preview[8];
+	snprintf(cfg, sizeof(cfg), "%s/system.cfg", root);
+	for (size_t i = 0; i < sizeof(transitions) / sizeof(transitions[0]); i++) {
+		snprintf(text, sizeof(text), "system.timezone=%s\n", transitions[i].zone);
+		fixture_write(cfg, text);
+		setenv("TZ", "UTC0", 1);
+		tzset();
+		tz_refresh(cfg);
+		check_local(transitions[i].at - 1, transitions[i].before, transitions[i].dst);
+		check_local(transitions[i].at, transitions[i].after, !transitions[i].dst);
+		/* Browsing another city's clock restores the selected zone. */
+		tz_clock("UTC", preview, sizeof(preview));
+		check_local(transitions[i].at, transitions[i].after, !transitions[i].dst);
+	}
+
+	/* Refresh a changed setting in the same process. Tokyo and UTC never
+	 * make a seasonal adjustment, even when Europe changes its clocks. */
+	fixture_write(cfg, "system.timezone=Asia/Tokyo\n");
+	tz_refresh(cfg);
+	check_local(1711846800, "2024-03-31 10:00:00", 0);
+	check_local(1729990800, "2024-10-27 10:00:00", 0);
+	fixture_write(cfg, "system.timezone=UTC\n");
+	tz_refresh(cfg);
+	check_local(1711846800, "2024-03-31 01:00:00", 0);
+	check_local(1729990800, "2024-10-27 01:00:00", 0);
+
+	/* Missing/empty settings follow the system, clearing an inherited TZ. */
+	tz_refresh("/tmp/pl-test-does-not-exist");
+	CHECK(getenv("TZ") == NULL);
+	setenv("TZ", "UTC0", 1);
+	fixture_write(cfg, "system.timezone=\n");
+	tz_refresh(cfg);
+	CHECK(getenv("TZ") == NULL);
+}
+
 static void test_apply(void)
 {
 	char cfg[64], cache[64], p[96];
@@ -118,7 +191,13 @@ static void test_apply(void)
 
 	fake_reset();
 	fake_reply("/usr/bin/systemctl restart tz-data.service", "", 0);
+	/* A fixed inherited timezone must not override the user's selection. */
+	setenv("TZ", "UTC0", 1);
+	tzset();
 	CHECK_INT(tz_apply("Europe/Berlin", cfg, cache), 0);
+	CHECK_STR(getenv("TZ"), ":Europe/Berlin");
+	check_local(1711846800, "2024-03-31 03:00:00", 1);
+	check_local(1729990800, "2024-10-27 02:00:00", 0);
 
 	CHECK_STR(fixture_read(cfg),
 	          "system.language=en_US\nsystem.timezone=Europe/Berlin\n");
@@ -130,6 +209,8 @@ static void test_apply(void)
 
 	/* Nowhere to write: fails, and says so. */
 	CHECK_INT(tz_apply("Europe/Berlin", cfg, "/tmp/pl-test-does-not-exist"), -1);
+	unsetenv("TZ");
+	tzset();
 }
 
 int main(void)
@@ -142,6 +223,7 @@ int main(void)
 	test_load();
 	test_city();
 	test_clock();
+	test_refresh();
 	test_apply();
 
 	fixture_cleanup(root);

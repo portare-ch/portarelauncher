@@ -1,5 +1,6 @@
 #include "status.h"
 #include "settings.h"
+#include "tz.h"
 
 #include <dirent.h>
 #include <stdio.h>
@@ -73,6 +74,7 @@ static int find_battery(char *out, size_t osz)
 
 void status_read(struct status *s)
 {
+	tz_refresh(SETTINGS_PATH);
 	time_t now = time(NULL);
 	struct tm tm;
 	localtime_r(&now, &tm);

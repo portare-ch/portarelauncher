@@ -34,8 +34,12 @@ void tz_city(const char *zone, char *out, size_t osz);
 /* The current time in zone as "HH:MM", for choosing a city by its clock. */
 void tz_clock(const char *zone, char *out, size_t osz);
 
-/* Applies the zone; returns 0 or -1 on a file write failure.
- * The service restart is asynchronous. */
+/* Refreshes libc's timezone from the saved selection, falling back to the
+ * system timezone. Local clocks and dates then follow its DST rules. */
+void tz_refresh(const char *settings);
+
+/* Applies the zone to the launcher and system; returns 0 or -1 on a file
+ * write failure. */
 int tz_apply(const char *zone, const char *settings, const char *cache);
 
 #endif
