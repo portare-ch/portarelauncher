@@ -174,6 +174,35 @@ static void test_usb(void)
 	CHECK_INT(n, 2);
 }
 
+static void test_usb_drive(void)
+{
+	char img[256];
+	fake_reset();
+	fake_reply("/usr/bin/usbgadget usb_drive /storage/usbdrive/my disk.iso", "", 0);
+	CHECK_INT(usb_drive_serve("/storage/usbdrive/my disk.iso"), 0);
+	CHECK_INT(fake_n_calls, 1);
+
+	fake_reply("/usr/bin/usbgadget image", "/storage/usbdrive/my disk.iso\n", 0);
+	usb_drive_image(img, sizeof(img));
+	CHECK_STR(img, "/storage/usbdrive/my disk.iso");
+
+	/* Longer than the 80 columns other answers get. */
+	const char *longp = "/storage/usbdrive/"
+	                    "a-rather-long-installer-name-that-goes-on-and-on-1234567890.iso";
+	char cmd[300];
+	snprintf(cmd, sizeof(cmd), "%s\n", longp);
+	fake_reset();
+	fake_reply("/usr/bin/usbgadget image", cmd, 0);
+	usb_drive_image(img, sizeof(img));
+	CHECK_STR(img, longp);
+
+	/* Nothing served: usbgadget prints nothing and fails. */
+	fake_reset();
+	fake_reply("/usr/bin/usbgadget image", "", 1);
+	usb_drive_image(img, sizeof(img));
+	CHECK_STR(img, "");
+}
+
 static void test_wifi_switch(void)
 {
 	/* Unblock boot-time rfkill before powering the iwd adapter. */
@@ -233,6 +262,7 @@ int main(void)
 	test_join();
 	test_address();
 	test_usb();
+	test_usb_drive();
 	test_wifi_switch();
 	test_ssh_switch();
 	return check_report("net");

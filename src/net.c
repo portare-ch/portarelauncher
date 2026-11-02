@@ -242,3 +242,24 @@ void usb_address(char *out, size_t osz)
 	proc_run(argv, cb_first, v);
 	str_copy(out, osz, v);
 }
+
+int usb_drive_serve(const char *path)
+{
+	char *const argv[] = { (char *)USBGADGET, (char *)"usb_drive", (char *)path, NULL };
+	return proc_run(argv, NULL, NULL);
+}
+
+static void cb_path(char *line, void *ctx)
+{
+	char *out = ctx;
+	if (!out[0])
+		str_copy(out, 256, line);
+}
+
+void usb_drive_image(char *out, size_t osz)
+{
+	char v[256] = "";
+	char *const argv[] = { (char *)USBGADGET, (char *)"image", NULL };
+	proc_run(argv, cb_path, v);
+	str_copy(out, osz, v);
+}

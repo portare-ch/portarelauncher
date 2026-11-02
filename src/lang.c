@@ -83,7 +83,7 @@ static const struct {
 	[S_DESC_REGION]   = { { "Language and timezone.", "言語とタイムゾーンを設定します。" }, 45 },
 	[S_DESC_POWER]    = { { "Restart or power off.", "再起動または電源オフ。" }, 45 },
 	[S_DESC_ABOUT]    = { { "Version, address, updates.", "バージョン、アドレス、アップデート。" }, 45 },
-	[S_DESC_USB]      = { { "USB networking or file transfer.", "USBネットワークまたはファイル転送。" }, 45 },
+	[S_DESC_USB]      = { { "Choose how to use the USB connection.", "USB接続の用途を選びます。" }, 45 },
 	[S_HINT_SETTINGS] = { { "%c CHANGE   %c BACK", "%c 決定   %c 戻る" }, 51 },
 	[S_HINT_CHANGE]   = { { "%c CHANGE   %c BACK", "%c 変更   %c 戻る" }, 51 },
 	[S_HINT_OPEN]     = { { "%c OPEN   %c BACK", "%c 開く   %c 戻る" }, 51 },
@@ -126,6 +126,13 @@ static const struct {
 
 	[S_TOOLS_HEAD] = { { "TOOLS", "ツール" }, 24 },
 	[S_HINT_TOOLS] = { { "%c RUN   %c BACK", "%c 実行   %c 戻る" }, 51 },
+
+	[S_USB_DRIVE]   = { { "USB drive", "USBドライブ" }, 24 },
+	[S_IMAGES]      = { { "IMAGES", "イメージ" }, 24 },
+	[S_NO_IMAGES]   = { { "No disk images found.", "ディスクイメージが見つかりません。" }, 47 },
+	[S_ADD_IMAGES]  = { { "Add .iso or .img files to /storage/usbdrive.", ".iso または .img ファイルを /storage/usbdrive に追加してください。" }, 90 },
+	[S_IMAGE_FMT]   = { { "Image: %s", "イメージ: %s" }, 12 },
+	[S_DRIVE_FAIL]  = { { "Could not share the image over USB.", "USBでイメージを共有できませんでした。" }, 47 },
 
 	[S_NETWORK]       = { { "NETWORK", "ネットワーク" }, 12 },
 	[S_PASSWORD]      = { { "PASSWORD", "パスワード" }, 12 },
@@ -293,7 +300,7 @@ const char *lang_usb_mode(const char *mode)
 {
 	static const char *const p[][2] = {
 		{ "disabled", "無効" }, { "network", "ネットワーク" },
-		{ "file_transfer", "ファイル転送" },
+		{ "file_transfer", "ファイル転送" }, { "usb_drive", "USBドライブ" },
 	};
 	return word(p, sizeof(p) / sizeof(p[0]), mode);
 }

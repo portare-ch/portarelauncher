@@ -35,7 +35,7 @@ ifeq ($(PL_VERSION),)
 PL_VERSION := dev
 endif
 
-SRC  := src/disc_titles.c src/ps_serial.c src/text.c src/proc.c src/update.c src/osinfo.c src/tz.c src/quit.c src/idle.c src/orbit.c src/sheets.c src/color.c src/net.c src/bt.c src/osk.c src/tools.c src/settings.c src/status.c src/notify.c src/term.c src/pix.c src/glyph.c src/unifont.c src/ja26.c src/lang.c src/kms.c \
+SRC  := src/disc_titles.c src/ps_serial.c src/text.c src/proc.c src/update.c src/osinfo.c src/tz.c src/quit.c src/idle.c src/orbit.c src/sheets.c src/color.c src/net.c src/bt.c src/osk.c src/tools.c src/usbdrive.c src/settings.c src/status.c src/notify.c src/term.c src/pix.c src/glyph.c src/unifont.c src/ja26.c src/lang.c src/kms.c \
         src/fit.c src/modes.c src/uevent.c src/input.c src/catalog.c src/lists.c src/main.c
 OBJ  := $(SRC:.c=.o)
 BIN  := portarelauncher
@@ -92,7 +92,8 @@ TESTS := tests/test_text tests/test_settings tests/test_proc \
          tests/test_catalog tests/test_metadata_input tests/test_disc_titles tests/test_tools tests/test_net tests/test_bt \
          tests/test_osk tests/test_update tests/test_osinfo tests/test_tz tests/test_quit tests/test_sheets tests/test_color tests/test_lists \
          tests/test_scope tests/test_pix tests/test_term tests/test_glyph tests/test_lang tests/test_ja26 \
-         tests/test_idle tests/test_orbit tests/test_fit tests/test_uevent tests/test_modes
+         tests/test_idle tests/test_orbit tests/test_fit tests/test_uevent tests/test_modes \
+         tests/test_usbdrive
 
 tests/test_text:     src/text.c
 tests/test_settings: src/settings.c
@@ -103,6 +104,7 @@ tests/test_metadata_input: src/input.c src/proc.c src/quit.c
 endif
 tests/test_disc_titles: src/ps_sfo.c src/disc_titles.c src/ps_serial.c src/ps_iso.c src/proc.c src/catalog.c src/settings.c src/sheets.c src/text.c src/glyph.c src/unifont.c
 tests/test_tools:    src/tools.c src/text.c
+tests/test_usbdrive: src/usbdrive.c src/text.c
 tests/test_net:      src/net.c src/text.c tests/fake_proc.c
 tests/test_bt:       src/bt.c src/text.c src/settings.c tests/fake_proc.c
 tests/test_osk:      src/osk.c src/term.c src/pix.c src/glyph.c src/unifont.c src/ja26.c

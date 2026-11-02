@@ -223,6 +223,7 @@ if __name__ == "__main__":
     render(mockup.gamepad_shapes, os.path.join(out, "portscope-shapes.png"), glyphs,
            mockup.pad_spans(True), mockup.pad_shapes(True))
     render(mockup.diagnostics, os.path.join(out, "settings-diagnostics.png"), glyphs)
+    render(mockup.usb_drive, os.path.join(out, "settings-usb-drive.png"), glyphs)
     for name, lines in (("ja-systems", mockup.ja_systems), ("ja-games", mockup.ja_games),
                         ("ja-recently-played", mockup.ja_recent),
                         ("ja-settings", mockup.ja_settings),

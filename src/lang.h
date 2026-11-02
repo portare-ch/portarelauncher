@@ -49,6 +49,8 @@ enum str {
 	S_HINT_BT_WAIT, S_BT_FAILED, S_BT_TIMEOUT,
 	/* Tools */
 	S_TOOLS_HEAD, S_HINT_TOOLS,
+	/* Settings > USB mode > USB drive */
+	S_USB_DRIVE, S_IMAGES, S_NO_IMAGES, S_ADD_IMAGES, S_IMAGE_FMT, S_DRIVE_FAIL,
 	/* the keyboard */
 	S_NETWORK, S_PASSWORD, S_PW_COUNT_MIN, S_PW_SHOW, S_HINT_KEYBOARD,
 	/* Power */
