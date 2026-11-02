@@ -159,7 +159,7 @@ diagnostics += [THIN, row(" A OPEN   B BACK", "\u2191\u2193 MOVE ")]
 DRIVE = [("cachyos-desktop-linux-260809", "3.2 GB"),
          ("debian-13.1.0-amd64-netinst", "754 MB")]
 usb_drive = [header("Settings  \u203a  USB mode  \u203a  USB drive"), RULE, "",
-             row("  IMAGES", "2 found  "), ""]
+             row("  IMAGES", ""), ""]
 usb_drive += [item(i == 0, n, v) for i, (n, v) in enumerate(DRIVE)]
 usb_drive += [""] * (ROWS - 2 - len(usb_drive))
 usb_drive += [THIN, " A SELECT   B BACK"]

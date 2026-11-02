@@ -411,7 +411,7 @@
      Settings  ›  USB mode  ›  USB drive           23:59 |
      ═══════════════════════════════════════════════════ |
                                                          |
-      IMAGES                                    2 found  |
+      IMAGES                                             |
                                                          |
       ▸ cachyos-desktop-linux-260809             3.2 GB  |
         debian-13.1.0-amd64-netinst              754 MB  |

@@ -1183,13 +1183,12 @@ static void draw_usbdrive(struct ui *u)
 
 	draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SETTINGS), tr(S_SET_USB),
 	                       tr(S_USB_DRIVE)));
-	snprintf(buf, sizeof(buf), tr(S_N_FOUND), u->drive.n);
 	term_puts(t, 2, 3, tr(S_IMAGES), ATTR_MID);
-	term_puts_right(t, t->cols - 2, 3, buf, ATTR_MID);
 
 	if (u->drive.n == 0) {
 		term_puts(t, 4, LIST_TOP, tr(S_NO_IMAGES), ATTR_BRIGHT);
-		term_puts(t, 4, LIST_TOP + 2, tr(S_ADD_IMAGES), ATTR_MID);
+		wrap_puts(t, 4, LIST_TOP + 2, t->cols - 8, 2,
+		          tr(S_ADD_IMAGES), ATTR_MID);
 	}
 
 	int visible = (int)list_rows(u);
