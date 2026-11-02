@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Updates via portareos-update, which checks GitHub, downloads, verifies
  * and stages builds, reporting key=value lines. updates.branch selects
  * "nightly" (newest build), "release" (monthly), or "auto" (installed channel). */

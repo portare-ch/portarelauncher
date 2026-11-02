@@ -1,3 +1,4 @@
+# Copyright (C) 2026-present PortareOS
 # Requires libc and libdrm. Honor the cross-build system's PKG_CONFIG
 # to avoid silently using host headers and libraries.
 

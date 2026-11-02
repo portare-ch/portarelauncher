@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* PortScope input model: held controls, axes, recent events and report rate.
  * Virtual and raw layers map controls separately; raw combines the MCU pad
  * and gpio-keys paddles. */

@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #ifndef PL_DISC_TITLES_H
 #define PL_DISC_TITLES_H
 #include <stddef.h>

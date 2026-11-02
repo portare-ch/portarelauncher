@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #ifndef PL_FAKE_PROC_H
 #define PL_FAKE_PROC_H
 

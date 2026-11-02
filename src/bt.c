@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #include "bt.h"
 #include "proc.h"
 #include "settings.h"

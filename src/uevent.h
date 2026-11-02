@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Display hotplug: the kernel's uevents for the DRM card, which arrive when
  * a monitor is plugged or pulled and when external-display switches the
  * panel's connector off or back. */

@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* 26 x 26, 16-level Japanese glyphs from tools/mkja26.py, scaled with
  * bilinear filtering (docs/japanese.md). Falls back to Unifont without the file. */
 #ifndef PL_JA26_H

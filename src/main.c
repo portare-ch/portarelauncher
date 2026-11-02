@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* portarelauncher: KMS launcher for PortareOS. */
 #include "bt.h"
 #include "catalog.h"

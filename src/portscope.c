@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* PortScope: virtual or raw evdev input diagnostics using the launcher's
  * KMS grid and pixel stick indicators. Hold SELECT for one second to switch
  * layers; Home + START exits.

@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #include "ps_serial.h"
 #include <ctype.h>
 #include <string.h>

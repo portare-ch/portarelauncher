@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* English and Japanese UI strings (docs/japanese.md). system.language
  * selects en_US or ja_JP, defaulting to English. Each table entry has a
  * column limit checked by tests/test_lang.c; external names are displayed as given. */

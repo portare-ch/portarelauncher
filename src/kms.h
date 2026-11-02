@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* KMS with one connector and one dumb buffer, written directly without
  * page flips. Static menus avoid a second buffer and vblank waits at the
  * cost of possible tearing during cell updates. VRR lets the panel settle

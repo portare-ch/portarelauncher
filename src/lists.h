@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Cross-system lists, atomically rewritten on change:
  *   recent      "<epoch>\t<system>\t<path>", newest first, at most ten
  *   favourites  "<path>", in insertion order

@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #include "xbox_iso.h"
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #include "term.h"
 #include "font8x16.h"
 #include "glyph.h"

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026-present PortareOS
 """Pinned Libretro/Redump PS1 DAT -> sorted serial<TAB>title, regenerated offline."""
 import argparse
 import hashlib

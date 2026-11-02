@@ -1,3 +1,4 @@
+# Copyright (C) 2026-present PortareOS
 # Native arm64 build with glibc 2.36, compatible with the device's newer glibc.
 FROM docker.io/library/debian:bookworm-slim
 

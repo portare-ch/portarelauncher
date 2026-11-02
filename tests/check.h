@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Test macros and fixture helpers. Each test_*.c builds as a standalone
  * program; make test runs them all. */
 #ifndef PL_CHECK_H

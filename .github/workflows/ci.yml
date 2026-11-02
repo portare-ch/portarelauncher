@@ -1,3 +1,4 @@
+# Copyright (C) 2026-present PortareOS
 # Build on arm64 with warnings as errors; test normally and with ASan/UBSan.
 name: CI
 

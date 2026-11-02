@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #include "kms.h"
 #include "color.h"
 #include "modes.h"

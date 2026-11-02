@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #include "catalog.h"
 #include "glyph.h"
 #include "settings.h"

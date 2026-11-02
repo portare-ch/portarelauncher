@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #include "disc_titles.h"
 #include "catalog.h"
 #include "glyph.h"

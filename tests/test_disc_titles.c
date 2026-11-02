@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #include "check.h"
 #include "disc_titles.h"
 #include "ps_iso.h"

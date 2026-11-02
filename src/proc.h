@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Runs system tools with argv, without a shell, so names and addresses
  * remain literal arguments. Synchronous calls have wall-clock deadlines. */
 #ifndef PL_PROC_H

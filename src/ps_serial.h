@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #ifndef PL_PS_SERIAL_H
 #define PL_PS_SERIAL_H
 #include <stddef.h>

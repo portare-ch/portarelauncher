@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #ifndef PL_XBOX_ISO_H
 #define PL_XBOX_ISO_H
 #include "ps_iso.h"

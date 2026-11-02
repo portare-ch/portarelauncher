@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Shared system.cfg key=value settings, also used by setsettings.sh. */
 #ifndef PL_SETTINGS_H
 #define PL_SETTINGS_H

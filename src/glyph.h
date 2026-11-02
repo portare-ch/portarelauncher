@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* UTF-8 decoding and glyph widths (docs/japanese.md). Font lookup order:
  *   1. VGA/CP437, one cell;
  *   2. Unifont JIS X 0213, one or two cells according to the glyph;

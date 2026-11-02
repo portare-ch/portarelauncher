@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Blank after the idle timeout, then request sleep through power-handler.
  * Declined sleep requests retry after one minute. */
 #ifndef PL_IDLE_H

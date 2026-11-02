@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026-present PortareOS
 """Synthetic ISO9660 and Xbox XDVDFS images, plain or in CHDv5 containers. No copyrighted discs."""
 import os
 from pathlib import Path

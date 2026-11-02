@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Time zone selection from the image's zone list. Matches es_settings:
  * write system.timezone and both cache files, then restart tz-data.service.
  * RetroArch reapplies the saved setting when launched. */

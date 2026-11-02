@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* FIFO notifications that prompt a refresh of the header status.
  * The path is retained for compatibility with input_sense's writer.
  */

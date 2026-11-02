@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026-present PortareOS
 """Export only standard serial keys and their name fields from pinned YAML."""
 import argparse
 import hashlib

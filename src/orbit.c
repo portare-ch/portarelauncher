@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #include "orbit.h"
 
 static int triangle(long long minute, int amp)

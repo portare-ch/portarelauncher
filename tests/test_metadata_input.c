@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #include "check.h"
 #ifdef __linux__
 #include "input.h"

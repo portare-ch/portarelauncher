@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Monotonic deadlines shared by the UI and process runner. */
 #ifndef PL_TIMEUTIL_H
 #define PL_TIMEUTIL_H

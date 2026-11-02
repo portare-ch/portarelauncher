@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #include "modes.h"
 
 unsigned modes_refresh_mhz(const struct mode_info *m)

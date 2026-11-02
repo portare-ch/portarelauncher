@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Gamepad and keyboard input from evdev. Polls all key-capable devices
  * and blocks while idle; held directions use a repeat timeout. */
 #ifndef PL_INPUT_H
