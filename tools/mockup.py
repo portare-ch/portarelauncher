@@ -156,6 +156,15 @@ diagnostics += [item(i == 0, n, v) for i, (n, v) in enumerate(DIAG)]
 diagnostics += [""] * (ROWS - 2 - len(diagnostics))
 diagnostics += [THIN, row(" A OPEN   B BACK", "\u2191\u2193 MOVE ")]
 
+# Images in /storage/usbdrive, served to a PC by usbgadget usb_drive.
+DRIVE = [("cachyos-desktop-linux-260809", "3.2 GB"),
+         ("debian-13.1.0-amd64-netinst", "754 MB")]
+usb_drive = [header("Settings  \u203a  USB mode  \u203a  USB drive"), RULE, "",
+             row("  IMAGES", "2 found  "), ""]
+usb_drive += [item(i == 0, n, v) for i, (n, v) in enumerate(DRIVE)]
+usb_drive += [""] * (ROWS - 2 - len(usb_drive))
+usb_drive += [THIN, " A SELECT   B BACK"]
+
 BT = [("WH-1000XM4", "connected"), ("DualSense Edge", "paired"),
       ("Bose QC35", "paired"), ("JBL Flip 5", "new")]
 bluetooth = [header("Settings  \u203a  Bluetooth"), RULE, "",
@@ -541,6 +550,7 @@ if __name__ == "__main__":
                  ("PROPOSED - RECENTLY PLAYED", recent),
                  ("PROPOSED - FAVOURITES", favourites),
                  ("SETTINGS - DIAGNOSTICS", diagnostics),
+                 ("SETTINGS - USB DRIVE", usb_drive),
                  ("PROPOSED - PORTSCOPE", gamepad),
                  ("PROPOSED - PORTSCOPE, SHAPE MARKS", gamepad_shapes),
                  ("PROPOSED - JAPANESE, SYSTEMS", ja_systems),

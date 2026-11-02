@@ -56,10 +56,13 @@ void net_address(char *out, size_t osz);
 struct ifaddrs;
 int  net_address_pick(const struct ifaddrs *list, char *out, size_t osz);
 
-/* USB gadget: disabled, network, file_transfer. */
+/* USB gadget: disabled, network, file_transfer, usb_drive. */
 void usb_modes(char out[][24], int *n, int max);
 void usb_mode(char *out, size_t osz);
 int  usb_set_mode(const char *mode);
 void usb_address(char *out, size_t osz);
+/* usb_drive takes an image; the served image's path, empty when none. */
+int  usb_drive_serve(const char *path);
+void usb_drive_image(char *out, size_t osz);
 
 #endif

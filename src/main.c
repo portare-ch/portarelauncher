@@ -21,6 +21,7 @@
 #include "status.h"
 #include "term.h"
 #include "tools.h"
+#include "usbdrive.h"
 #include "tz.h"
 #include "uevent.h"
 #include "update.h"
@@ -141,7 +142,7 @@ enum { QUICK_RECENT = 0, QUICK_FAVS = 1 };
 enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI, SCR_BT,
               SCR_KEYBOARD, SCR_TOOLS, SCR_ABOUT, SCR_UPDATE,
               SCR_TZ, SCR_POWER, SCR_CONSOLES, SCR_RECENT, SCR_FAVS,
-              SCR_DIAG, SCR_REGION };
+              SCR_DIAG, SCR_REGION, SCR_USBDRIVE };
 
 struct ui {
 	struct term term;
@@ -209,6 +210,9 @@ struct ui {
 	char usb[24];
 	char usb_opts[8][24];
 	int n_usb;
+	char usb_image[256];     /* served by the USB drive, else empty */
+	struct usbdrive drive;
+	int drive_sel, drive_top;
 	int retroid;         /* Retroid button labels/layout */
 	enum screen screen;
 	int sys_sel, sys_top;    /* rows 0 and 1 are Quick Access, then systems */
@@ -928,6 +932,14 @@ static void draw_settings(struct ui *u)
 			snprintf(val, sizeof(val), tr(S_ADDRESS_FMT), addr);
 			term_puts(t, 4, y + 2, val, ATTR_MID);
 		}
+		if (u->usb_image[0] && strcmp(u->usb, "usb_drive") == 0) {
+			const char *slash = strrchr(u->usb_image, '/');
+			char line[192];
+			snprintf(line, sizeof(line), tr(S_IMAGE_FMT),
+			         slash ? slash + 1 : u->usb_image);
+			str_copy(line + text_fit(line, (int)t->cols - 8), 1, "");
+			term_puts(t, 4, y + 2, line, ATTR_MID);
+		}
 		break;
 	}
 	default:
@@ -1161,6 +1173,42 @@ static void draw_tools(struct ui *u)
 
 	struct face f = face_of(u->retroid);
 	snprintf(buf, sizeof(buf), tr(S_HINT_TOOLS), f.confirm, f.back);
+	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
+}
+
+static void draw_usbdrive(struct ui *u)
+{
+	struct term *t = &u->term;
+	char buf[192];
+
+	draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SETTINGS), tr(S_SET_USB),
+	                       tr(S_USB_DRIVE)));
+	snprintf(buf, sizeof(buf), tr(S_N_FOUND), u->drive.n);
+	term_puts(t, 2, 3, tr(S_IMAGES), ATTR_MID);
+	term_puts_right(t, t->cols - 2, 3, buf, ATTR_MID);
+
+	if (u->drive.n == 0) {
+		term_puts(t, 4, LIST_TOP, tr(S_NO_IMAGES), ATTR_BRIGHT);
+		term_puts(t, 4, LIST_TOP + 2, tr(S_ADD_IMAGES), ATTR_MID);
+	}
+
+	int visible = (int)list_rows(u);
+	scroll_to(u->drive_sel, &u->drive_top, u->drive.n, visible);
+	for (int i = 0; i < visible && u->drive_top + i < u->drive.n; i++) {
+		const struct image *im = &u->drive.e[u->drive_top + i];
+		char size[16], label[sizeof(im->name)];
+		usbdrive_size(im->bytes, size, sizeof(size));
+		str_copy(label, sizeof(label), im->name);
+		str_copy(label + text_fit(label, (int)t->cols - 4 - text_width(size) - 3), 1, "");
+		draw_row(u, (unsigned)(LIST_TOP + i), u->drive_top + i == u->drive_sel,
+		         label, size);
+	}
+
+	if (u->note[0])
+		term_puts(t, 4, t->rows - 3, u->note, ATTR_BRIGHT);
+
+	struct face f = face_of(u->retroid);
+	snprintf(buf, sizeof(buf), tr(S_HINT_SELECT), f.confirm, f.back);
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
@@ -1536,6 +1584,7 @@ static void redraw(struct ui *u)
 	case SCR_CONSOLES: draw_consoles(u); break;
 	case SCR_DIAG:     draw_diag(u);     break;
 	case SCR_REGION:   draw_region(u);   break;
+	case SCR_USBDRIVE: draw_usbdrive(u); break;
 	case SCR_UPDATE:   draw_update(u);   break;
 	case SCR_RECENT:
 	case SCR_FAVS:     draw_list(u);     break;
@@ -2053,6 +2102,38 @@ static void bluetooth(struct ui *u, enum bt_op op, const char *addr)
 	if (u->bt_sel >= BT_HEAD + u->bt.n) u->bt_sel = 0;
 }
 
+static void refresh_usb(struct ui *u)
+{
+	usb_mode(u->usb, sizeof(u->usb));
+	u->usb_image[0] = '\0';
+	if (strcmp(u->usb, "usb_drive") == 0)
+		usb_drive_image(u->usb_image, sizeof(u->usb_image));
+}
+
+/* Starts on the image being served, if it is still in the folder. */
+static void open_usbdrive(struct ui *u)
+{
+	usbdrive_load(&u->drive);
+	int i = usbdrive_find(&u->drive, u->usb_image);
+	u->drive_sel = i > 0 ? i : 0;
+	u->drive_top = 0;
+	u->screen = SCR_USBDRIVE;
+}
+
+static void serve_image(struct ui *u)
+{
+	char path[sizeof(u->drive.dir) + 1 + sizeof(u->drive.e[0].file)];
+	snprintf(path, sizeof(path), "%s/%s", u->drive.dir,
+	         u->drive.e[u->drive_sel].file);
+	draw_busy(u, tr(S_SWITCHING));
+	int rc = usb_drive_serve(path);
+	refresh_usb(u);
+	if (rc == 0 && strcmp(u->usb, "usb_drive") == 0)
+		u->screen = SCR_SETTINGS;
+	else
+		str_copy(u->note, sizeof(u->note), tr(S_DRIVE_FAIL));
+}
+
 static void on_action(struct ui *u, enum action a)
 {
 
@@ -2116,6 +2197,7 @@ static void on_action(struct ui *u, enum action a)
 			u->screen = SCR_SETTINGS;
 			u->set_sel = 0;
 			u->ssh_on = net_ssh_enabled();
+			refresh_usb(u);
 		} else if (a == ACT_QUIT) u->running = 0;
 		break;
 
@@ -2204,7 +2286,8 @@ static void on_action(struct ui *u, enum action a)
 		}
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
 		         u->set_sel == SET_USB && u->n_usb > 0) {
-			/* Use the modes reported by usbgadget --options. */
+			/* Use the modes reported by usbgadget --options. A USB drive
+			 * needs an image first; confirm on a served one picks another. */
 			int cur = 0;
 			for (int i = 0; i < u->n_usb; i++)
 				if (strcmp(u->usb_opts[i], u->usb) == 0)
@@ -2212,9 +2295,15 @@ static void on_action(struct ui *u, enum action a)
 			int next = (a == ACT_LEFT)
 			         ? (cur + u->n_usb - 1) % u->n_usb
 			         : (cur + 1) % u->n_usb;
-			draw_busy(u, tr(S_SWITCHING));
-			usb_set_mode(u->usb_opts[next]);
-			usb_mode(u->usb, sizeof(u->usb));
+			if (a == ACT_CONFIRM && strcmp(u->usb, "usb_drive") == 0)
+				open_usbdrive(u);
+			else if (strcmp(u->usb_opts[next], "usb_drive") == 0)
+				open_usbdrive(u);
+			else {
+				draw_busy(u, tr(S_SWITCHING));
+				usb_set_mode(u->usb_opts[next]);
+				refresh_usb(u);
+			}
 		}
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
 		         u->set_sel == SET_COLOR) {
@@ -2413,6 +2502,14 @@ static void on_action(struct ui *u, enum action a)
 		}
 		else if (a == ACT_CONFIRM && u->region_sel == 1)
 			open_tz(u);
+		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
+		else if (a == ACT_QUIT) u->running = 0;
+		break;
+
+	case SCR_USBDRIVE:
+		if (a == ACT_UP && u->drive_sel > 0) u->drive_sel--;
+		else if (a == ACT_DOWN && u->drive_sel < u->drive.n - 1) u->drive_sel++;
+		else if (a == ACT_CONFIRM && u->drive_sel < u->drive.n) serve_image(u);
 		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
 		else if (a == ACT_QUIT) u->running = 0;
 		break;
@@ -2647,7 +2744,7 @@ int main(void)
 	/* Defer the slow Wi-Fi scan until its screen opens. */
 	tools_load(&u.tools);
 	usb_modes(u.usb_opts, &u.n_usb, 8);
-	usb_mode(u.usb, sizeof(u.usb));
+	refresh_usb(&u);
 	/* Build metadata changes only after reboot. */
 	osinfo_read(OS_RELEASE, &u.os);
 	u.upd_staged = update_staged(STAGE_DIR);
