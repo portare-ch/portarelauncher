@@ -210,7 +210,7 @@ struct ui {
 	char usb[24];
 	char usb_opts[8][24];
 	int n_usb;
-	char usb_image[256];     /* served by the USB drive, else empty */
+	char usb_image[256];
 	struct usbdrive drive;
 	int drive_sel, drive_top;
 	int retroid;         /* Retroid button labels/layout */
@@ -2110,7 +2110,6 @@ static void refresh_usb(struct ui *u)
 		usb_drive_image(u->usb_image, sizeof(u->usb_image));
 }
 
-/* Starts on the image being served, if it is still in the folder. */
 static void open_usbdrive(struct ui *u)
 {
 	usbdrive_load(&u->drive);
@@ -2286,8 +2285,7 @@ static void on_action(struct ui *u, enum action a)
 		}
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
 		         u->set_sel == SET_USB && u->n_usb > 0) {
-			/* Use the modes reported by usbgadget --options. A USB drive
-			 * needs an image first; confirm on a served one picks another. */
+			/* Opening the image picker leaves the current USB mode active. */
 			int cur = 0;
 			for (int i = 0; i < u->n_usb; i++)
 				if (strcmp(u->usb_opts[i], u->usb) == 0)

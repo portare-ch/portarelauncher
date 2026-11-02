@@ -41,10 +41,8 @@ int usbdrive_load_from(struct usbdrive *d, const char *dir)
 		    !is_image(e->d_name))
 			continue;
 
-		char path[sizeof(d->dir) + 1 + sizeof(d->e[0].file)];
-		snprintf(path, sizeof(path), "%s/%s", d->dir, e->d_name);
 		struct stat st;
-		if (stat(path, &st) != 0 || !S_ISREG(st.st_mode))
+		if (fstatat(dirfd(dh), e->d_name, &st, 0) != 0 || !S_ISREG(st.st_mode))
 			continue;
 
 		struct image *im = &d->e[d->n++];

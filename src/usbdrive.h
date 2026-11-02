@@ -1,5 +1,5 @@
 /* Copyright (C) 2026-present PortareOS */
-/* Disk images a PC can boot from the device, served by usbgadget usb_drive. */
+/* Disk images served through usbgadget usb_drive. */
 #ifndef PL_USBDRIVE_H
 #define PL_USBDRIVE_H
 
@@ -9,7 +9,7 @@
 #define USBDRIVE_MAX 32
 
 struct image {
-	char file[128];      /* "cachyos-desktop-linux-260809.iso" */
+	char file[128];
 	char name[128];      /* the file name without its extension */
 	long long bytes;
 };
@@ -27,7 +27,7 @@ int usbdrive_load_from(struct usbdrive *d, const char *dir);
 /* Index of the image at path, or -1. */
 int usbdrive_find(const struct usbdrive *d, const char *path);
 
-/* "3.2 GB" from a gigabyte up, "700 MB" below, decimal like a drive's label. */
+/* Decimal MB below 1 GB, otherwise GB with one decimal place. */
 void usbdrive_size(long long bytes, char *out, size_t osz);
 
 #endif
