@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Disc sheets and playlists. Files referenced by a sheet in the same
  * system belong to that game and are hidden from the catalog. */
 #ifndef PL_SHEETS_H

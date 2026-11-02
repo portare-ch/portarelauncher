@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #include "sheets.h"
 
 #include <ctype.h>

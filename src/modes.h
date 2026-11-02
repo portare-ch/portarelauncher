@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Which of a connector's modes to drive. The panel runs the fastest mode
  * at its own size. A display runs 1080p class: the largest mode of its own
  * aspect up to 1080 lines, at 144 Hz, else 120 Hz, else another rate of

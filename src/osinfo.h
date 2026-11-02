@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Installed build metadata from /etc/os-release. */
 #ifndef PL_OSINFO_H
 #define PL_OSINFO_H

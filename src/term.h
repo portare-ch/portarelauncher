@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Text grid over a linear framebuffer. Only changed cells are written
  * to keep writes to uncached framebuffer memory small. */
 #ifndef PL_TERM_H

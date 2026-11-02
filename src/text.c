@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #include "text.h"
 
 #include <string.h>

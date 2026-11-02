@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #include "check.h"
 #include "fake_proc.h"
 #include "tz.h"

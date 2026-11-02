@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026-present PortareOS
 """Generates src/unifont.c and src/unifont.h: the glyphs and the tables
 the launcher draws text beyond ASCII with (docs/japanese.md).
 

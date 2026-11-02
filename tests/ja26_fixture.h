@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* A glyph file in ja26.bin's format, written for a test. */
 #ifndef PL_JA26_FIXTURE_H
 #define PL_JA26_FIXTURE_H

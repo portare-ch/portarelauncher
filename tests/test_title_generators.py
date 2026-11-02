@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026-present PortareOS
 import importlib.util
 from pathlib import Path
 import unittest

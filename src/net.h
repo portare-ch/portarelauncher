@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Networking via portnet (iwd) and USB modes via usbgadget.
  * Commands use proc_run without a shell. */
 #ifndef PL_NET_H

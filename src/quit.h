@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Home + START exits any launched program: allow a grace period, then
  * SIGTERM, then SIGKILL. Signals target the child's process group except
  * runemu.sh, which must finish restoring performance settings. */

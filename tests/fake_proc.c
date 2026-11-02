@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Replays command output and exit statuses, recording calls without
  * starting processes. Unconfigured commands fail. */
 #include "fake_proc.h"

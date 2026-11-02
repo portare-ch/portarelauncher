@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #include "ps_sfo.h"
 #include <ctype.h>
 #include <stdint.h>

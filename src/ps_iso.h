@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #ifndef PL_PS_ISO_H
 #define PL_PS_ISO_H
 #include <stdint.h>

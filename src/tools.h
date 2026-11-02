@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Scripts in the modules directory, named and described by its gamelist.xml. */
 #ifndef PL_TOOLS_H
 #define PL_TOOLS_H

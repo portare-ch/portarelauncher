@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* String helpers shared by the launcher and process parsers. */
 #ifndef PL_TEXT_H
 #define PL_TEXT_H

@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* On-screen keyboard for printable ASCII, used for Wi-Fi passwords.
  * Two character layers share digits and a row of wide action keys.
  * See docs/mockup.txt for the layout. */

@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Clipped framebuffer primitives for stick indicators and button outlines. */
 #ifndef PL_PIX_H
 #define PL_PIX_H

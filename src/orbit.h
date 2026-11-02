@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Where the menu's grid sits: a walk of a few pixels around its centred
  * place, so static text does not wear the same OLED pixels for hours. */
 #ifndef PL_ORBIT_H

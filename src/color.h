@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Panel color profiles, applied through DRM CRTC color properties by kms.c.
  *
  * Profile format:

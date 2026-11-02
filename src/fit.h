@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Where the panel-sized screen goes on a display: the largest whole-number
  * zoom of it that fits the mode, centred, black around it. The panel itself
  * gets zoom 1 and the whole mode. */

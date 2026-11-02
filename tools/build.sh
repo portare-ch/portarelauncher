@@ -1,4 +1,5 @@
 #!/bin/sh
+# Copyright (C) 2026-present PortareOS
 # Builds the launcher for the device. Run from the repo root.
 set -e
 IMAGE=portarelauncher-build

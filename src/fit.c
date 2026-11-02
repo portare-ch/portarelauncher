@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #include "fit.h"
 
 struct fit fit_box(unsigned mode_w, unsigned mode_h,

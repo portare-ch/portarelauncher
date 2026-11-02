@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 #include "check.h"
 #include "osinfo.h"
 

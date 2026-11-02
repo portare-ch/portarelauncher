@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Game catalog from EmulationStation's es_systems.cfg and per-system
  * overrides in system.cfg. The tag scanner handles generated XML and
  * explicitly decodes entity escapes. */

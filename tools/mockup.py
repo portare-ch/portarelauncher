@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026-present PortareOS
 """Render layouts on the launcher's 53x20 grid: 8x16 glyphs at scale 3."""
 
 import os, unicodedata

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026-present PortareOS
 """Generates data/ja26.bin: the kana and kanji drawn the way the PS2 drew
 its system font, rom0:FONTM (docs/japanese.md): 26 x 26 pixels with 16
 grey levels, which the launcher scales to two cells with bilinear

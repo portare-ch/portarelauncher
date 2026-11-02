@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026-present PortareOS
 """Cuts the glyphs the mockups use out of the Japanese build of GNU
 Unifont into tools/unifont-mockup.hex, so the mockups render kana and
 kanji without the whole 4 MB font in the repository.

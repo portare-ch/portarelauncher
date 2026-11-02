@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Bluetooth via bluetoothctl and portareos-bluetooth.
  *
  * Auto-connect uses BlueZ's Trusted flag for incoming connections. Enabling

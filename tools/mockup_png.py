@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026-present PortareOS
 """Render mockup.py layouts to docs/images/ with launcher fonts and the amber
 palette at 1280x960, scale 3. Uses only the Python standard library.
 

@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Header status, refreshed on minute boundaries or FIFO notifications. */
 #ifndef PL_STATUS_H
 #define PL_STATUS_H

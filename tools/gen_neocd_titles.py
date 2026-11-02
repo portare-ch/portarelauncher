@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026-present PortareOS
 """Pinned Libretro/Redump Neo Geo CD DAT -> program-header ID<TAB>title."""
 import argparse
 import hashlib

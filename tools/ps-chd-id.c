@@ -1,3 +1,4 @@
+/* Copyright (C) 2026-present PortareOS */
 /* Read-only, bounded PS1/PS2/PSP/Neo Geo CD/Xbox identification. Compression is libchdr's. */
 #include "ps_iso.h"
 #include "xbox_iso.h"

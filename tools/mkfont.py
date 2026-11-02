@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026-present PortareOS
 """Turns the kernel's VGA 8x16 console font into src/font8x16.h.
 
 The font is lib/fonts/font_8x16.c from Linux: the classic VGA text-mode
