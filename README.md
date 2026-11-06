@@ -8,6 +8,8 @@ Written in C, it draws directly to the display through KMS using libc and libdrm
 - Launch games through `runemu.sh` and tools such as PortMaster.
 - Manage Wi-Fi, Bluetooth, display settings, power and system updates.
 - Check every button and stick with PortScope, under Settings > Diagnostics.
+- Prepare an SD card under Settings > SD card. Formatting erases the card
+  and creates an F2FS filesystem; its games then appear in the game list.
 - In English or Japanese, under Settings > Language & time. Japanese titles
   and supported accented characters display in either language.
 
@@ -44,9 +46,10 @@ display and input devices.
 
 Button style can be changed in Settings > Button style.
 
-Settings > Power controls the menu's screen-off timeout and the delay from
-screen off to sleep. A direction or face button wakes a blanked menu; that
-press does not select anything. These timeouts do not apply to games.
+Settings > Power controls the menu's screen-off timeout, the delay from
+screen off to sleep and the charging LED. A direction or face button wakes a
+blanked menu; that press does not select anything. These timeouts do not apply
+to games.
 
 The timezone selected under Settings > Language & time determines daylight
 saving changes automatically, using the system's timezone database.

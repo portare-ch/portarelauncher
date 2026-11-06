@@ -119,14 +119,14 @@ games += [""] * (ROWS - 2 - len(games))
 games += [THIN, row(" A LAUNCH   B BACK", "8 / 112 ")]
 
 SET = [("WiFi", "Hofmann-5G"), ("SSH", "on"), ("Bluetooth", "WH-1000XM4"),
-       ("USB mode", "network"), ("Button style", "Retroid"),
-       ("Consoles", "2 changed"),
-       ("Color", "grey"), ("Color profile", "stock"), ("Charging LED", "on"),
+       ("USB mode", "network"), ("SD card", "128 GB, F2FS"),
+       ("Button style", "Retroid"), ("Consoles", "2 changed"),
+       ("Color", "grey"), ("Color profile", "stock"),
        ("Timezone", "Europe/Zurich"), ("Diagnostics", ""),
        ("About", "v0.2.6 2026-09-26"), ("Power", "")]
 # Settings fill rows 2..14; the three-row button diagram also uses the upper rule.
 settings = [header("Settings"), RULE]
-settings += [item(i == 4, n, v) for i, (n, v) in enumerate(SET)]
+settings += [item(i == 5, n, v) for i, (n, v) in enumerate(SET)]
 settings += ["         X          X confirm",
              "      Y     A       A back",
              "         B          X settings"]
@@ -163,6 +163,21 @@ usb_drive = [header("Settings  \u203a  USB mode  \u203a  USB drive"), RULE, "",
 usb_drive += [item(i == 0, n, v) for i, (n, v) in enumerate(DRIVE)]
 usb_drive += [""] * (ROWS - 2 - len(usb_drive))
 usb_drive += [THIN, " A SELECT   B BACK"]
+
+sdcard = [header("Settings  \u203a  SD card"), RULE, "",
+          item(True, "Format", "SN128, 128 GB"), THIN,
+          "    Games on this card appear in your game list.", "",
+          "    Press A again to erase all data on this card."]
+sdcard += [""] * (ROWS - 2 - len(sdcard))
+sdcard += [THIN, " A SELECT   B BACK"]
+
+POWER = [("Screen off", "2 min"), ("Sleep after", "15 min"),
+         ("Charging LED", "on"), ("Restart", ""), ("Power off", "")]
+power = [header("Settings  \u203a  Power"), RULE, ""]
+power += [item(i == 2, n, v) for i, (n, v) in enumerate(POWER)]
+power += [THIN, "    Experimental: yellow thumbsticks when", "    charging."]
+power += [""] * (ROWS - 2 - len(power))
+power += [THIN, " A SELECT   B BACK"]
 
 BT = [("WH-1000XM4", "connected"), ("DualSense Edge", "paired"),
       ("Bose QC35", "paired"), ("JBL Flip 5", "new")]
@@ -487,11 +502,11 @@ ja_recent += [THIN, row(" A \u8d77\u52d5   B \u623b\u308b   Y \u89e3\u9664", "")
 # Language & time shares one Settings row and shows the language in its own script.
 JA_SET = [("WiFi", "Hofmann-5G"), ("SSH", "\u30aa\u30f3"), ("Bluetooth", "WH-1000XM4"),
           ("USB\u30e2\u30fc\u30c9", "\u30cd\u30c3\u30c8\u30ef\u30fc\u30af"),
+          ("SD\u30ab\u30fc\u30c9", "128 GB\u30fbF2FS"),
           ("\u30dc\u30bf\u30f3\u8868\u8a18", "Retroid"),
           ("\u30b2\u30fc\u30e0\u6a5f", "\u5909\u66f4 2\u4ef6"),
           ("\u914d\u8272", "\u30b0\u30ec\u30fc"),
           ("\u30ab\u30e9\u30fc\u30d7\u30ed\u30d5\u30a1\u30a4\u30eb", "\u6a19\u6e96"),
-          ("\u5145\u96fbLED", "\u30aa\u30f3"),
           ("\u8a00\u8a9e\u3068\u5730\u57df", "\u65e5\u672c\u8a9e"),
           ("\u8a3a\u65ad", ""), ("\u60c5\u5831", "v0.6.0 2026-10-07"), ("\u96fb\u6e90", "")]
 ja_settings = [ja_header("\u8a2d\u5b9a"), RULE]
@@ -550,6 +565,8 @@ if __name__ == "__main__":
                  ("PROPOSED - FAVOURITES", favourites),
                  ("SETTINGS - DIAGNOSTICS", diagnostics),
                  ("SETTINGS - USB DRIVE", usb_drive),
+                 ("SETTINGS - SD CARD", sdcard),
+                 ("SETTINGS - POWER", power),
                  ("PROPOSED - PORTSCOPE", gamepad),
                  ("PROPOSED - PORTSCOPE, SHAPE MARKS", gamepad_shapes),
                  ("PROPOSED - JAPANESE, SYSTEMS", ja_systems),

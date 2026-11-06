@@ -5,6 +5,7 @@
 #define PL_PROC_H
 
 #include <stddef.h>
+#include <sys/types.h>
 
 #include "text.h"
 
@@ -23,6 +24,14 @@ int proc_run(char *const argv[], void (*cb)(char *line, void *ctx), void *ctx);
 /* proc_run with an explicit wall-clock deadline in milliseconds. */
 int proc_run_for(char *const argv[], void (*cb)(char *line, void *ctx),
                  void *ctx, int ceiling_ms);
+/* Run in a separate process group. Stop remaining workers after the child
+ * exits or times out, and wait until no live group members remain. */
+int proc_run_group_for(char *const argv[], void (*cb)(char *line, void *ctx),
+                       void *ctx, int ceiling_ms);
+
+/* Ignore zombies when /proc is available: an inactive reaper may retain them
+ * indefinitely. Otherwise, count every group member. */
+int proc_group_running(pid_t pgid);
 
 /* Starts argv without waiting. Double-forks to avoid zombies. */
 void proc_spawn(char *const argv[]);

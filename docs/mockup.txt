@@ -54,11 +54,11 @@
         SSH                                          on  |
         Bluetooth                            WH-1000XM4  |
         USB mode                                network  |
+        SD card                            128 GB, F2FS  |
       ▸ Button style                            Retroid  |
         Consoles                              2 changed  |
         Color                                      grey  |
         Color profile                             stock  |
-        Charging LED                                 on  |
         Timezone                          Europe/Zurich  |
         Diagnostics                                      |
         About                         v0.2.6 2026-09-26  |
@@ -430,6 +430,54 @@
      A SELECT   B BACK                                   |
     '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
 
+    SETTINGS - SD CARD
+    .....................................................  <- 53 columns
+     Settings  ›  SD card                          23:59 |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+      ▸ Format                            SN128, 128 GB  |
+     ─────────────────────────────────────────────────── |
+        Games on this card appear in your game list.     |
+                                                         |
+        Press A again to erase all data on this card.    |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A SELECT   B BACK                                   |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
+    SETTINGS - POWER
+    .....................................................  <- 53 columns
+     Settings  ›  Power                            23:59 |
+     ═══════════════════════════════════════════════════ |
+                                                         |
+        Screen off                                2 min  |
+        Sleep after                              15 min  |
+      ▸ Charging LED                                 on  |
+        Restart                                          |
+        Power off                                        |
+     ─────────────────────────────────────────────────── |
+        Experimental: yellow thumbsticks when            |
+        charging.                                        |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+                                                         |
+     ─────────────────────────────────────────────────── |
+     A SELECT   B BACK                                   |
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''  <- 20 rows
+
     PROPOSED - PORTSCOPE
     .....................................................  <- 53 columns
      PortScope                               RATE 200 Hz |
@@ -558,11 +606,11 @@
         SSH                                        オン  |
         Bluetooth                            WH-1000XM4  |
         USBモード                          ネットワーク  |
+        SDカード                           128 GB・F2FS  |
         ボタン表記                              Retroid  |
         ゲーム機                               変更 2件  |
         配色                                     グレー  |
         カラープロファイル                         標準  |
-        充電LED                                    オン  |
       ▸ 言語と地域                               日本語  |
         診断                                             |
         情報                          v0.6.0 2026-10-07  |
