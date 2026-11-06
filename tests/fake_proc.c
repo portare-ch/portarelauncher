@@ -85,6 +85,12 @@ int proc_run_for(char *const argv[], void (*cb)(char *line, void *ctx),
 	return PROC_FAILED;
 }
 
+int proc_run_group_for(char *const argv[], void (*cb)(char *line, void *ctx),
+                       void *ctx, int ceiling_ms)
+{
+	return proc_run_for(argv, cb, ctx, ceiling_ms);
+}
+
 int proc_run(char *const argv[], void (*cb)(char *line, void *ctx), void *ctx)
 {
 	return proc_run_for(argv, cb, ctx, PROC_CEILING_MS);

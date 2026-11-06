@@ -2,8 +2,10 @@
 #include "proc.h"
 #include "timeutil.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdio.h>
@@ -17,8 +19,92 @@ int proc_run(char *const argv[], void (*cb)(char *line, void *ctx), void *ctx)
 	return proc_run_for(argv, cb, ctx, PROC_CEILING_MS);
 }
 
-int proc_run_for(char *const argv[], void (*cb)(char *line, void *ctx),
-                 void *ctx, int ceiling_ms)
+int proc_group_running(pid_t pgid)
+{
+	DIR *d = opendir("/proc");
+	if (!d)
+		return kill(-pgid, 0) == 0;
+	int running = 0;
+	struct dirent *e;
+	while (!running && (e = readdir(d)) != NULL) {
+		char *end;
+		long id = strtol(e->d_name, &end, 10);
+		if (id <= 0 || *end)
+			continue;
+		char path[40], buf[512];
+		snprintf(path, sizeof(path), "/proc/%ld/stat", id);
+		int fd = open(path, O_RDONLY | O_CLOEXEC);
+		if (fd < 0)
+			continue;
+		ssize_t n = read(fd, buf, sizeof(buf) - 1);
+		close(fd);
+		if (n <= 0)
+			continue;
+		buf[n] = '\0';
+		/* pid (comm) state ppid pgrp ...; comm may hold spaces and ')'. */
+		char *p = strrchr(buf, ')');
+		char state;
+		long ppid, pgrp;
+		if (p && sscanf(p + 1, " %c %ld %ld", &state, &ppid, &pgrp) == 3 &&
+		    pgrp == pgid && state != 'Z' && state != 'X')
+			running = 1;
+	}
+	closedir(d);
+	return running;
+}
+
+/* Buffer stdout lines for the callback. */
+struct out {
+	char line[1024];
+	size_t len;
+	void (*cb)(char *line, void *ctx);
+	void *ctx;
+};
+
+static void out_feed(struct out *o, const char *buf, ssize_t n)
+{
+	for (ssize_t i = 0; i < n; i++) {
+		if (buf[i] == '\n' || o->len + 1 >= sizeof(o->line)) {
+			o->line[o->len] = '\0';
+			if (o->cb && o->line[0])
+				o->cb(o->line, o->ctx);
+			o->len = 0;
+			if (buf[i] != '\n')
+				o->line[o->len++] = buf[i];
+		} else {
+			o->line[o->len++] = buf[i];
+		}
+	}
+}
+
+static void out_flush(struct out *o)
+{
+	if (o->len && o->cb) {
+		o->line[o->len] = '\0';
+		if (o->line[0])
+			o->cb(o->line, o->ctx);
+	}
+	o->len = 0;
+}
+
+/* Wait for killed workers to finish, including any pending kernel writes. */
+static void stop_group(pid_t pgid)
+{
+	for (;;) {
+		while (waitpid(-pgid, NULL, WNOHANG) > 0)
+			;              /* reap any adopted children */
+		if (kill(-pgid, SIGKILL) < 0 && errno != EINTR)
+			break;         /* ESRCH: nothing is left in the group */
+		if (!proc_group_running(pgid))
+			break;         /* only zombies are left */
+		poll(NULL, 0, 20);
+	}
+}
+
+/* Group mode monitors child exit as well as stdout: descendants may keep
+ * the pipe open after the child exits. */
+static int run(char *const argv[], void (*cb)(char *line, void *ctx),
+               void *ctx, int ceiling_ms, int group)
 {
 	int fd[2];
 	if (pipe(fd) < 0)
@@ -31,6 +117,8 @@ int proc_run_for(char *const argv[], void (*cb)(char *line, void *ctx),
 		return PROC_FAILED;
 	}
 	if (pid == 0) {
+		if (group)
+			setpgid(0, 0);
 		close(fd[0]);
 		dup2(fd[1], STDOUT_FILENO);
 		int null = open("/dev/null", O_RDWR);
@@ -46,12 +134,15 @@ int proc_run_for(char *const argv[], void (*cb)(char *line, void *ctx),
 	}
 
 	close(fd[1]);
+	if (group)
+		setpgid(pid, pid);   /* either side may run first */
+	pid_t victim = group ? -pid : pid;
 
 	/* Use read/poll so the deadline also applies while waiting for stdout. */
-	char line[1024];
-	size_t len = 0;
+	struct out o = { .len = 0, .cb = cb, .ctx = ctx };
+	char buf[512];
 	long long deadline = now_ms() + ceiling_ms;
-	int timed_out = 0;
+	int timed_out = 0, reaped = 0, status = 0;
 
 	for (;;) {
 		long long left = deadline - now_ms();
@@ -60,71 +151,93 @@ int proc_run_for(char *const argv[], void (*cb)(char *line, void *ctx),
 			break;
 		}
 
+		/* Bound exit detection when descendants keep stdout open. */
+		int slice = group && left > 50 ? 50 : (int)left;
 		struct pollfd p = { .fd = fd[0], .events = POLLIN };
-		int r = poll(&p, 1, (int)left);
+		int r = poll(&p, 1, slice);
 		if (r < 0) {
 			if (errno == EINTR)
 				continue;
 			break;
 		}
-		if (r == 0) {
-			timed_out = 1;
-			break;
-		}
-
-		char buf[512];
-		ssize_t n = read(fd[0], buf, sizeof(buf));
-		if (n < 0) {
-			if (errno == EINTR)
-				continue;
-			break;
-		}
-		if (n == 0)
-			break;                     /* the child closed stdout */
-
-		for (ssize_t i = 0; i < n; i++) {
-			if (buf[i] == '\n' || len + 1 >= sizeof(line)) {
-				line[len] = '\0';
-				if (cb && line[0])
-					cb(line, ctx);
-				len = 0;
-				if (buf[i] != '\n')
-					line[len++] = buf[i];
-			} else {
-				line[len++] = buf[i];
+		if (r > 0) {
+			ssize_t n = read(fd[0], buf, sizeof(buf));
+			if (n < 0) {
+				if (errno == EINTR)
+					continue;
+				break;
 			}
+			if (n == 0)
+				break;                     /* every writer closed stdout */
+			out_feed(&o, buf, n);
+		} else if (!group) {
+			timed_out = 1;                 /* the slice was all that was left */
+			break;
 		}
-	}
-
-	if (len && cb) {
-		line[len] = '\0';
-		if (line[0])
-			cb(line, ctx);
+		if (group && waitpid(pid, &status, WNOHANG) == pid) {
+			reaped = 1;
+			break;
+		}
 	}
 
 	if (timed_out)
-		kill(pid, SIGKILL);
+		kill(victim, SIGKILL);
 
-	close(fd[0]);
+	if (!group) {
+		out_flush(&o);
+		close(fd[0]);
+	}
 
-	int status = 0;
-	for (;;) {
+	while (!reaped) {
 		pid_t r = waitpid(pid, &status, timed_out ? 0 : WNOHANG);
 		if (r == pid) break;
-		if (r < 0 && errno != EINTR) return PROC_FAILED;
+		if (r < 0 && errno != EINTR) {
+			if (group)
+				close(fd[0]);
+			return PROC_FAILED;
+		}
 		if (timed_out) continue;
 		long long left = deadline - now_ms();
 		if (left <= 0) {
 			timed_out = 1;
-			kill(pid, SIGKILL);
+			kill(victim, SIGKILL);
 		} else {
 			/* EOF can precede process exit; it must not bypass the deadline. */
 			poll(NULL, 0, left < 10 ? (int)left : 10);
 		}
 	}
+
+	if (group) {
+		stop_group(pid);
+		/* Drain final output after all writers have stopped. */
+		fcntl(fd[0], F_SETFL, O_NONBLOCK);
+		for (;;) {
+			ssize_t n = read(fd[0], buf, sizeof(buf));
+			if (n > 0)
+				out_feed(&o, buf, n);
+			else if (n < 0 && errno == EINTR)
+				continue;
+			else
+				break;
+		}
+		out_flush(&o);
+		close(fd[0]);
+	}
 	if (timed_out)
 		return PROC_TIMEOUT;
 	return WIFEXITED(status) ? WEXITSTATUS(status) : PROC_FAILED;
+}
+
+int proc_run_for(char *const argv[], void (*cb)(char *line, void *ctx),
+                 void *ctx, int ceiling_ms)
+{
+	return run(argv, cb, ctx, ceiling_ms, 0);
+}
+
+int proc_run_group_for(char *const argv[], void (*cb)(char *line, void *ctx),
+                       void *ctx, int ceiling_ms)
+{
+	return run(argv, cb, ctx, ceiling_ms, 1);
 }
 
 void proc_spawn(char *const argv[])

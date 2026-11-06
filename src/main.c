@@ -20,6 +20,7 @@
 #include "settings.h"
 #include "status.h"
 #include "term.h"
+#include "sdcard.h"
 #include "tools.h"
 #include "usbdrive.h"
 #include "tz.h"
@@ -142,7 +143,7 @@ enum { QUICK_RECENT = 0, QUICK_FAVS = 1 };
 enum screen { SCR_SYSTEMS, SCR_GAMES, SCR_SETTINGS, SCR_WIFI, SCR_BT,
               SCR_KEYBOARD, SCR_TOOLS, SCR_ABOUT, SCR_UPDATE,
               SCR_TZ, SCR_POWER, SCR_CONSOLES, SCR_RECENT, SCR_FAVS,
-              SCR_DIAG, SCR_REGION, SCR_USBDRIVE };
+              SCR_DIAG, SCR_REGION, SCR_USBDRIVE, SCR_SDCARD };
 
 struct ui {
 	struct term term;
@@ -213,6 +214,9 @@ struct ui {
 	char usb_image[256];
 	struct usbdrive drive;
 	int drive_sel, drive_top;
+	struct sdcard sd;
+	int sd_armed;
+	char sd_armed_id[40];  /* CID captured on the first confirmation press */
 	int retroid;         /* Retroid button labels/layout */
 	enum screen screen;
 	int sys_sel, sys_top;    /* rows 0 and 1 are Quick Access, then systems */
@@ -232,13 +236,13 @@ struct ui {
 #define KEY_PALETTE "launcher.palette"
 
 /* Thirteen settings fit rows 2..14; additional settings need a submenu. */
-enum { SET_WIFI = 0, SET_SSH, SET_BLUETOOTH, SET_USB, SET_BUTTONS, SET_CONSOLES,
-       SET_COLOR, SET_PROFILE, SET_CHARGING, SET_REGION, SET_DIAGNOSTICS,
+enum { SET_WIFI = 0, SET_SSH, SET_BLUETOOTH, SET_USB, SET_SDCARD, SET_BUTTONS,
+       SET_CONSOLES, SET_COLOR, SET_PROFILE, SET_REGION, SET_DIAGNOSTICS,
        SET_ABOUT, SET_POWER, N_SETTINGS };
 
 static const enum str settings_labels[N_SETTINGS] = {
-	S_SET_WIFI, S_SET_SSH, S_SET_BT, S_SET_USB, S_SET_BUTTONS, S_SET_CONSOLES,
-	S_SET_COLOR, S_SET_PROFILE, S_SET_CHARGING, S_SET_REGION, S_SET_DIAG,
+	S_SET_WIFI, S_SET_SSH, S_SET_BT, S_SET_USB, S_SET_SDCARD, S_SET_BUTTONS,
+	S_SET_CONSOLES, S_SET_COLOR, S_SET_PROFILE, S_SET_REGION, S_SET_DIAG,
 	S_SET_ABOUT, S_SET_POWER,
 };
 
@@ -786,6 +790,20 @@ static void draw_face(struct ui *u, unsigned y, int retroid)
 static unsigned wrap_puts(struct term *t, unsigned x, unsigned y, unsigned width,
                           unsigned lines, const char *text, int attr);
 
+static void sd_value(const struct sdcard *c, char *out, size_t osz)
+{
+	char size[16];
+	sdcard_size(c->bytes, size, sizeof(size));
+	switch (c->state) {
+	case SD_NONE:   str_copy(out, osz, tr(S_SD_NONE)); break;
+	case SD_READY:  snprintf(out, osz, tr(S_SD_READY_FMT), size); break;
+	case SD_FORMAT: snprintf(out, osz, tr(S_SD_OTHER_FMT), size); break;
+	case SD_SYSTEM: str_copy(out, osz, tr(S_SD_SYSTEM)); break;
+	case SD_SMALL:  snprintf(out, osz, tr(S_SD_SMALL_FMT), size); break;
+	default:        str_copy(out, osz, tr(S_UNKNOWN)); break;
+	}
+}
+
 static void draw_settings(struct ui *u)
 {
 	struct term *t = &u->term;
@@ -843,8 +861,9 @@ static void draw_settings(struct ui *u)
 		case SET_PROFILE:
 			value = u->profile ? profile_names[u->profile].label : tr(S_STOCK);
 			break;
-		case SET_CHARGING:
-			value = tr(u->charging_led ? S_ON : S_OFF);
+		case SET_SDCARD:
+			sd_value(&u->sd, val, sizeof(val));
+			value = val;
 			break;
 		case SET_POWER:
 			value = "";
@@ -908,9 +927,8 @@ static void draw_settings(struct ui *u)
 		if (!u->profile_ok[1] && !u->profile_ok[2])
 			term_puts(t, 4, y + 1, tr(S_NO_PROFILES), ATTR_MID);
 		break;
-	case SET_CHARGING:
-		wrap_puts(t, 4, y + 1, t->cols - 8, 2,
-		          tr(S_DESC_CHARGING), ATTR_DIM);
+	case SET_SDCARD:
+		term_puts(t, 4, y + 1, tr(S_DESC_SDCARD), ATTR_DIM);
 		break;
 	case SET_BLUETOOTH:
 		term_puts(t, 4, y + 1, tr(S_DESC_BT), ATTR_DIM);
@@ -1211,6 +1229,40 @@ static void draw_usbdrive(struct ui *u)
 	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
 }
 
+static void draw_sdcard(struct ui *u)
+{
+	static const enum str desc[] = {
+		[SD_UNKNOWN] = S_SD_DESC_UNKNOWN, [SD_NONE] = S_SD_DESC_NONE,
+		[SD_READY] = S_SD_DESC_READY, [SD_FORMAT] = S_SD_DESC_OTHER,
+		[SD_SYSTEM] = S_SD_DESC_SYSTEM, [SD_SMALL] = S_SD_DESC_SMALL,
+	};
+	struct term *t = &u->term;
+	struct face f = face_of(u->retroid);
+	char buf[192], size[16], card[64] = "";
+
+	draw_frame(u, crumb_of(buf, sizeof(buf), tr(S_SETTINGS), tr(S_SET_SDCARD), NULL));
+	if (u->sd.state != SD_UNKNOWN && u->sd.state != SD_NONE) {
+		sdcard_size(u->sd.bytes, size, sizeof(size));
+		if (u->sd.name[0])
+			snprintf(card, sizeof(card), "%s, %s", u->sd.name, size);
+		else
+			str_copy(card, sizeof(card), size);
+	}
+	draw_row(u, 3, 1, tr(S_SD_FORMAT), card);
+	term_hline(t, 4, G_HLINE, ATTR_DIM);
+	term_puts(t, 4, 5, tr(desc[u->sd.state]), ATTR_DIM);
+
+	if (u->sd_armed) {
+		snprintf(buf, sizeof(buf), tr(S_SD_ARMED), f.confirm);
+		term_puts(t, 4, 7, buf, ATTR_BRIGHT);
+	}
+	if (u->note[0])
+		term_puts(t, 4, t->rows - 4, u->note, ATTR_BRIGHT);
+
+	snprintf(buf, sizeof(buf), tr(S_HINT_SELECT), f.confirm, f.back);
+	term_puts(t, 1, t->rows - 1, buf, ATTR_MID);
+}
+
 /* Wi-Fi password frame around osk.c, with a count and error message. */
 static void draw_keyboard(struct ui *u)
 {
@@ -1260,13 +1312,15 @@ static void power(struct ui *u, const char *verb)
 	         tr(strcmp(verb, "reboot") == 0 ? S_FAIL_RESTART : S_FAIL_OFF), rc);
 }
 
-/* Rows 0..1 cycle settings; rows 2..3 index power_verbs and require confirmation. */
-#define POW_BLANK   0
-#define POW_SLEEP   1
-#define POW_RESTART 2
-#define POW_OFF     3
-#define N_POWER_ROWS 4
-static const enum str power_rows[] = { S_SCREEN_OFF, S_SLEEP_AFTER, S_RESTART, S_POWER_OFF };
+/* Rows 0..2 change settings; rows 3..4 index power_verbs and require confirmation. */
+#define POW_BLANK    0
+#define POW_SLEEP    1
+#define POW_CHARGING 2
+#define POW_RESTART  3
+#define POW_OFF      4
+#define N_POWER_ROWS 5
+static const enum str power_rows[] = { S_SCREEN_OFF, S_SLEEP_AFTER, S_SET_CHARGING,
+                                       S_RESTART, S_POWER_OFF };
 static const char *const power_verbs[] = { "reboot", "poweroff" };
 
 static void draw_power(struct ui *u)
@@ -1283,7 +1337,8 @@ static void draw_power(struct ui *u)
 			snprintf(v, sizeof(v), tr(S_MIN), i == POW_BLANK
 			         ? blank_minutes[u->blank_idx] : sleep_minutes[u->sleep_idx]);
 			value = v;
-		}
+		} else if (i == POW_CHARGING)
+			value = tr(u->charging_led ? S_ON : S_OFF);
 		draw_row(u, (unsigned)(3 + i), i == u->power_sel, tr(power_rows[i]), value);
 	}
 	term_hline(t, 3 + N_POWER_ROWS, G_HLINE, ATTR_DIM);
@@ -1291,6 +1346,9 @@ static void draw_power(struct ui *u)
 	if (u->power_sel == POW_BLANK || u->power_sel == POW_SLEEP)
 		wrap_puts(t, 4, 3 + N_POWER_ROWS + 1, t->cols - 8, 3,
 		          tr(u->power_sel == POW_BLANK ? S_DESC_BLANK : S_DESC_SLEEP), ATTR_DIM);
+	else if (u->power_sel == POW_CHARGING)
+		wrap_puts(t, 4, 3 + N_POWER_ROWS + 1, t->cols - 8, 2,
+		          tr(S_DESC_CHARGING), ATTR_DIM);
 
 	/* A second press confirms; any other action disarms. */
 	if (u->power_armed >= 0) {
@@ -1584,6 +1642,7 @@ static void redraw(struct ui *u)
 	case SCR_DIAG:     draw_diag(u);     break;
 	case SCR_REGION:   draw_region(u);   break;
 	case SCR_USBDRIVE: draw_usbdrive(u); break;
+	case SCR_SDCARD:   draw_sdcard(u);   break;
 	case SCR_UPDATE:   draw_update(u);   break;
 	case SCR_RECENT:
 	case SCR_FAVS:     draw_list(u);     break;
@@ -2132,6 +2191,29 @@ static void serve_image(struct ui *u)
 		str_copy(u->note, sizeof(u->note), tr(S_DRIVE_FAIL));
 }
 
+static void open_sdcard(struct ui *u)
+{
+	sdcard_read(&u->sd);
+	u->sd_armed = 0;
+	u->screen = SCR_SDCARD;
+}
+
+static void format_sdcard(struct ui *u, const char *id)
+{
+	static const enum str errors[] = {
+		[SDE_OK] = S_SD_DONE, [SDE_NONE] = S_SD_DESC_NONE,
+		[SDE_SYSTEM] = S_SD_DESC_SYSTEM, [SDE_SMALL] = S_SD_DESC_SMALL,
+		[SDE_BUSY] = S_SD_BUSY, [SDE_CHANGED] = S_SD_CHANGED,
+		[SDE_FAILED] = S_SD_FAILED,
+	};
+	draw_busy(u, tr(S_SD_FORMATTING));
+	enum sd_error e = sdcard_format(id);
+	/* Discard presses queued during formatting. */
+	input_drain(&u->in);
+	sdcard_read(&u->sd);
+	str_copy(u->note, sizeof(u->note), tr(errors[e]));
+}
+
 static void on_action(struct ui *u, enum action a)
 {
 
@@ -2196,6 +2278,7 @@ static void on_action(struct ui *u, enum action a)
 			u->set_sel = 0;
 			u->ssh_on = net_ssh_enabled();
 			refresh_usb(u);
+			sdcard_read(&u->sd);
 		} else if (a == ACT_QUIT) u->running = 0;
 		break;
 
@@ -2269,6 +2352,8 @@ static void on_action(struct ui *u, enum action a)
 		}
 		else if (a == ACT_CONFIRM && u->set_sel == SET_DIAGNOSTICS)
 			u->screen = SCR_DIAG;
+		else if (a == ACT_CONFIRM && u->set_sel == SET_SDCARD)
+			open_sdcard(u);
 		else if (a == ACT_CONFIRM && u->set_sel == SET_BLUETOOTH) {
 			u->bt_sel = u->bt_top = 0;
 			bluetooth(u, BT_READ, NULL);
@@ -2327,11 +2412,6 @@ static void on_action(struct ui *u, enum action a)
 					str_copy(u->note, sizeof(u->note), tr(S_PROFILE_FAIL));
 				}
 			}
-		}
-		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
-		         u->set_sel == SET_CHARGING) {
-			u->charging_led = !u->charging_led;
-			settings_set(SETTINGS, KEY_CHARGING, u->charging_led ? "1" : "0");
 		}
 		else if ((a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT) &&
 		         u->set_sel == SET_BUTTONS) {
@@ -2444,6 +2524,11 @@ static void on_action(struct ui *u, enum action a)
 			snprintf(buf, sizeof(buf), "%d", sleep_minutes[u->sleep_idx]);
 			settings_set(SETTINGS, KEY_SLEEP, buf);
 		}
+		else if (u->power_sel == POW_CHARGING &&
+		         (a == ACT_CONFIRM || a == ACT_LEFT || a == ACT_RIGHT)) {
+			u->charging_led = !u->charging_led;
+			settings_set(SETTINGS, KEY_CHARGING, u->charging_led ? "1" : "0");
+		}
 		else if (a == ACT_CONFIRM) u->power_armed = u->power_sel;
 		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
 		else if (a == ACT_QUIT) u->running = 0;
@@ -2499,6 +2584,29 @@ static void on_action(struct ui *u, enum action a)
 		}
 		else if (a == ACT_CONFIRM && u->region_sel == 1)
 			open_tz(u);
+		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
+		else if (a == ACT_QUIT) u->running = 0;
+		break;
+
+	case SCR_SDCARD:
+		if (a == ACT_CONFIRM && u->sd_armed) {
+			/* Recheck the CID here and pass it to the helper for validation. */
+			u->sd_armed = 0;
+			sdcard_read(&u->sd);
+			if (sdcard_confirm(&u->sd, u->sd_armed_id))
+				format_sdcard(u, u->sd_armed_id);
+			else
+				str_copy(u->note, sizeof(u->note), tr(S_SD_CHANGED));
+			break;
+		}
+		u->sd_armed = 0;
+		if (a == ACT_CONFIRM) {
+			sdcard_read(&u->sd);
+			/* Ignore presses queued before the erase warning appears. */
+			input_drain(&u->in);
+			u->sd_armed = sdcard_can_format(&u->sd);
+			str_copy(u->sd_armed_id, sizeof(u->sd_armed_id), u->sd.id);
+		}
 		else if (a == ACT_BACK) u->screen = SCR_SETTINGS;
 		else if (a == ACT_QUIT) u->running = 0;
 		break;
