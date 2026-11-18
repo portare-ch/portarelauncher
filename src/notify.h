@@ -5,7 +5,9 @@
 #ifndef PL_NOTIFY_H
 #define PL_NOTIFY_H
 
-#define NOTIFY_PATH "/run/portarelauncher.osd"
+#include "paths.h"
+
+#define NOTIFY_PATH PL_ROOT "/run/portarelauncher.osd"
 
 struct notify {
 	int fd;

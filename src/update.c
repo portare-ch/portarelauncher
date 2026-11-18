@@ -1,4 +1,5 @@
 /* Copyright (C) 2026-present PortareOS */
+#include "paths.h"
 #include "update.h"
 #include "proc.h"
 #include "settings.h"
@@ -8,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define UPDATE_SCRIPT "/usr/bin/portareos-update"
+#define UPDATE_SCRIPT PL_ROOT "/usr/bin/portareos-update"
 
 /* The script limits curl to 30 seconds; allow extra time for script overhead. */
 #define CHECK_MS 60000

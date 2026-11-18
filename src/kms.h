@@ -29,6 +29,9 @@ struct kms {
 /* Opens the card, picks the connected connector and its mode, allocates
  * a dumb buffer and scans it out. Every other CRTC is switched off. */
 int  kms_open(struct kms *k, const char *card);
+/* The same on the first of /dev/dri/card0.. that drives a display: card0
+ * on the device, often card1 on a PC. */
+int  kms_open_any(struct kms *k);
 void kms_close(struct kms *k);
 
 /* After a hotplug, moves to the connector that is now connected, with a

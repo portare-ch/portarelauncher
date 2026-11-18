@@ -3,9 +3,11 @@
 #ifndef PL_SETTINGS_H
 #define PL_SETTINGS_H
 
+#include "paths.h"
+
 #include <stddef.h>
 
-#define SETTINGS_PATH "/storage/.config/system/configs/system.cfg"
+#define SETTINGS_PATH PL_ROOT "/storage/.config/system/configs/system.cfg"
 
 /* Returns 1 and fills out for a nonempty value; otherwise 0. */
 int settings_get(const char *path, const char *key, char *out, size_t osz);

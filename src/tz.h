@@ -5,11 +5,13 @@
 #ifndef PL_TZ_H
 #define PL_TZ_H
 
+#include "paths.h"
+
 #include <stddef.h>
 
-#define TZ_LIST      "/usr/config/system/configs/tz"
+#define TZ_LIST      PL_ROOT "/usr/config/system/configs/tz"
 #define TZ_ZONEINFO  "/usr/share/zoneinfo"
-#define TZ_CACHE     "/storage/.cache"
+#define TZ_CACHE     PL_ROOT "/storage/.cache"
 #define TZ_KEY       "system.timezone"
 
 #define TZ_MAX       640

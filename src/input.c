@@ -18,8 +18,25 @@
 #define REPEAT_DELAY_MS 380
 #define REPEAT_RATE_MS  90
 
-/* Stick directions rearm only after returning to the deadzone. */
+/* Stick directions rearm only after returning to the deadzone: the edge
+ * is this share of the way from the centre to either end of the range. */
 #define STICK_EDGE 16000
+#define STICK_FULL 32767
+
+int input_stick_dir(int value, int min, int max)
+{
+	if (max <= min) {
+		min = -STICK_FULL - 1;
+		max = STICK_FULL;
+	}
+	long long mid = ((long long)min + max) / 2;
+	long long edge = ((long long)max - min) / 2 * STICK_EDGE / STICK_FULL;
+	if (value <= mid - edge)
+		return -1;
+	if (value >= mid + edge)
+		return 1;
+	return 0;
+}
 
 static int has_keys(int fd)
 {
@@ -56,6 +73,14 @@ static void open_devices(struct input *in)
 			continue;
 		}
 
+		for (int a = 0; a < 2; a++) {
+			struct input_absinfo ai;
+			memset(&ai, 0, sizeof(ai));
+			if (ioctl(fd, EVIOCGABS(a ? ABS_Y : ABS_X), &ai) < 0)
+				ai.minimum = ai.maximum = 0;
+			in->abs_min[in->n][a] = ai.minimum;
+			in->abs_max[in->n][a] = ai.maximum;
+		}
 		in->fd[in->n++] = fd;
 	}
 	closedir(d);
@@ -204,23 +229,20 @@ static int is_direction(enum action a)
 }
 
 /* Hats and the left stick both resolve to a direction or to centre. */
-static enum action from_abs(unsigned code, int value)
+static enum action from_abs(const struct input *in, int dev, unsigned code, int value)
 {
+	int dir;
 	switch (code) {
 	case ABS_HAT0X:
+		return value == 0 ? ACT_NONE : value < 0 ? ACT_LEFT : ACT_RIGHT;
 	case ABS_X:
-		if (code == ABS_X && value > -STICK_EDGE && value < STICK_EDGE)
-			return ACT_NONE;
-		if (code == ABS_HAT0X && value == 0)
-			return ACT_NONE;
-		return value < 0 ? ACT_LEFT : ACT_RIGHT;
+		dir = input_stick_dir(value, in->abs_min[dev][0], in->abs_max[dev][0]);
+		return dir == 0 ? ACT_NONE : dir < 0 ? ACT_LEFT : ACT_RIGHT;
 	case ABS_HAT0Y:
+		return value == 0 ? ACT_NONE : value < 0 ? ACT_UP : ACT_DOWN;
 	case ABS_Y:
-		if (code == ABS_Y && value > -STICK_EDGE && value < STICK_EDGE)
-			return ACT_NONE;
-		if (code == ABS_HAT0Y && value == 0)
-			return ACT_NONE;
-		return value < 0 ? ACT_UP : ACT_DOWN;
+		dir = input_stick_dir(value, in->abs_min[dev][1], in->abs_max[dev][1]);
+		return dir == 0 ? ACT_NONE : dir < 0 ? ACT_UP : ACT_DOWN;
 	default:
 		return ACT_NONE;
 	}
@@ -304,7 +326,7 @@ enum action input_wait_job(struct input *in, int idle_ms, int output_fd, int don
 				if (ev.value == 2)            /* kernel autorepeat */
 					continue;                 /* we do our own */
 			} else if (ev.type == EV_ABS) {
-				a = from_abs(ev.code, ev.value);
+				a = from_abs(in, i, ev.code, ev.value);
 				if (a == ACT_NONE) {
 					if (is_direction(in->held)) {
 						in->held = ACT_NONE;

@@ -226,6 +226,23 @@ fail_fd:
 	return -1;
 }
 
+int kms_open_any(struct kms *k)
+{
+	int cards = 0;
+	for (int i = 0; i < 16; i++) {
+		char card[32];
+		snprintf(card, sizeof(card), "/dev/dri/card%d", i);
+		if (access(card, F_OK) < 0)
+			continue;
+		cards++;
+		if (kms_open(k, card) == 0)
+			return 0;
+	}
+	if (!cards)
+		fprintf(stderr, "no /dev/dri/card*\n");
+	return -1;
+}
+
 int kms_follow(struct kms *k)
 {
 	drmModeRes *res = drmModeGetResources(k->fd);

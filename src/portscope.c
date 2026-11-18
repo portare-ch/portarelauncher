@@ -6,6 +6,7 @@
  * Raw mode stops InputPlumber to release its EVIOCGRAB on the MCU and
  * gpio-keys devices. Restore it on layer exit and shutdown; the launcher
  * also restores it after SIGKILL. */
+#include "paths.h"
 #include "fit.h"
 #include "kms.h"
 #include "pix.h"
@@ -46,8 +47,7 @@ _Static_assert(SC_BTN_SOUTH == BTN_SOUTH && SC_BTN_NORTH == BTN_NORTH &&
 
 extern char **environ;
 
-#define CARD        "/dev/dri/card0"
-#define SETTINGS    "/storage/.config/system/configs/system.cfg"
+#define SETTINGS    PL_ROOT "/storage/.config/system/configs/system.cfg"
 #define INPUTPLUMBER "inputplumber.service"
 #define SCALE       3
 #define PANEL_W     1280       /* boxed on a display as the launcher is */
@@ -389,7 +389,7 @@ int main(int argc, char **argv)
 	sigaction(SIGHUP, &sa, NULL);
 
 	struct kms kms;
-	if (kms_open(&kms, CARD) < 0)
+	if (kms_open_any(&kms) < 0)
 		return 1;
 	struct fit f = fit_box(kms.mode.hdisplay, kms.mode.vdisplay, PANEL_W, PANEL_H);
 	uint32_t *box = kms.map + (size_t)f.y * kms.pitch_px + f.x;

@@ -3,9 +3,11 @@
 #ifndef PL_TOOLS_H
 #define PL_TOOLS_H
 
+#include "paths.h"
+
 /* post-update copies modules to storage; use the image copy until then. */
-#define TOOLS_DIR          "/storage/.config/modules"
-#define TOOLS_DIR_FALLBACK "/usr/config/modules"
+#define TOOLS_DIR          PL_ROOT "/storage/.config/modules"
+#define TOOLS_DIR_FALLBACK PL_ROOT "/usr/config/modules"
 
 #define TOOLS_MAX 32
 

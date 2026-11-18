@@ -1,4 +1,5 @@
 /* Copyright (C) 2026-present PortareOS */
+#include "paths.h"
 #include "bt.h"
 #include "proc.h"
 #include "settings.h"
@@ -10,7 +11,7 @@
 #include <strings.h>
 
 #define BTCTL "/usr/bin/bluetoothctl"
-#define BTSCRIPT "/usr/bin/portareos-bluetooth"
+#define BTSCRIPT PL_ROOT "/usr/bin/portareos-bluetooth"
 
 #define KEY_AUTOCONNECT "bluetooth.autoconnect"
 

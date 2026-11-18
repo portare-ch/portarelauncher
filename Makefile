@@ -21,6 +21,14 @@ endif
 # Keep required flags separate: command-line CFLAGS overrides makefile
 # assignments. Apply PL_CFLAGS in recipes so those flags are retained.
 PL_CFLAGS  := -std=c11 -D_GNU_SOURCE $(DRM_CFLAGS)
+
+# PortareOS's files are looked up under ROOT: empty on the device, a
+# directory with the same layout elsewhere (see src/paths.h). Run make clean
+# after changing it.
+ROOT ?=
+ifneq ($(strip $(ROOT)),)
+PL_CFLAGS  += -DPL_ROOT='"$(ROOT)"'
+endif
 PL_WARN    := -Wall -Wextra -Wshadow -Wvla -Wno-unused-parameter
 
 CFLAGS     ?= -O2 -g

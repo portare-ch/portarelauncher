@@ -3,9 +3,11 @@
 #ifndef PL_USBDRIVE_H
 #define PL_USBDRIVE_H
 
+#include "paths.h"
+
 #include <stddef.h>
 
-#define USBDRIVE_DIR "/storage/usbdrive"
+#define USBDRIVE_DIR PL_ROOT "/storage/usbdrive"
 #define USBDRIVE_MAX 32
 
 struct image {
