@@ -30,6 +30,10 @@ enum action {
 struct input {
 	int fd[INPUT_MAX_DEV];
 	int n;
+	/* The left stick's range, per device and axis (X, Y), read when the
+	 * device is opened. Left at 0..0 when the device reports none. */
+	int abs_min[INPUT_MAX_DEV][2];
+	int abs_max[INPUT_MAX_DEV][2];
 	/* Status notification pipe, polled separately from evdev events. */
 	int aux_fd;
 	/* Display hotplug uevents. */
@@ -71,6 +75,12 @@ void input_quit_only(struct input *in, int on);
 /* Reads whatever is waiting and returns 1 if it completed Home + START. */
 struct quit_combo;
 int  input_quit_read(struct input *in, struct quit_combo *q);
+
+/* Which way a stick axis points: -1, 0 inside the dead zone, or 1. The
+ * dead zone is the middle half of the device's range (min..max), so a pad
+ * that reports 0..255 moves the menu like one that reports -32768..32767.
+ * A device without a range (max <= min) counts as the latter. */
+int  input_stick_dir(int value, int min, int max);
 
 /* Returns one action. idle_ms bounds the wait; negative waits indefinitely.
  * Held-direction repeat may shorten it. ACT_TICK marks a timeout; ACT_NONE

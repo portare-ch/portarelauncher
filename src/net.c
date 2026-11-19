@@ -1,4 +1,5 @@
 /* Copyright (C) 2026-present PortareOS */
+#include "paths.h"
 #include "net.h"
 #include "proc.h"
 
@@ -9,11 +10,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PORTNET "/usr/bin/portnet"
-#define USBGADGET "/usr/bin/usbgadget"
-#define WIFICTL "/usr/bin/wifictl"
+#define PORTNET PL_ROOT "/usr/bin/portnet"
+#define USBGADGET PL_ROOT "/usr/bin/usbgadget"
+#define WIFICTL PL_ROOT "/usr/bin/wifictl"
 #define SYSTEMCTL "/usr/bin/systemctl"
-#define SSHD_CONF "/storage/.cache/services/sshd.conf"
+#define SSHD_CONF PL_ROOT "/storage/.cache/services/sshd.conf"
 
 /* ---- Wi-Fi ---------------------------------------------------------- */
 

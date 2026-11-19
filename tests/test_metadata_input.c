@@ -114,10 +114,57 @@ static void streamed_output(void)
 	CHECK_INT(j.status, PROC_TIMEOUT);
 	CHECK(now_ms() - start < 1000);
 }
+/* A stick's dead zone follows the range its device reports. */
+static void stick_ranges(void)
+{
+	/* 16-bit pads: the edge the launcher always had */
+	CHECK_INT(input_stick_dir(0, -32768, 32767), 0);
+	CHECK_INT(input_stick_dir(15999, -32768, 32767), 0);
+	CHECK_INT(input_stick_dir(16000, -32768, 32767), 1);
+	CHECK_INT(input_stick_dir(-15999, -32768, 32767), 0);
+	CHECK_INT(input_stick_dir(-16000, -32768, 32767), -1);
+	/* no range reported: the same */
+	CHECK_INT(input_stick_dir(15999, 0, 0), 0);
+	CHECK_INT(input_stick_dir(-20000, 0, 0), -1);
+	/* 8-bit pads rest near 128 */
+	CHECK_INT(input_stick_dir(128, 0, 255), 0);
+	CHECK_INT(input_stick_dir(100, 0, 255), 0);
+	CHECK_INT(input_stick_dir(160, 0, 255), 0);
+	CHECK_INT(input_stick_dir(0, 0, 255), -1);
+	CHECK_INT(input_stick_dir(65, 0, 255), -1);
+	CHECK_INT(input_stick_dir(189, 0, 255), 1);
+	CHECK_INT(input_stick_dir(255, 0, 255), 1);
+	/* Three-position axes keep a neutral centre and both directions. */
+	CHECK_INT(input_stick_dir(-1, -1, 1), -1);
+	CHECK_INT(input_stick_dir(0, -1, 1), 0);
+	CHECK_INT(input_stick_dir(1, -1, 1), 1);
+	CHECK_INT(input_stick_dir(0, 0, 2), -1);
+	CHECK_INT(input_stick_dir(1, 0, 2), 0);
+	CHECK_INT(input_stick_dir(2, 0, 2), 1);
+
+	/* and through the event loop: 255 on an 8-bit device is right, on a
+	 * 16-bit one it is rest */
+	int p[2]; CHECK_INT(pipe(p), 0);
+	fcntl(p[0], F_SETFL, O_NONBLOCK);
+	struct input in = { .n = 1, .aux_fd = -1, .display_fd = -1, .notify_fd = -1 };
+	in.fd[0] = p[0];
+	struct input_event ev = { .type = EV_ABS, .code = ABS_X, .value = 255 };
+	CHECK_INT(write(p[1], &ev, sizeof(ev)), sizeof(ev));
+	CHECK_INT(input_wait(&in, 100), ACT_NONE);
+	in.abs_max[0][0] = 255;
+	CHECK_INT(write(p[1], &ev, sizeof(ev)), sizeof(ev));
+	CHECK_INT(input_wait(&in, 100), ACT_RIGHT);
+	ev.value = 128;
+	CHECK_INT(write(p[1], &ev, sizeof(ev)), sizeof(ev));
+	CHECK_INT(input_wait(&in, 100), ACT_NONE);
+	CHECK_INT(in.held, ACT_NONE);
+	close(p[0]); close(p[1]);
+}
 #endif
 int main(void)
 {
 #ifdef __linux__
+	stick_ranges();
 	input_during_job(); completion_wakes(); back_beats_ready_output(); streamed_output(); cancel_descendants();
 #endif
 	return check_report("metadata input");

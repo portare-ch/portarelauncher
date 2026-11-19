@@ -1,5 +1,6 @@
 /* Copyright (C) 2026-present PortareOS */
 /* portarelauncher: KMS launcher for PortareOS. */
+#include "paths.h"
 #include "bt.h"
 #include "catalog.h"
 #include "disc_titles.h"
@@ -41,14 +42,13 @@
 #include <time.h>
 #include <unistd.h>
 
-#define CARD        "/dev/dri/card0"
-#define ES_SYSTEMS  "/usr/config/emulationstation/es_systems.cfg"
+#define ES_SYSTEMS  PL_ROOT "/usr/config/emulationstation/es_systems.cfg"
 #ifndef PORTSCOPE
-#define PORTSCOPE   "/usr/bin/portscope"   /* a test build points elsewhere */
+#define PORTSCOPE   PL_ROOT "/usr/bin/portscope"   /* a test build points elsewhere */
 #endif
-#define SETTINGS    "/storage/.config/system/configs/system.cfg"
+#define SETTINGS    PL_ROOT "/storage/.config/system/configs/system.cfg"
 #ifndef JA26_PATH
-#define JA26_PATH   "/usr/share/portarelauncher/ja26.bin"
+#define JA26_PATH   PL_ROOT "/usr/share/portarelauncher/ja26.bin"
 #endif
 
 /* Color profiles use /usr/config/color/<key>.profile; stock disables correction. */
@@ -66,8 +66,8 @@ static const int blank_minutes[] = { 1, 2, 5, 10, 15 };
 #define KEY_SLEEP "system.sleepminutes"
 static const int sleep_minutes[] = { 5, 10, 15, 30 };
 #define N_SLEEP ((int)(sizeof(sleep_minutes) / sizeof(sleep_minutes[0])))
-#define POWER_HANDLER "/usr/lib/autostart/quirks/platforms/SM8550/bin/power-handler"
-#define PROFILE_DIR "/usr/config/color"
+#define POWER_HANDLER PL_ROOT "/usr/lib/autostart/quirks/platforms/SM8550/bin/power-handler"
+#define PROFILE_DIR PL_ROOT "/usr/config/color"
 static const struct { const char *key, *label; } profile_names[] = {
 	{ "stock",   "stock" },
 	{ "gamma22", "Gamma 2.2" },
@@ -124,16 +124,16 @@ static void console_set_latency(int i, int latency)
 /* Quick Access rows precede the systems list. */
 #define QUICK_ROWS  2
 enum { QUICK_RECENT = 0, QUICK_FAVS = 1 };
-#define LISTS_DIR   "/storage/.config/portarelauncher"
+#define LISTS_DIR   PL_ROOT "/storage/.config/portarelauncher"
 #define RECENT_FILE LISTS_DIR "/recent"
 #define FAVS_FILE   LISTS_DIR "/favourites"
-#define PS2_TITLES "/usr/share/portarelauncher/ps2-titles.tsv"
-#define PSX_TITLES "/usr/share/portarelauncher/psx-titles.tsv"
-#define PSP_TITLES "/usr/share/portarelauncher/psp-titles.tsv"
-#define NEOCD_TITLES "/usr/share/portarelauncher/neocd-titles.tsv"
-#define XBOX_TITLES "/usr/share/portarelauncher/xbox-titles.tsv"
-#define DISC_CACHE  "/storage/.cache/portarelauncher/disc-identities"
-#define DISC_HELPER "/usr/bin/ps-chd-id"
+#define PS2_TITLES PL_ROOT "/usr/share/portarelauncher/ps2-titles.tsv"
+#define PSX_TITLES PL_ROOT "/usr/share/portarelauncher/psx-titles.tsv"
+#define PSP_TITLES PL_ROOT "/usr/share/portarelauncher/psp-titles.tsv"
+#define NEOCD_TITLES PL_ROOT "/usr/share/portarelauncher/neocd-titles.tsv"
+#define XBOX_TITLES PL_ROOT "/usr/share/portarelauncher/xbox-titles.tsv"
+#define DISC_CACHE  PL_ROOT "/storage/.cache/portarelauncher/disc-identities"
+#define DISC_HELPER PL_ROOT "/usr/bin/ps-chd-id"
 
 /* Selected titles pause, scroll one column per step, pause at the end, then reset. */
 #define MARQUEE_WAIT_MS 1000
@@ -1447,7 +1447,7 @@ static void open_tz(struct ui *u)
 
 static void draw_busy(struct ui *u, const char *what);
 
-#define STAGE_DIR "/storage/.update"
+#define STAGE_DIR PL_ROOT "/storage/.update"
 
 static const char *update_action(const struct ui *u)
 {
@@ -1912,7 +1912,7 @@ static void launch(struct ui *u, const struct psystem *s, const struct game *g)
 	snprintf(emu, sizeof(emu), "--emulator=%s", s->emulator);
 
 	char *const argv[] = {
-		(char *)(s->launcher[0] ? s->launcher : "/usr/bin/runemu.sh"),
+		(char *)(s->launcher[0] ? s->launcher : PL_ROOT "/usr/bin/runemu.sh"),
 		(char *)g->path, pflag, core, emu,
 		(char *)"--controllers=", NULL
 	};
@@ -2729,7 +2729,7 @@ int main(void)
 	recents_load(&u.recent, RECENT_FILE);
 	favs_load(&u.favs, FAVS_FILE);
 
-	if (kms_open(&u.kms, CARD) < 0) {
+	if (kms_open_any(&u.kms) < 0) {
 		disc_titles_free(&u.discs);
 		catalog_free(&u.cat);
 		return 1;

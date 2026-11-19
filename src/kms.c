@@ -206,12 +206,14 @@ int kms_open(struct kms *k, const char *card)
 		goto fail_conn;
 	drmModeFreeConnector(conn);
 
-	k->saved = drmModeGetCrtc(k->fd, k->crtc_id);
-
+	drmModeCrtc *saved = drmModeGetCrtc(k->fd, k->crtc_id);
 	if (kms_present(k) < 0) {
-		drmModeFreeResources(res);
-		return -1;
+		if (saved)
+			drmModeFreeCrtc(saved);
+		fb_destroy(k);
+		goto fail_res;
 	}
+	k->saved = saved;
 	lit(k, res);
 	drmModeFreeResources(res);
 	return 0;
@@ -223,6 +225,23 @@ fail_res:
 fail_fd:
 	close(k->fd);
 	k->fd = -1;
+	return -1;
+}
+
+int kms_open_any(struct kms *k)
+{
+	int cards = 0;
+	for (int i = 0; i < 16; i++) {
+		char card[32];
+		snprintf(card, sizeof(card), "/dev/dri/card%d", i);
+		if (access(card, F_OK) < 0)
+			continue;
+		cards++;
+		if (kms_open(k, card) == 0)
+			return 0;
+	}
+	if (!cards)
+		fprintf(stderr, "no /dev/dri/card*\n");
 	return -1;
 }
 

@@ -1,5 +1,5 @@
 # Copyright (C) 2026-present PortareOS
-# Build on arm64 with warnings as errors; test normally and with ASan/UBSan.
+# Build on arm64 and x86-64 with warnings as errors; test normally and with ASan/UBSan.
 name: CI
 
 on:
@@ -12,7 +12,11 @@ permissions:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04-arm, ubuntu-24.04]
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v6
 
