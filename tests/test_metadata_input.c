@@ -134,6 +134,13 @@ static void stick_ranges(void)
 	CHECK_INT(input_stick_dir(65, 0, 255), -1);
 	CHECK_INT(input_stick_dir(189, 0, 255), 1);
 	CHECK_INT(input_stick_dir(255, 0, 255), 1);
+	/* Three-position axes keep a neutral centre and both directions. */
+	CHECK_INT(input_stick_dir(-1, -1, 1), -1);
+	CHECK_INT(input_stick_dir(0, -1, 1), 0);
+	CHECK_INT(input_stick_dir(1, -1, 1), 1);
+	CHECK_INT(input_stick_dir(0, 0, 2), -1);
+	CHECK_INT(input_stick_dir(1, 0, 2), 0);
+	CHECK_INT(input_stick_dir(2, 0, 2), 1);
 
 	/* and through the event loop: 255 on an 8-bit device is right, on a
 	 * 16-bit one it is rest */

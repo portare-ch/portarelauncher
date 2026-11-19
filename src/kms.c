@@ -206,12 +206,14 @@ int kms_open(struct kms *k, const char *card)
 		goto fail_conn;
 	drmModeFreeConnector(conn);
 
-	k->saved = drmModeGetCrtc(k->fd, k->crtc_id);
-
+	drmModeCrtc *saved = drmModeGetCrtc(k->fd, k->crtc_id);
 	if (kms_present(k) < 0) {
-		drmModeFreeResources(res);
-		return -1;
+		if (saved)
+			drmModeFreeCrtc(saved);
+		fb_destroy(k);
+		goto fail_res;
 	}
+	k->saved = saved;
 	lit(k, res);
 	drmModeFreeResources(res);
 	return 0;

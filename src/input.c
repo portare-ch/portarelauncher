@@ -31,6 +31,8 @@ int input_stick_dir(int value, int min, int max)
 	}
 	long long mid = ((long long)min + max) / 2;
 	long long edge = ((long long)max - min) / 2 * STICK_EDGE / STICK_FULL;
+	if (edge == 0)
+		edge = 1;
 	if (value <= mid - edge)
 		return -1;
 	if (value >= mid + edge)

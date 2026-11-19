@@ -56,10 +56,23 @@ Under that directory the launcher expects:
 | `storage/.config/portarelauncher/`, `storage/.cache/portarelauncher/` | Lists and the title cache |
 
 A system's `<command>` in `es_systems.cfg` names the program to run in place
-of `usr/bin/runemu.sh`. Wi-Fi, updates, USB mode and sleep are done by
-PortareOS's own programs; on another system those settings have nothing to
-act on. Run the launcher from a console login or a service on a virtual
-terminal, as a user in the `video` and `input` groups.
+of `usr/bin/runemu.sh`. Wi-Fi, updates, USB mode and sleep depend on
+PortareOS's own programs.
+
+Run the launcher as a systemd service without a controlling terminal. Each
+game runs in its own process group, so terminal job control can suspend an
+emulator that accesses the terminal. The service needs access to the DRM and
+input devices. Stop any compositor or display server using the DRM card first.
+
+From the build directory, start a transient service with the `video` and
+`input` groups and send its output to the journal.
+
+```sh
+sudo systemd-run --unit=portarelauncher --collect --uid="$(id -un)" \
+  -p 'SupplementaryGroups=video input' \
+  -p StandardInput=null -p StandardOutput=journal -p StandardError=journal \
+  "$PWD/portarelauncher"
+```
 
 ## Controls
 
